@@ -962,7 +962,7 @@ reuse_self:
  *       buffer size requirements for pipe input again those
  *       more effective for file input.
  */
-#if TPP_CONFIG_DEBUG 
+#if TPP_CONFIG_DEBUG && 0
 #define STREAM_BUFSIZE  1 /* This must still work, but also makes errors show up more easily. */
 #else
 #define STREAM_BUFSIZE  4096
@@ -1210,16 +1210,18 @@ TPP_Unescape(char *buf, char const *data, size_t size) {
      /* fallthrough. */
     default:
      if (ch >= '0' && ch <= '7') {
+      char *maxend;
       val = ch-'0';
-      char *maxend = iter+2;
-      if (maxend > end) maxend = end;
+      if ((maxend = iter+2) > end) maxend = end;
       while (iter != maxend &&
             (ch = *iter,ch >= '0' && ch <= '7')
              ) val = (val << 3)|(ch-'0'),++iter;
-     }
+      *buf++ = val;
+     } else {
 def_putch:
-     *buf++ = '\\';
-     goto put_ch;
+      *buf++ = '\\';
+      goto put_ch;
+     }
    }
   } else {
 put_ch:
@@ -2566,8 +2568,8 @@ parse_multichar:
  switch (ch) {
 
   case '\0':
-   /* Sporadic \0-character (ignore). */
-   if unlikely(iter < end) goto startover_iter;
+   /* Sporadic \0-character (interpret as whitespace). */
+   if unlikely(iter < end) goto whitespace;
    if unlikely(iter > end) iter = end;
    /* Don't allow seek if the EOB flag is set or
     * the EOB file matches the current one. */
@@ -2838,6 +2840,7 @@ continue_int:
     }
    }
    if (isspace(ch)) {
+whitespace:
     /* Parse space tokens. */
     for (;;) {
      while (SKIP_WRAPLF(iter,end));
