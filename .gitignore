@@ -1,0 +1,6 @@
+bin/*
+build/*
+lib/*
+.vs/*.sdf
+.vs/*.suo
+*.exe
