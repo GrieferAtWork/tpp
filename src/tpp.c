@@ -163,6 +163,7 @@ extern void __debugbreak(void);
 #define CH_ISTRIGRAPH  0x10 /*< Character can be used as the 3th byte of a trigraph. */
 #define CH_ISMULTICHAR 0x20 /*< Character is the first byte of a multi-character token (non-keyword; non-number; non-string). */
 #define CH_ISLF        0x40 /*< The character is '\r' or '\n'. */
+#define CH_ISZERO      0x80 /*< The character is '\0'. */
 
 #define ceildiv(x,y) (((x)+((y)-1))/(y))
 
@@ -192,11 +193,12 @@ for (local i = 0; i < 256; ++i) {
   if (i in ['<','>','=','!','.','+','-','*','/','%',
             '&','|','^','#','~',':']) flags |= CH_ISMULTICHAR;
   if (i in ['\r','\n']) flags |= CH_ISLF;
+  if (i in ['\0']) flags |= CH_ISZERO;
   print "0x%.2x," % flags,;
   if ((i % 16) == 15) print;
 }
 ]]]*/
-  0x04,0x04,0x04,0x04,0x04,0x04,0x04,0x04,0x04,0x04,0x44,0x04,0x04,0x44,0x04,0x04,
+  0x84,0x04,0x04,0x04,0x04,0x04,0x04,0x04,0x04,0x04,0x44,0x04,0x04,0x44,0x04,0x04,
   0x04,0x04,0x04,0x04,0x04,0x04,0x04,0x04,0x04,0x04,0x04,0x04,0x04,0x04,0x04,0x04,
   0x0c,0x38,0x08,0x28,0x09,0x28,0x28,0x18,0x18,0x18,0x28,0x28,0x08,0x38,0x28,0x38,
   0x0a,0x0a,0x0a,0x0a,0x0a,0x0a,0x0a,0x0a,0x0a,0x0a,0x28,0x08,0x38,0x38,0x38,0x18,
@@ -486,7 +488,7 @@ skip_whitespacenolf_and_comments_rev(char *iter, char *begin) {
  while (iter != begin) {
   while (iter != begin) {
    while (SKIP_WRAPLF_REV(iter,begin));
-   if (!isspace_nolf(iter[-1])) break;
+   if ((chrattr[iter[-1]]&(CH_ISSPACE|CH_ISLF|CH_ISZERO))!=CH_ISSPACE) break;
    --iter;
   }
   if (iter == begin) break;
@@ -959,7 +961,7 @@ reuse_self:
  *       buffer size requirements for pipe input again those
  *       more effective for file input.
  */
-#if TPP_CONFIG_DEBUG
+#if TPP_CONFIG_DEBUG && 0
 #define STREAM_BUFSIZE  1 /* This must still work, but also makes errors show up more easily. */
 #else
 #define STREAM_BUFSIZE  4096
@@ -1634,7 +1636,7 @@ err: result = 0; codewriter_quit(&writer); goto done;
 PUBLIC struct TPPFile *
 TPPFile_NewDefine(void) {
  struct TPPFile *result,*curfile; uint32_t macro_flags;
- struct TPPKeyword *keyword_entry;
+ struct TPPKeyword *keyword_entry; int fix_linenumber = 0;
  tok_t argend_token,argument_name;
  struct arginfo_t *arginfo_v,*new_arginfo_v; size_t arginfo_a;
  assert(current.l_flags&TPPLEXER_FLAG_WANTLF);
@@ -1823,9 +1825,11 @@ skip_argument_name:
                                             result->f_begin);
  if (((*result->f_end == '\r' && result->f_end[1] != '\n') ||
        *result->f_end == '\n')) {
-  /* We are about to delete a linefeed that will go undetectable
-   * >> Must adjust the associated file's line offset accordingly. */
-  if (curfile->f_kind == TPPFILE_KIND_TEXT) ++curfile->f_textfile.f_lineoff;
+  /* Adjust the file's offset according to the linefeed we're deleting. */
+  if (curfile->f_kind == TPPFILE_KIND_TEXT) {
+   ++curfile->f_textfile.f_lineoff;
+   fix_linenumber = 1;
+  }
  }
 
  assert(result->f_macro.m_deffile);
@@ -1848,10 +1852,15 @@ skip_argument_name:
   if (((size_t)(oldfile->f_end-oldfile->f_begin) !=
        (size_t)(result ->f_end-result ->f_begin) ||
         memcmp(result->f_begin,oldfile->f_begin,
-              (size_t)(result->f_end-result->f_begin)) != 0) &&
-      !TPPLexer_Warn(W_REDEFINING_MACRO,keyword_entry)) {
-   TPPFile_Decref(result);
-   return NULL;
+              (size_t)(result->f_end-result->f_begin)) != 0)) {
+   int warn_error; /* Make sure to use the correct line number in this warning. */
+   if (fix_linenumber) --curfile->f_textfile.f_lineoff;
+   warn_error = TPPLexer_Warn(W_REDEFINING_MACRO,keyword_entry);
+   if (fix_linenumber) ++curfile->f_textfile.f_lineoff;
+   if (!warn_error) {
+    TPPFile_Decref(result);
+    return NULL;
+   }
   }
   TPPFile_Decref(keyword_entry->k_macro);
  }
@@ -2600,7 +2609,8 @@ parse_multichar:
      if (!TPPLexer_Warn(W_STRING_TERMINATED_BY_LINEFEED)) goto err;
      break;
     }
-    if (*iter == '\\' && iter != end) ++iter;
+    if (*iter == '\\' && iter != end &&
+      !(current.l_flags&TPPLEXER_FLAG_INCLUDESTRING)) ++iter;
     ++iter;
    }
    if (*iter == (char)ch) ++iter;
@@ -2935,6 +2945,40 @@ PRIVATE int skip_pp_block(void) {
  return result;
 }
 
+PRIVATE int parse_include_string(char **begin, char **end) {
+ int result = 1;
+ pushf();
+ current.l_flags &= ~(TPPLEXER_FLAG_WANTLF|
+                      TPPLEXER_FLAG_WANTSPACE|
+                      TPPLEXER_FLAG_WANTCOMMENTS);
+ current.l_flags |= TPPLEXER_FLAG_INCLUDESTRING;
+ TPPLexer_Yield();
+ if (TOK == '\"') {
+  /* Relative #include-string. */
+  *begin = token.t_begin;
+  *end = token.t_end;
+  assert(*begin < *end);
+  if ((*end)[-1] == '\"') --*end;
+ } else if (TOK == '<') {
+  /* System #include-string. */
+  *begin = token.t_begin;
+  *end = (char *)memchr(token.t_end,'>',
+                       (size_t)(token.t_file->f_end-token.t_end));
+  if (!*end) *end = token.t_end;
+  else {
+   token.t_file->f_pos = *end;
+   *--end;
+  }
+  assert(*end > *begin);
+ } else {
+  TPPLexer_Warn(W_EXPECTED_INCLUDE_STRING);
+  token.t_file->f_pos = token.t_begin;
+  result = 0;
+ }
+ popf();
+ return result;
+}
+
 
 PUBLIC tok_t TPPLexer_YieldPP(void) {
  tok_t result;
@@ -3214,43 +3258,33 @@ skip_block_and_parse:
    {
     int mode; struct TPPKeyword *kwd_entry;
     struct TPPFile *curfile,*include_file,*final_file;
-    char *end_of_line,*include_string;
+    char *include_begin,*include_end,*end_of_line;
     if (FALSE) { case KWD_include:      mode = TPPLEXER_OPENFILE_MODE_NORMAL; }
     if (FALSE) { case KWD_include_next: mode = TPPLEXER_OPENFILE_FLAG_NEXT;
                  if (!HAVE_EXTENSION_INCLUDE_NEXT) goto default_directive; }
     if (FALSE) { case KWD_import:       mode = TPPLEXER_OPENFILE_MODE_IMPORT;
                  if (!HAVE_EXTENSION_IMPORT) goto default_directive; }
     curfile = token.t_file; assert(curfile);
+    end_of_line = string_find_eol_after_comments(curfile->f_pos,curfile->f_end);
     /* Locate the end of the current line and place the file pointer there. */
-    include_string = curfile->f_pos;
-    /* Don't use 'string_find_eol' here (It doesn't work well with comments) */
-    end_of_line = string_find_eol_after_comments(include_string,curfile->f_end);
-    assert(end_of_line >= include_string);
+    if unlikely(!parse_include_string(&include_begin,&include_end)) break;
+    assert(end_of_line >= curfile->f_begin);
+    assert(end_of_line >= curfile->f_pos);
     assert(end_of_line <= curfile->f_end);
     curfile->f_pos = end_of_line;
-    /* At this point, the include string may be surrounded by spaces,
-     * but is located between 'include_string' and 'end_of_line'. */
-    /* NOTE: STD-C allows for comments to appear before and after #include strings. */
-    include_string = skip_whitespace_and_comments(include_string,end_of_line);
-    end_of_line = skip_whitespace_and_comments_rev(end_of_line,include_string);
-    /* Space characters have been stripped (or rather skipped)
-     * and we can determine the kind of #include-string. */
-    if (include_string[0] == '\"' && end_of_line[-1] == '\"') {
+    assert(include_begin[0] == '\"' || include_begin[0] == '<');
+    if (include_begin[0] == '\"') {
      mode |= TPPLEXER_OPENFILE_MODE_RELATIVE; /* #include "foo.h" */
-    } else if (include_string[0] == '<' && end_of_line[-1] == '>') {
-     mode |= TPPLEXER_OPENFILE_MODE_SYSTEM; /* #include <stdlib.h> */
     } else {
-     TPPLexer_Warn(W_EXPECTED_INCLUDE_STRING,include_string,
-                  (size_t)(end_of_line-include_string));
-     break;
+     mode |= TPPLEXER_OPENFILE_MODE_SYSTEM; /* #include <stdlib.h> */
     }
-    ++include_string,--end_of_line;
-    include_file = TPPLexer_OpenFile(mode&0x7,include_string,
-                                    (size_t)(end_of_line-include_string),
+    ++include_begin;
+    include_file = TPPLexer_OpenFile(mode&0x7,include_begin,
+                                    (size_t)(include_end-include_begin),
                                     &kwd_entry);
     if unlikely(!include_file) {
-     token.t_begin = include_string;
-     TPPLexer_Warn(W_FILE_NOT_FOUND,include_string);
+     token.t_begin = include_begin;
+     TPPLexer_Warn(W_FILE_NOT_FOUND,include_begin);
      break;
     }
     if unlikely(mode&TPPLEXER_OPENFILE_MODE_IMPORT) {
@@ -3694,8 +3728,9 @@ create_int_file:
    } break;
 
    { /* Check various attributes of include files. */
-    tok_t function; int mode,temp; struct TPPFile *curfile,*incfile;
-    char *include_begin,*include_end,endch;
+    tok_t function; int mode;
+    struct TPPFile *incfile;
+    char *include_begin,*include_end;
    case KWD___has_include:
    case KWD___has_include_next:
     if (!HAVE_EXTENSION_CLANG_FEATURES) break;
@@ -3712,44 +3747,15 @@ create_int_file:
     TPPLexer_YieldPP();
     popf();
     if (TOK != '(') TPPLexer_Warn(W_EXPECTED_LPAREN);
-    include_begin = token.t_end,curfile = token.t_file;
-    for (;;) {
-     include_begin = skip_whitespace_and_comments(include_begin,
-                                                  curfile->f_end);
-     if (include_begin != curfile->f_end) break;
-     *(uintptr_t *)&include_begin -= (uintptr_t)curfile->f_text->s_text;
-     temp = TPPFile_NextChunk(curfile,1);
-     *(uintptr_t *)&include_begin += (uintptr_t)curfile->f_text->s_text;
-     if (!temp) break;
-    }
+    if unlikely(!parse_include_string(&include_begin,&include_end)) break;
+    assert(include_end > include_begin);
+    assert(include_begin[0] == '\"' || include_begin[0] == '<');
     if (include_begin[0] == '\"') {
      mode |= TPPLEXER_OPENFILE_MODE_RELATIVE; /* #include "foo.h" */
-     endch = '\"';
-    } else if (include_begin[0] == '<') {
-     mode |= TPPLEXER_OPENFILE_MODE_SYSTEM; /* #include <stdlib.h> */
-     endch = '>';
     } else {
-     include_end = (char *)memchr(include_begin,')',
-                                  curfile->f_end-include_begin);
-     if (!include_end) include_end = curfile->f_end;
-     TPPLexer_Warn(W_EXPECTED_INCLUDE_STRING,include_begin,
-                  (size_t)(include_end-include_begin));
-     break;
+     mode |= TPPLEXER_OPENFILE_MODE_SYSTEM; /* #include <stdlib.h> */
     }
-    include_end = ++include_begin;
-    while (*include_end != endch) {
-     if (!*include_end && include_end == curfile->f_end) {
-      *(uintptr_t *)&include_begin -= (uintptr_t)curfile->f_text->s_text;
-      *(uintptr_t *)&include_end -= (uintptr_t)curfile->f_text->s_text;
-      temp = TPPFile_NextChunk(curfile,1);
-      *(uintptr_t *)&include_begin += (uintptr_t)curfile->f_text->s_text;
-      *(uintptr_t *)&include_end += (uintptr_t)curfile->f_text->s_text;
-      if (!temp) break;
-     }
-     ++include_end;
-    }
-    /* Place the file pointer after the end of the #include string. */
-    curfile->f_pos = include_end+1;
+    ++include_begin;
     /* Try to open the file described.
      * NOTE: If we do manage to open it, it will already
      *       be cached when a #include tries to use it. */
@@ -4669,6 +4675,8 @@ add_arg:
     ++iter;
    }
   }
+
+
 #if 0 /* DEBUG: Log calls to macros. */
   {
    arg_end = (arg_iter = argv)+effective_argc;
@@ -4859,10 +4867,11 @@ PRIVATE void EVAL_CALL eval_unary(struct TPPConst *result) {
      else numsys = 8;
     } else numsys = 10;
     resval = strtoll(numbegin,&numend,numsys);
-    do {
+    for (;;) {
      if (*numend == 'u' || *numend == 'U') { ++numend; continue; }
      if (*numend == 'l' || *numend == 'L') { ++numend; continue; }
-    } while (FALSE);
+     break;
+    }
     *token.t_end = old_ch; /* Restore the old  */
     assert(numend <= token.t_end);
     result->c_kind       = TPP_CONST_INTEGRAL;
@@ -5636,10 +5645,15 @@ seterr:
 }
 
 
+#ifdef _MSC_VER
+#pragma warning(push)
+#pragma warning(disable: 4701)
+#endif
 
 #define WARNF(...) fprintf(stderr,__VA_ARGS__)
 PUBLIC int TPPLexer_Warn(int wnum, ...) {
  va_list args; char const *used_filename,*true_filename;
+ char const *macro_name = NULL; int macro_name_size;
  struct TPPKeyword *kwd; char *temp;
  struct TPPIfdefStackSlot *ifdef_slot;
  struct TPPString *temp_string = NULL;
@@ -5671,12 +5685,19 @@ PUBLIC int TPPLexer_Warn(int wnum, ...) {
   default: break; 
  }
  used_filename = TPPLexer_FILE(NULL);
- true_filename = TPPLexer_TRUE_FILE(NULL);
+ if (token.t_file->f_kind == TPPFILE_KIND_MACRO) {
+  macro_name = token.t_file->f_name;
+  macro_name_size = (int)token.t_file->f_namesize;
+  true_filename = TPPLexer_TRUE_FILE(NULL);
+ } else {
+  true_filename = used_filename;
+ }
  if (current.l_flags&TPPLEXER_FLAG_MSVC_MESSAGEFORMAT) {
   WARNF("%s(%d,%d) : ",true_filename,TPPLexer_TRUE_LINE()+1,TPPLexer_TRUE_COLUMN()+1);
  } else {
   WARNF("%s:%d:%d: ",true_filename,TPPLexer_TRUE_LINE()+1,TPPLexer_TRUE_COLUMN()+1);
  }
+ if (macro_name) WARNF("In macro '%.*s': ",macro_name_size,macro_name);
  switch (wnum) {
   case W_STARSLASH_OUTSIDE_OF_COMMENT    : WARNF("'*" "/' outside of comment"); break;
   case W_LINE_COMMENT_CONTINUED          : WARNF("Line-comment continued"); break;
@@ -5714,7 +5735,7 @@ PUBLIC int TPPLexer_Warn(int wnum, ...) {
   case W_EXPECTED_STRING_AFTER_PRAGMA    : WARNF("Expected string after _Pragma, but got '%s'",CONST_STR()); break;
   case W_EXPECTED_STRING_IN_EXPRESSION   : WARNF("Expected string in expression, but got '%s'",CONST_STR()); break;
   case W_EXPECTED_STRING_AFTER_LINE      : WARNF("Expected string after #line, but got '%s'",CONST_STR()); break;
-  case W_EXPECTED_INCLUDE_STRING         : temp = ARG(char *),WARNF("Expected #include-string, but got '%.*s'",(int)ARG(size_t),temp); break;
+  case W_EXPECTED_INCLUDE_STRING         : WARNF("Expected #include-string, but got " TOK_S,TOK_A); break;
   case W_EXPECTED_STRING_AFTER_PUSHMACRO : WARNF("Expected string after push_macro, but got '%s'",CONST_STR()); break;
   case W_EXPECTED_STRING_AFTER_MESSAGE   : WARNF("Expected string after message, but got '%s'",CONST_STR()); break;
   case W_EXPECTED_STRING_AFTER_DEPRECATED: WARNF("Expected string after deprecated, but got '%s'",CONST_STR()); break;
@@ -5762,7 +5783,7 @@ PUBLIC int TPPLexer_Warn(int wnum, ...) {
 #undef ARG
  va_end(args);
  WARNF("\n");
- if (true_filename != used_filename) {
+ if (macro_name) {
   if (current.l_flags&TPPLEXER_FLAG_MSVC_MESSAGEFORMAT) {
    WARNF("%s(%d,%d) : See reference to effective code location\n",
          used_filename,TPPLexer_LINE()+1,TPPLexer_COLUMN()+1);
@@ -5772,10 +5793,14 @@ PUBLIC int TPPLexer_Warn(int wnum, ...) {
   }
  }
 end:
+ fflush(stderr);
  return 1;
  /* NOTE: On error, the current token _must_ be set to TOK_ERR */
 }
 
+#ifdef _MSC_VER
+#pragma warning(pop)
+#endif
 
 
 
