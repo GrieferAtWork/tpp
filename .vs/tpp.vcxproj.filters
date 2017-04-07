@@ -17,6 +17,9 @@
     <ClInclude Include="..\src\tpp.h">
       <Filter>src</Filter>
     </ClInclude>
+    <ClInclude Include="..\src\tpp-backwards-compatibility.h">
+      <Filter>src</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="..\src\tpp-defs.inl">

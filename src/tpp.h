@@ -499,15 +499,15 @@ enum{
  TPP(TOK_TILDE_TILDE),   /*< "~~". */
  TPP(TOK_ARROW),         /*< "->". */
  TPP(TOK_COLLON_EQUAL),  /*< ":=". */
- TPP(TOK_COLLON_COLLON), /*< "::". */
+ TPP(TOK_NAMESPACE),     /*< "::". */
  TPP(TOK_KEYWORD_BEGIN),
 
  /* Name aliases */
- TPP(TOK_POS)     = TPP(TOK_ADD),
- TPP(TOK_NEG)     = TPP(TOK_SUB),
- TPP(TOK_LOWER)   = TPP(TOK_LANGLE),
- TPP(TOK_GREATER) = TPP(TOK_RANGLE),
- /* TODO: The old TPP has many more names... */
+ TPP(TOK_POS)           = TPP(TOK_ADD),
+ TPP(TOK_NEG)           = TPP(TOK_SUB),
+ TPP(TOK_LOWER)         = TPP(TOK_LANGLE),
+ TPP(TOK_GREATER)       = TPP(TOK_RANGLE),
+ TPP(TOK_COLLON_COLLON) = TPP(TOK_NAMESPACE),
 };
 
 #define TPP_ISKEYWORD(id)     ((id) >= TPP(TOK_KEYWORD_BEGIN))
@@ -658,6 +658,7 @@ TPP_LOCAL int TPPLexer_LINE(void) { struct TPPFile *f = TPPLexer_Textfile(); ret
 TPP_LOCAL int TPPLexer_COLUMN(void) { struct TPPFile *f = TPPLexer_Textfile(); return TPPFile_ColumnAt(f,f->f_pos); }
 
 
+/* Lexer state flags. */
 #define TPPLEXER_FLAG_NONE                  0x00000000
 #define TPPLEXER_FLAG_WANTCOMMENTS          0x00000001 /*< Emit COMMENT tokens. */
 #define TPPLEXER_FLAG_WANTSPACE             0x00000002 /*< Emit SPACE tokens. */
@@ -692,6 +693,7 @@ TPP_LOCAL int TPPLexer_COLUMN(void) { struct TPPFile *f = TPPLexer_Textfile(); r
 #define TPPLEXER_FLAG_MERGEMASK             0xf0000000 /*< A mask of flags that are merged (or'd together) during popf(). */
 #define TPPLEXER_FLAG_DEFAULT               0x00000000 /*< Default set of flags (suitable for use with most token-based compilers). */
 
+/* Extension flags. */
 #define TPPLEXER_EXTENSION_NONE             0x0000000000000000ull
 #define TPPLEXER_EXTENSION_TRIGRAPHS        0x0000000000000001ull /*< [FEATURE] Recognize trigraph character sequences. */
 #define TPPLEXER_EXTENSION_DIGRAPHS         0x0000000000000002ull /*< [FEATURE] Recognize digraph character sequences. */
