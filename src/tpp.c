@@ -172,6 +172,7 @@ extern void __debugbreak(void);
 #define isalnum(ch)         (chrattr[ch]&(CH_ISALPHA|CH_ISDIGIT))
 #define isspace(ch)         (chrattr[ch]&CH_ISSPACE)
 #define islf(ch)            (chrattr[ch]&CH_ISLF)
+#define islforzero(ch)      (chrattr[ch]&(CH_ISLF|CH_ISZERO))
 #define isspace_nolf(ch)   ((chrattr[ch]&(CH_ISSPACE|CH_ISLF))==CH_ISSPACE)
 #define isnospace_orlf(ch) ((chrattr[ch]&(CH_ISSPACE|CH_ISLF))!=CH_ISSPACE)
 #define isprint(ch)         (chrattr[ch]&CH_ISPRINT)
@@ -885,7 +886,9 @@ TPPFile_ColumnAt(struct TPPFile const *__restrict self,
    : 0;
  }
  begin = self->f_text->s_text,iter = text_pointer;
- while (iter != begin && !islf(iter[-1])) --iter;
+ /* NOTE: Must accept \0 as linefeed here to correctly
+  *       determine column numbers after a #define directive. */
+ while (iter != begin && !islforzero(iter[-1])) --iter;
  /* WARNING: This value stops being accurate in expanded macros! */
  return (int)(text_pointer-iter);
 }
@@ -4843,6 +4846,7 @@ at_next_non_whitespace:
      /* Special case: Must load more data from the arguments file. */
      if (!TPPFile_NextChunk(arguments_file,1)) {
       arg_iter->ac_offset_end = (size_t)(token.t_begin-token.t_file->f_text->s_text);
+      if (!TPPLexer_Warn(W_EOF_IN_MACRO_ARGUMENT_LIST)) goto err_argv;
       goto done_args;
      }
      break;
@@ -5980,6 +5984,7 @@ PUBLIC int TPPLexer_Warn(int wnum, ...) {
   case W_SPECIAL_ARGUMENT_NAME           : WARNF("Special keyword '%s' used as argument name",KWDNAME()); break;
   case W_VA_KEYWORD_IN_REGULAR_MACRO     : WARNF("Variadic keyword '%s' used in regular macro",KWDNAME()); break;
   case W_KEYWORD_MACRO_ALREADY_ONSTACK   : WARNF("Keyword-style macro '%s' is already being expanded",FILENAME()); break;
+  case W_EOF_IN_MACRO_ARGUMENT_LIST      : WARNF("EOF in macro argument list"); break;
   case W_TOO_MANY_MACRO_ARGUMENTS        : WARNF("Too many arguments for '%s'",FILENAME()); break;
   case W_NOT_ENGOUH_MACRO_ARGUMENTS      : WARNF("Too enough arguments for '%s'",FILENAME()); break;
   case W_CHARACTER_TOO_LONG              : WARNF("Character sequence is too long"); break;
