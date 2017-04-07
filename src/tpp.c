@@ -379,7 +379,7 @@ do{ tok_t              _old_tok_id    = token.t_id;\
 #define LOG_CALLMACRO   1
 #define LOG_LEGACYGUARD 2
 #if TPP_CONFIG_DEBUG
-#define HAVELOG(level) ((level) == LOG_LEGACYGUARD) /* Change this to select active logs. */
+#define HAVELOG(level) (0 && (level) == LOG_LEGACYGUARD) /* Change this to select active logs. */
 LOCAL void tpp_log(char const *fmt, ...) {
  va_list args;
  assert(TPPLexer_Current);
@@ -4699,11 +4699,17 @@ incback_restore(struct incback_t *__restrict self,
 }
 
 
+/* Parenthesis recursion IDs. */
+#define RECURSION_OF(flag)((flag) >> 12)
+#define RECURSION_PAREN   RECURSION_OF(TPP_MACROFILE_FUNC_START_LPAREN)
+#define RECURSION_BRACKET RECURSION_OF(TPP_MACROFILE_FUNC_START_LBRACKET)
+#define RECURSION_BRACE   RECURSION_OF(TPP_MACROFILE_FUNC_START_LBRACE)
+#define RECURSION_ANGLE   RECURSION_OF(TPP_MACROFILE_FUNC_START_LANGLE)
+
 PUBLIC int
 TPPLexer_ExpandFunctionMacro(struct TPPFile *__restrict macro) {
  struct TPPFile *arguments_file,*expand_file;
- tok_t begin_token,end_token; char *iter,*end;
- unsigned int paren_recursion;
+ tok_t begin_token; char *iter,*end;
  struct incback_t popped_includes;
  int check_mirrors,result;
  assert(macro);
@@ -4714,10 +4720,10 @@ TPPLexer_ExpandFunctionMacro(struct TPPFile *__restrict macro) {
  arguments_file = token.t_file;
  assert(arguments_file);
  switch (macro->f_macro.m_flags&TPP_MACROFILE_MASK_FUNC_STARTCH) {
-  case TPP_MACROFILE_FUNC_START_LBRACKET: begin_token = '[',end_token = ']'; break;
-  case TPP_MACROFILE_FUNC_START_LBRACE  : begin_token = '{',end_token = '}'; break;
-  case TPP_MACROFILE_FUNC_START_LANGLE  : begin_token = '<',end_token = '>'; break;
-  default                               : begin_token = '(',end_token = ')'; break;
+  case TPP_MACROFILE_FUNC_START_LBRACKET: begin_token = '['; break;
+  case TPP_MACROFILE_FUNC_START_LBRACE  : begin_token = '{'; break;
+  case TPP_MACROFILE_FUNC_START_LANGLE  : begin_token = '<'; break;
+  default                               : begin_token = '('; break;
  }
  /* Skip all whitespace while unwinding the #include
   * stack, trying to find the 'begin_token' character. */
@@ -4799,6 +4805,7 @@ at_next_non_whitespace:
  pushf();
  current.l_flags |= TPPLEXER_FLAG_NO_SEEK_ON_EOB;
  {
+  int paren_recursion[4],calling_conv;
   struct argcache_t *argv,*arg_iter,*arg_last,*arg_end;
   size_t effective_argc = macro->f_macro.m_function.f_argc;
   size_t va_size = 0; uintptr_t text_offset;
@@ -4823,34 +4830,82 @@ at_next_non_whitespace:
    if unlikely(!argv) goto end0;
   }
   arg_last = (arg_iter = argv)+(effective_argc-1);
-  paren_recursion = 1; /* TODO: Paren recursion for other calling conventions (copy what the old TPP does) */
+  calling_conv = RECURSION_OF(macro->f_macro.m_flags&TPP_MACROFILE_MASK_FUNC_STARTCH);
+  assert(calling_conv >= 0 && calling_conv <= 3);
+  memset(paren_recursion,0,sizeof(paren_recursion));
+  paren_recursion[calling_conv] = 1;
   assert(token.t_file == arguments_file);
   arg_iter->ac_offset_begin = (size_t)(token.t_begin-token.t_file->f_text->s_text);
   for (;;) {
-   if (TOK == begin_token) ++paren_recursion;
-   else if (TOK == end_token) {
-    if (!--paren_recursion) goto add_arg;
-   } else if (TOK == ',' && paren_recursion == 1) {
-add_arg:
-    ++va_size;
-    /* Add a new argument. */
-    arg_iter->ac_offset_end = (size_t)(token.t_begin-token.t_file->f_text->s_text);
-    if (!paren_recursion) break;
-    if (arg_iter != arg_last) {
-     (++arg_iter)->ac_offset_begin = (size_t)(token.t_end-token.t_file->f_text->s_text);
-    } else if (!(macro->f_macro.m_flags&TPP_MACROFILE_FLAG_FUNC_VARIADIC)) {
-     if unlikely(!TPPLexer_Warn(W_TOO_MANY_MACRO_ARGUMENTS,macro)) { err_argv: free(argv); goto end0; }
-    }
-   }
-   if (!TOK) {
-    /* Special case: Must load more data from the arguments file. */
-    if (!TPPFile_NextChunk(arguments_file,1)) {
-     arg_iter->ac_offset_end = (size_t)(token.t_begin-token.t_file->f_text->s_text);
+   switch (TOK) {
+
+    case 0:
+     /* Special case: Must load more data from the arguments file. */
+     if (!TPPFile_NextChunk(arguments_file,1)) {
+      arg_iter->ac_offset_end = (size_t)(token.t_begin-token.t_file->f_text->s_text);
+      goto done_args;
+     }
      break;
-    }
-   } else if (TOK < 0) break; /* An error occurred. */
-   TPPLexer_YieldPP(); /* Allow preprocessor directives in macro arguments. */
+
+     /* Increase parenthesis. */
+    case '(': ++paren_recursion[RECURSION_PAREN];
+              break;
+    case '[': if (calling_conv >= RECURSION_BRACKET &&
+                 !paren_recursion[RECURSION_PAREN]
+                  ) ++paren_recursion[RECURSION_BRACKET];
+              break;
+    case '{': if (calling_conv >= RECURSION_BRACE &&
+                 !paren_recursion[RECURSION_PAREN] &&
+                 !paren_recursion[RECURSION_BRACKET]
+                  ) ++paren_recursion[RECURSION_BRACE];
+              break;
+    case '<': if (calling_conv >= RECURSION_ANGLE &&
+                 !paren_recursion[RECURSION_PAREN] &&
+                 !paren_recursion[RECURSION_BRACKET] &&
+                 !paren_recursion[RECURSION_BRACE]
+                  ) ++paren_recursion[RECURSION_ANGLE];
+              break;
+
+     /* Reduce parenthesis. */
+     if (FALSE) { case ')': --paren_recursion[RECURSION_PAREN]; }
+     if (FALSE) { case ']': if (calling_conv < RECURSION_BRACKET ||
+                                paren_recursion[RECURSION_PAREN]) break;
+                            --paren_recursion[RECURSION_BRACKET]; }
+     if (FALSE) { case '}': if (calling_conv < RECURSION_BRACE ||
+                                paren_recursion[RECURSION_BRACKET] ||
+                                paren_recursion[RECURSION_PAREN]) break;
+                            --paren_recursion[RECURSION_BRACE]; }
+     if (FALSE) { case '>': if (calling_conv < RECURSION_ANGLE ||
+                                paren_recursion[RECURSION_BRACE] ||
+                                paren_recursion[RECURSION_BRACKET] ||
+                                paren_recursion[RECURSION_PAREN]) break;
+                            --paren_recursion[RECURSION_ANGLE]; }
+     /* Check if the select calling convention has dropped to zero. */
+     if (!paren_recursion[calling_conv]) goto add_arg;
+     break;
+
+    case ',': /* Add a new argument. */
+     if (paren_recursion[calling_conv] == 1 &&
+         paren_recursion[(calling_conv+1) % 4] == 0 &&
+         paren_recursion[(calling_conv+2) % 4] == 0 &&
+         paren_recursion[(calling_conv+3) % 4] == 0) {
+add_arg:
+      ++va_size;
+      /* Add a new argument. */
+      arg_iter->ac_offset_end = (size_t)(token.t_begin-token.t_file->f_text->s_text);
+      if (!paren_recursion[calling_conv]) goto done_args;
+      if (arg_iter != arg_last) {
+       (++arg_iter)->ac_offset_begin = (size_t)(token.t_end-token.t_file->f_text->s_text);
+      } else if (!(macro->f_macro.m_flags&TPP_MACROFILE_FLAG_FUNC_VARIADIC)) {
+       if unlikely(!TPPLexer_Warn(W_TOO_MANY_MACRO_ARGUMENTS,macro)) { err_argv: free(argv); goto end0; }
+      }
+     }
+     break;
+    default: if (TOK < 0) goto done_args; break;
+   }
+   TPPLexer_YieldPP(); /* YieldPP: Allow preprocessor directives in macro arguments. */
   }
+done_args:
   if (va_size < effective_argc) va_size = 0;
   else va_size -= (effective_argc-1);
   assert(token.t_file == arguments_file);

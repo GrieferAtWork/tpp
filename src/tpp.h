@@ -244,13 +244,13 @@ struct TPPMacroFile {
  /* [owned(f_name) = m_flags&TPP_MACROFILE_FLAG_OWNSNAME] */
 #define TPP_MACROFILE_KIND                   0x000000ff
 #define TPP_MACROFILE_KIND_HASCOMMON(k)   (((k)&TPP_MACROFILE_KIND) != TPP_MACROFILE_KIND_EXPANDED)
-#define TPP_MACROFILE_FLAG_OWNSNAME          0x00001000 /*< The associated "f_name" member is owned. */
 #define TPP_MACROFILE_KIND_KEYWORD           0x00000000 /*< Keyword-style macro (without string/concat operations). */
 #define TPP_MACROFILE_KIND_FUNCTION          0x00000001 /*< Function-style macro. */
 #define TPP_MACROFILE_FLAG_FUNC_VARIADIC     0x00000100 /*< The last argument of the function is variadic. */
 #define TPP_MACROFILE_FLAG_FUNC_SELFEXPAND   0x00000200 /*< After being expanded, this function is allowed to re-invoke itself and be
                                                          *  expanded, when the generated text is not identical to a previous iteration. */
-#define TPP_MACROFILE_MASK_FUNC_STARTCH      0x0000f000 /*< The character that should be recognized as start of an argument list (one of the macros below). */
+#define TPP_MACROFILE_FLAG_OWNSNAME          0x00000400 /*< The associated "f_name" member is owned. */
+#define TPP_MACROFILE_MASK_FUNC_STARTCH      0x00003000 /*< The character that should be recognized as start of an argument list (one of the macros below). */
 #define TPP_MACROFILE_FUNC_START_LPAREN      0x00000000 /*< '(...)' */
 #define TPP_MACROFILE_FUNC_START_LBRACKET    0x00001000 /*< '[...]' */
 #define TPP_MACROFILE_FUNC_START_LBRACE      0x00002000 /*< '{...}' */
