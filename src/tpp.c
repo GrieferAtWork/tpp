@@ -365,6 +365,7 @@ do{ tok_t              _old_tok_id    = token.t_id;\
 #define HAVE_EXTENSION_TPP_LOAD_FILE    (current.l_extensions&TPPLEXER_EXTENSION_TPP_LOAD_FILE)
 #define HAVE_EXTENSION_TPP_COUNTER      (current.l_extensions&TPPLEXER_EXTENSION_TPP_COUNTER)
 #define HAVE_EXTENSION_TPP_RANDOM       (current.l_extensions&TPPLEXER_EXTENSION_TPP_RANDOM)
+#define HAVE_EXTENSION_TPP_STR_DECOMPILE (current.l_extensions&TPPLEXER_EXTENSION_TPP_STR_DECOMPILE)
 
 
 
@@ -3503,14 +3504,14 @@ put_filename:
     TPP_Escape(string_text->s_text+1,name,size);
     string_text->s_text[quoted_size-1] = '\"';
     string_text->s_text[quoted_size]   = '\0';
-use_string_text:
+create_string_file:
     string_text->s_refcnt = 1;
     string_file = TPPFile_NewExplicitInherited(string_text);
     if unlikely(!string_file) { TPPString_Decref(string_text); goto seterr; }
     pushfile_inherited(string_file);
     goto again;
    case KWD___BASE_FILE__:
-    if (!HAVE_EXTENSION_BASEFILE) goto end;
+    if (!HAVE_EXTENSION_BASEFILE) break;
     name = TPPLexer_BASEFILE(&size);
     goto put_filename;
    }
@@ -3527,7 +3528,7 @@ use_string_text:
     if (!tmnow) strcpy(string_text->s_text,"\"??:??:??\"");
     else sprintf(string_text->s_text,"\"%02d:%02d:%02d\"",
                  tmnow->tm_hour,tmnow->tm_min,tmnow->tm_sec);
-    goto use_string_text;
+    goto create_string_file;
    case KWD___DATE__:
     string_text = (struct TPPString *)malloc(TPP_OFFSETOF(struct TPPString,s_text)+
                                             (13+1)*sizeof(char));
@@ -3539,7 +3540,7 @@ use_string_text:
     else sprintf(string_text->s_text,"\"%s %2d %4d\"",
                  date_month_names[tmnow->tm_mon],
                  tmnow->tm_mday,tmnow->tm_year+1900);
-    goto use_string_text;
+    goto create_string_file;
    case KWD___TIMESTAMP__:
     if (!HAVE_EXTENSION_TIMESTAMP) break;
     string_text = (struct TPPString *)malloc(TPP_OFFSETOF(struct TPPString,s_text)+
@@ -3554,7 +3555,7 @@ use_string_text:
                  date_month_names[tmnow->tm_mon],
                  tmnow->tm_mday,tmnow->tm_hour,tmnow->tm_min,
                  tmnow->tm_sec,1900+tmnow->tm_year);
-    goto use_string_text;
+    goto create_string_file;
    }
 
    { /* Generate an integral constant representing
@@ -3583,7 +3584,7 @@ create_int_file:
     struct TPPFile *file_iter;
    case KWD___INCLUDE_LEVEL__:
    case KWD___INCLUDE_DEPTH__:
-    if (!HAVE_EXTENSION_INCLUDE_LEVEL) goto end;
+    if (!HAVE_EXTENSION_INCLUDE_LEVEL) break;
     intval = -1,file_iter = token.t_file;
     while (file_iter != &TPPFile_Empty) {
      if (file_iter->f_kind == TPPFILE_KIND_TEXT) ++intval;
@@ -3595,7 +3596,7 @@ create_int_file:
 
    { /* Expand into a non-recurring, ever-incrementing integral constant. */
    case KWD___COUNTER__:
-    if (!HAVE_EXTENSION_COUNTER) goto end;
+    if (!HAVE_EXTENSION_COUNTER) break;
     intval = current.l_counter++;
     goto create_int_file;
    } break;
@@ -3614,16 +3615,16 @@ create_int_file:
    case KWD___has_declspec_attribute:
    case KWD___has_extension:
    case KWD___has_feature:
-    if (!HAVE_EXTENSION_CLANG_FEATURES) goto end;
+    if (!HAVE_EXTENSION_CLANG_FEATURES) break;
     create_missing_keyword = 0;
     if (FALSE) {
    case KWD___TPP_UNIQUE:
-     if (!HAVE_EXTENSION_TPP_UNIQUE) goto end;
+     if (!HAVE_EXTENSION_TPP_UNIQUE) break;
      create_missing_keyword = 1;
     }
     if (FALSE) {
    case KWD___TPP_COUNTER:
-     if (!HAVE_EXTENSION_TPP_COUNTER) goto end;
+     if (!HAVE_EXTENSION_TPP_COUNTER) break;
      create_missing_keyword = 1;
     }
     mode = TOK;
@@ -3697,10 +3698,10 @@ create_int_file:
     char *include_begin,*include_end,endch;
    case KWD___has_include:
    case KWD___has_include_next:
-    if (!HAVE_EXTENSION_CLANG_FEATURES) goto end;
+    if (!HAVE_EXTENSION_CLANG_FEATURES) break;
     if (FALSE) {
    case KWD___TPP_LOAD_FILE:
-    if (!HAVE_EXTENSION_TPP_LOAD_FILE) goto end;
+    if (!HAVE_EXTENSION_TPP_LOAD_FILE) break;
     }
     function = TOK,mode = 0;
     if (function == KWD___has_include_next) mode |= TPPLEXER_OPENFILE_FLAG_NEXT;
@@ -3781,7 +3782,7 @@ create_int_file:
       TPPFile_Decref(incfile);
      }
      if unlikely(!string_text) goto seterr;
-     goto use_string_text;
+     goto create_string_file;
     }
     intval = incfile != NULL;
     goto create_int_file;
@@ -3823,7 +3824,7 @@ create_int_file:
     char *old_filepos;
     int pragma_error;
    case KWD___pragma:
-    if (!HAVE_EXTENSION_MSVC_PRAGMA) goto end;
+    if (!HAVE_EXTENSION_MSVC_PRAGMA) break;
     pushf();
     pusheof();
     /* Disable some unnecessary tokens. */
@@ -3865,7 +3866,7 @@ create_int_file:
     struct TPPFile *val_file;
     int eval_error;
    case KWD___TPP_EVAL:
-    if (!HAVE_EXTENSION_TPP_EVAL) goto end;
+    if (!HAVE_EXTENSION_TPP_EVAL) break;
     pushf();
     current.l_flags &= ~(TPPLEXER_FLAG_WANTCOMMENTS|
                          TPPLEXER_FLAG_WANTSPACE|
@@ -3894,7 +3895,7 @@ create_int_file:
     int_t random_begin,random_end;
     struct TPPConst val;
    case KWD___TPP_RANDOM:
-    if (!HAVE_EXTENSION_TPP_RANDOM) goto end;
+    if (!HAVE_EXTENSION_TPP_RANDOM) break;
     pushf();
     current.l_flags &= ~(TPPLEXER_FLAG_WANTCOMMENTS|
                          TPPLEXER_FLAG_WANTSPACE|
@@ -3935,6 +3936,39 @@ create_int_file:
      intval     += random_begin;
     }
     goto create_int_file;
+   } break;
+
+   {
+    struct TPPConst val;
+   case KWD___TPP_STR_DECOMPILE:
+    if (!HAVE_EXTENSION_TPP_STR_DECOMPILE) break;
+    pushf();
+    current.l_flags &= ~(TPPLEXER_FLAG_WANTCOMMENTS|
+                         TPPLEXER_FLAG_WANTSPACE|
+                         TPPLEXER_FLAG_WANTLF);
+    yield_fetch();
+    if (TOK == '(') yield_fetch();
+    else TPPLexer_Warn(W_EXPECTED_LPAREN);
+    /* Evaluate a constant preprocessor-expression. */
+    /* WARNING: 'val' may be the unmodified text of the calling file (as loaded by '__TPP_LOAD_FILE').
+     *           In that case, we have no way of detecting a possible infinite recursion, essentially
+     *           meaning that you probably just shouldn't do that... */
+    if unlikely(!TPPLexer_Eval(&val)) { breakf(); return TOK_ERR; }
+    if (TOK != ')') {
+     TPPLexer_Warn(W_EXPECTED_RPAREN);
+     token.t_file->f_pos = token.t_begin;
+    }
+    popf();
+    if (val.c_kind != TPP_CONST_STRING) {
+     TPPLexer_Warn(W_EXPECTED_STRING_AFTER_TPP_STRD,&val);
+     goto again;
+    } else if (!val.c_data.c_string->s_size) {
+     /* Special case: Empty string (No need to push anything) */
+     TPPString_Decref(val.c_data.c_string);
+     goto again;
+    }
+    string_text = val.c_data.c_string; /* Inherit reference. */
+    goto create_string_file;
    } break;
 
    { /* Various (true) predefined macros. */
@@ -5686,6 +5720,7 @@ PUBLIC int TPPLexer_Warn(int wnum, ...) {
   case W_EXPECTED_STRING_AFTER_DEPRECATED: WARNF("Expected string after deprecated, but got '%s'",CONST_STR()); break;
   case W_EXPECTED_STRING_AFTER_TPP_EXEC  : WARNF("Expected string after tpp_exec, but got '%s'",CONST_STR()); break;
   case W_EXPECTED_STRING_AFTER_TPP_SETF  : WARNF("Expected string after tpp_set_keyword_flags, but got '%s'",CONST_STR()); break;
+  case W_EXPECTED_STRING_AFTER_TPP_STRD  : WARNF("Expected string after __TPP_STR_DECOMPILE, but got '%s'",CONST_STR()); break;
   case W_FILE_NOT_FOUND                  : WARNF("File not found: '%s'",ARG(char *)); break;
   case W_ERROR                           : temp = ARG(char *),WARNF("ERROR : %.*s",(int)ARG(size_t),temp); break;
   case W_WARNING                         : temp = ARG(char *),WARNF("WARNING : %.*s",(int)ARG(size_t),temp); break;
