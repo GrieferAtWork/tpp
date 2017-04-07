@@ -690,11 +690,12 @@ TPP_LOCAL int TPPLexer_COLUMN(void) { struct TPPFile *f = TPPLexer_Textfile(); r
 #define TPPLEXER_EXTENSION_CLANG_FEATURES   0x0000000000400000ull /*< Recognize clang's __has_(feature|extension|attribute|...) and __is_(deprecated|{builtin_}identifier) special macros. */
 #define TPPLEXER_EXTENSION_HAS_INCLUDE      0x0000000000800000ull /*< Recognize clang's __has_{next_}include special macros. */
 #define TPPLEXER_EXTENSION_LXOR             0x0000000001000000ull /*< Allow the use of '^^' in expressions as logical xor. */
-#define TPPLEXER_EXTENSION_TPP_EVAL         0x0000000002000000ull /*< Enable the '__TPP_EVAL(...)' extension function. */
-#define TPPLEXER_EXTENSION_TPP_UNIQUE       0x0000000004000000ull /*< Enable the '__TPP_UNIQUE(...)' extension function. */
-#define TPPLEXER_EXTENSION_DATEUTILS        0x0000000008000000ull /*< Recognize a set of macros to expand to integral parts of the current date. */
-#define TPPLEXER_EXTENSION_TIMEUTILS        0x0000000010000000ull /*< Recognize a set of macros to expand to integral parts of the current time. */
-#define TPPLEXER_EXTENSION_TIMESTAMP        0x0000000020000000ull /*< Recognize the '__TIMESTAMP__' preprocessor macro. */
+#define TPPLEXER_EXTENSION_DATEUTILS        0x0000000002000000ull /*< Recognize a set of macros to expand to integral parts of the current date. */
+#define TPPLEXER_EXTENSION_TIMEUTILS        0x0000000004000000ull /*< Recognize a set of macros to expand to integral parts of the current time. */
+#define TPPLEXER_EXTENSION_TIMESTAMP        0x0000000008000000ull /*< Recognize the '__TIMESTAMP__' preprocessor macro. */
+#define TPPLEXER_EXTENSION_TPP_EVAL         0x0000000010000000ull /*< Enable the '__TPP_EVAL(...)' builtin macro. */
+#define TPPLEXER_EXTENSION_TPP_UNIQUE       0x0000000020000000ull /*< Enable the '__TPP_UNIQUE(...)' builtin macro. */
+#define TPPLEXER_EXTENSION_TPP_LOAD_FILE    0x0000000040000000ull /*< Enable the '__TPP_LOAD_FILE(...)' builtin macro. */
 #define TPPLEXER_EXTENSION_DEFAULT          0xffffffffffffffffull /*< Enable all extensions. */
 
 struct TPPLexer {
@@ -809,12 +810,15 @@ TPPFUN int TPPLexer_Warn(int wnum, ...);
 // >> Called when an unrecoverable error occurrs.
 // HINT: To recover after such an event, 'TPPLexer_UnsetErr()' should be called.
 #define TPPLexer_SetErr() \
- (void)(TPPLexer_Current->l_flags |= TPPLEXER_FLAG_ERROR,\
-        TPPLexer_Current->l_noerror = TPPLexer_Current->l_token.t_id,\
-        TPPLexer_Current->l_token.t_id = TPP(TOK_ERR))
+ ((TPPLexer_Current->l_flags&TPPLEXER_FLAG_ERROR) ? 0 : \
+  (TPPLexer_Current->l_flags |= TPPLEXER_FLAG_ERROR,\
+   TPPLexer_Current->l_noerror = TPPLexer_Current->l_token.t_id,\
+   TPPLexer_Current->l_token.t_id = TPP(TOK_ERR),1))
 #define TPPLexer_UnsetErr() \
- (void)(TPPLexer_Current->l_flags &= ~TPPLEXER_FLAG_ERROR,\
-        TPPLexer_Current->l_token.t_id = TPPLexer_Current->l_noerror)
+ ((TPPLexer_Current->l_flags&TPPLEXER_FLAG_ERROR) ? \
+  (TPPLexer_Current->l_flags &= ~TPPLEXER_FLAG_ERROR,\
+   TPPLexer_Current->l_token.t_id = TPPLexer_Current->l_noerror,\
+   1) : 0)
 
 
 //////////////////////////////////////////////////////////////////////////

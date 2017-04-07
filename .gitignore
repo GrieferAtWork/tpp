@@ -3,4 +3,5 @@ build/*
 lib/*
 .vs/*.sdf
 .vs/*.suo
+.vs/*.opensdf
 *.exe

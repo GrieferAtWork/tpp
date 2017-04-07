@@ -289,7 +289,7 @@ int main(int argc, char *argv[]) {
   last_token_file = TPPLexer_Current->l_token.t_file;
   last_token_end  = TPPLexer_Current->l_token.t_end;
   file_offset     = get_file_offset(last_token_end);
-  if (outline_tokens == OUTLINE_MODE_TOK) fwrite("[",sizeof(char),1,stdout);
+  if (outline_tokens == OUTLINE_MODE_TOK) out_write("[",sizeof(char));
   out_write(TPPLexer_Current->l_token.t_begin,
            (size_t)(TPPLexer_Current->l_token.t_end-
                     TPPLexer_Current->l_token.t_begin)*

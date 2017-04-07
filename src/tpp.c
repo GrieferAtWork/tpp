@@ -357,11 +357,12 @@ do{ tok_t              _old_tok_id    = token.t_id;\
 #define HAVE_EXTENSION_CLANG_FEATURES   (current.l_extensions&TPPLEXER_EXTENSION_CLANG_FEATURES)
 #define HAVE_EXTENSION_HAS_INCLUDE      (current.l_extensions&TPPLEXER_EXTENSION_HAS_INCLUDE)
 #define HAVE_EXTENSION_LXOR             (current.l_extensions&TPPLEXER_EXTENSION_LXOR)
-#define HAVE_EXTENSION_TPP_EVAL         (current.l_extensions&TPPLEXER_EXTENSION_TPP_EVAL)
-#define HAVE_EXTENSION_TPP_UNIQUE       (current.l_extensions&TPPLEXER_EXTENSION_TPP_UNIQUE)
 #define HAVE_EXTENSION_DATEUTILS        (current.l_extensions&TPPLEXER_EXTENSION_DATEUTILS)
 #define HAVE_EXTENSION_TIMEUTILS        (current.l_extensions&TPPLEXER_EXTENSION_TIMEUTILS)
 #define HAVE_EXTENSION_TIMESTAMP        (current.l_extensions&TPPLEXER_EXTENSION_TIMESTAMP)
+#define HAVE_EXTENSION_TPP_EVAL         (current.l_extensions&TPPLEXER_EXTENSION_TPP_EVAL)
+#define HAVE_EXTENSION_TPP_UNIQUE       (current.l_extensions&TPPLEXER_EXTENSION_TPP_UNIQUE)
+#define HAVE_EXTENSION_TPP_LOAD_FILE    (current.l_extensions&TPPLEXER_EXTENSION_TPP_LOAD_FILE)
 
 
 
@@ -3332,6 +3333,56 @@ err:
  return result;
 }
 
+PRIVATE /*ref*/struct TPPString *
+escape_entire_file(struct TPPFile *infile) {
+ struct TPPString *result,*newresult;
+ size_t insize,reqsize,allocsize;
+ /* Load the initial chunk. */
+ if unlikely(infile->f_begin == infile->f_end &&
+            !TPPFile_NextChunk(infile,0)) {
+  /* Special case: Empty file. */
+  TPPString_Incref(empty_string);
+  return empty_string;
+ }
+ insize = (size_t)(infile->f_end-infile->f_begin);
+ reqsize = TPP_SizeofEscape(infile->f_begin,insize)+2;
+ result = (struct TPPString *)malloc(TPP_OFFSETOF(struct TPPString,s_text)+
+                                    (reqsize+1)*sizeof(char));
+ if unlikely(!result) return NULL;
+ assert(reqsize);
+ result->s_refcnt = 1;
+ result->s_size = allocsize = reqsize;
+ result->s_text[0] = '\"';
+ TPP_Escape(result->s_text+1,infile->f_begin,insize);
+ while (TPPFile_NextChunk(infile,0)) {
+  /* Escape and append this chunk. */
+  insize = (size_t)(infile->f_end-infile->f_begin);
+  reqsize = result->s_size+TPP_SizeofEscape(infile->f_begin,insize);
+  if (reqsize > allocsize) {
+   while (allocsize < reqsize) allocsize *= 2;
+   newresult = (struct TPPString *)realloc(result,TPP_OFFSETOF(struct TPPString,s_text)+
+                                          (allocsize+1)*sizeof(char));
+   if unlikely(!newresult) goto err_r;
+   result = newresult;
+  }
+  TPP_Escape(result->s_text+(result->s_size-1),infile->f_begin,insize);
+  result->s_size = reqsize;
+ }
+ if (result->s_size != allocsize) {
+  newresult = (struct TPPString *)realloc(result,TPP_OFFSETOF(struct TPPString,s_text)+
+                                         (result->s_size+1)*sizeof(char));
+  if likely(newresult) result = newresult;
+ }
+ assert(result->s_size);
+ result->s_text[result->s_size-1] = '\"';
+ result->s_text[result->s_size] = '\0';
+ return result;
+err_r:
+ free(result);
+ return NULL;
+}
+
+
 PRIVATE char const date_month_names[12][4] = {
  "Jan","Feb","Mar","Apr","May","Jun",
  "Jul","Aug","Sep","Oct","Nov","Dec"};
@@ -3340,6 +3391,7 @@ PRIVATE char const date_wday_names[7][4] = {
 
 PUBLIC tok_t TPPLexer_Yield(void) {
  struct TPPFile *macro;
+ struct TPPString *string_text;
  tok_t result;
 again:
  result = TPPLexer_YieldPP();
@@ -3435,7 +3487,6 @@ again:
    { /* Generate an escaped string representation of the current file's name. */
     char const *name;
     size_t      size,quoted_size;
-    struct TPPString *string_text;
     struct TPPFile   *string_file;
    case KWD___FILE__:
     name = TPPLexer_FILE(&size);
@@ -3627,13 +3678,17 @@ create_int_file:
    } break;
 
    { /* Check various attributes of include files. */
-    int mode,temp; struct TPPFile *curfile;
+    tok_t function; int mode,temp; struct TPPFile *curfile,*incfile;
     char *include_begin,*include_end,endch;
    case KWD___has_include:
    case KWD___has_include_next:
     if (!HAVE_EXTENSION_CLANG_FEATURES) goto end;
-    mode = 0;
-    if (TOK == KWD___has_include_next) mode |= TPPLEXER_OPENFILE_FLAG_NEXT;
+    if (FALSE) {
+   case KWD___TPP_LOAD_FILE:
+    if (!HAVE_EXTENSION_TPP_LOAD_FILE) goto end;
+    }
+    function = TOK,mode = 0;
+    if (function == KWD___has_include_next) mode |= TPPLEXER_OPENFILE_FLAG_NEXT;
     pushf();
     current.l_flags &= ~(TPPLEXER_FLAG_WANTCOMMENTS|
                          TPPLEXER_FLAG_WANTSPACE|
@@ -3677,11 +3732,17 @@ create_int_file:
      }
      ++include_end;
     }
-    intval = TPPLexer_OpenFile(mode,include_begin,
-                              (size_t)(include_end-include_begin),
-                               NULL) != NULL;
     /* Place the file pointer after the end of the #include string. */
     curfile->f_pos = include_end+1;
+    /* Try to open the file described.
+     * NOTE: If we do manage to open it, it will already
+     *       be cached when a #include tries to use it. */
+    incfile = TPPLexer_OpenFile(mode,include_begin,
+                               (size_t)(include_end-include_begin),
+                                NULL);
+    if (function == KWD___TPP_LOAD_FILE && !incfile) {
+     TPPLexer_Warn(W_FILE_NOT_FOUND,include_begin);
+    }
     pushf();
     current.l_flags &= ~(TPPLEXER_FLAG_WANTCOMMENTS|
                          TPPLEXER_FLAG_WANTSPACE|
@@ -3695,6 +3756,19 @@ create_int_file:
      assert(token.t_begin <= token.t_file->f_end);
      token.t_file->f_pos = token.t_begin;
     }
+    if (function == KWD___TPP_LOAD_FILE) {
+     if (!incfile) string_text = TPPString_New("\"\"",2);
+     else {
+      /* Special case: Load the raw text of this file. */
+      incfile = TPPFile_CopyForInclude(incfile);
+      if unlikely(!incfile) goto seterr;
+      string_text = escape_entire_file(incfile);
+      TPPFile_Decref(incfile);
+     }
+     if unlikely(!string_text) goto seterr;
+     goto use_string_text;
+    }
+    intval = incfile != NULL;
     goto create_int_file;
    } break;
 
