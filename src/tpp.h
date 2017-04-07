@@ -85,17 +85,23 @@
 // [<recursion>]  #define inc(x)           inc(x+1)                        /*< Recursively allow macros to expand themself (Must be enabled using pragmas; Inconjunction with __TPP_EVAL, very useful for creating loops). */
 //
 //BUILTIN MACROS:
-// [__FILE__]          printf("%s\n",__FILE__);          /*< Expand to the string representation of the current file. */
-// [__LINE__]          printf("%d\n",__LINE__);          /*< Expand to the integral representation of the current line. */
-// [__TIME__]          printf("%s\n",__TIME__);          /*< Expand to the string representation of the current time. */
-// [__DATE__]          printf("%s\n",__DATE__);          /*< Expand to the string representation of the current date. */
-// [__BASE_FILE__]     printf("%s\n",__BASE_FILE__);     /*< Expand to the name of the original source file used to startup the preprocessor. */
-// [__INCLUDE_LEVEL__] printf("%d\n",__INCLUDE_LEVEL__); /*< Expand to the integral representation of how many files away the original source file is (this counter starts at '0'). */
-// [__COUNTER__]       printf("%d\n",__COUNTER__);       /*< Expand to the integral representation an integral that increments by 1 every time it is expanded (starts at '0'). */
-// [_Pragma]           _Pragma("once")                   /*< STD-C style pragma with a string as argument (unknown pragmas are re-emit). */
-// [__pragma]          __pragma(once)                    /*< MSVC style pragma with the argument not being a string (unknown pragmas are re-emit). */
-// [__TPP_EVAL]        __TPP_EVAL(10+20)                 /*< Evaluate an expression as used by '#if'. This macro expands to the string/decimal representation of that expression's value. */
-// [__TPP_UNIQUE]      #define __TPP_UNIQUE(keyword)     /*< A unique integral number associated with 'keyword'; new keywords have greater numbers. */
+// [__FILE__]            printf("%s\n",__FILE__);                    /*< Expand to the string representation of the current file. */
+// [__LINE__]            printf("%d\n",__LINE__);                    /*< Expand to the integral representation of the current line. */
+// [__TIME__]            printf("%s\n",__TIME__);                    /*< Expand to the string representation of the current time. */
+// [__DATE__]            printf("%s\n",__DATE__);                    /*< Expand to the string representation of the current date. */
+// [__BASE_FILE__]       printf("%s\n",__BASE_FILE__);               /*< Expand to the name of the original source file used to startup the preprocessor. */
+// [__INCLUDE_LEVEL__]   printf("%d\n",__INCLUDE_LEVEL__);           /*< Expand to the integral representation of how many files away the original source file is (this counter starts at '0'). */
+// [__COUNTER__]         printf("%d\n",__COUNTER__);                 /*< Expand to the integral representation an integral that increments by 1 every time it is expanded (starts at '0'). */
+// [_Pragma]             _Pragma("once")                             /*< STD-C style pragma with a string as argument (unknown pragmas are re-emit). */
+// [__pragma]            __pragma(once)                              /*< MSVC style pragma with the argument not being a string (unknown pragmas are re-emit). */
+// [__TIME_*__]          printf("%d\n",__TIME_SEC__)                 /*< Expand to the integral representation of the current '__TIME_SEC__', '__TIME_MIN__' or '__TIME_HOUR__'. */
+// [__DATE_*__]          printf("%d\n",__DATE_DAY__)                 /*< Expand to the integral representation of the current '__DATE_DAY__', '__DATE_WDAY__', '__DATE_YDAY__', '__DATE_MONTH__' or '__DATE_YEAR__'. */
+// [__TPP_UNIQUE]        __TPP_UNIQUE(keyword)                       /*< A unique integral number associated with 'keyword'; new keywords have greater numbers. */
+// [__TPP_COUNTER]       __TPP_COUNTER(keyword)                      /*< Similar to __COUNTER__, but instead of global, the current index increments individually for different given keywords. */
+// [__TPP_RANDOM]        __TPP_RANDOM(count)|__TPP_RANDOM(begin,end) /*< Expand to a random integral between '0..count-1' or 'begin..end-1' (inclusive). */
+// [__TPP_EVAL]          __TPP_EVAL(10+20)                           /*< Evaluate an expression as used by '#if'. This macro expands to the string/decimal representation of that expression's value. */
+// [__TPP_LOAD_FILE]     __TPP_LOAD_FILE(<stdlib.h>)                 /*< Expand to the string representation of the unmodified contents of the given file. (NOTE: The file's name is a regular #include-string) */
+// [__TPP_STR_DECOMPILE] __TPP_STR_DECOMPILE("foo bar foobar")       /*< Re-parse the given string, yielding all tokens contained within (The example would expand to [foo][ ][bar][ ][foobar]). */
 //
 //PRAGMA EXTENSIONS:
 // [once]              #pragma once                      /*< Mark a file that should only be #includ-ed once (same as defining and setting a unique #include-guard for that file). */
