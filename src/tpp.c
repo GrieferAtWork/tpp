@@ -1953,7 +1953,7 @@ keyword_popmacro(struct TPPKeyword *self) {
  assert(macro->f_kind == TPPFILE_KIND_MACRO);
  if likely(!--macro->f_macro.m_pushcount) {
   /* Last pop (Must actually remove the file from the push/pop chain) */
-  self->k_rare->kr_oldmacro = macro->f_macro.m_pushprev; /* Inherit reference. */
+  self->k_rare->kr_oldmacro = macro->f_macro.m_pushprev; /*< Inherit reference. */
   macro->f_macro.m_pushprev = NULL;
  } else {
   /* The macro was pushed multiple times and must remain on the push/pop stack. */
@@ -1961,7 +1961,7 @@ keyword_popmacro(struct TPPKeyword *self) {
  }
 set_macro:
  if unlikely(self->k_macro) TPPFile_Decref(self->k_macro);
- self->k_macro = macro; /* Inherit reference. */
+ self->k_macro = macro; /*< Inherit reference. */
  assert(!macro || !macro->f_macro.m_pushprev);
  assert(!macro || !macro->f_macro.m_pushcount);
 }
@@ -2419,6 +2419,47 @@ TPPLexer_AddIncludePath(char *path, size_t pathsize) {
  return 1;
 }
 
+PUBLIC int
+TPPLexer_Define(char const *__restrict name, size_t name_size,
+                char const *__restrict value, size_t value_size) {
+ struct TPPKeyword *keyword;
+ struct TPPString *value_string;
+ struct TPPFile *macro_file,*oldfile;
+ assert(TPPLexer_Current);
+ assert(name);
+ assert(value);
+ /* Create the text string. */
+ value_string = TPPString_New(value,value_size);
+ if unlikely(!value_string) return 0;
+ /* Lookup the keyword associated with 'name'. */
+ keyword = TPPLexer_LookupKeyword(name,name_size,1);
+ if unlikely(!keyword) goto err_value_string;
+ /* Create a macro file inheriting the string. */
+ macro_file = (struct TPPFile *)malloc(TPPFILE_SIZEOF_MACRO_KEYWORD);
+ if unlikely(!macro_file) goto err_value_string;
+ macro_file->f_refcnt            = 1;
+ macro_file->f_kind              = TPPFILE_KIND_MACRO;
+ macro_file->f_prev              = NULL;
+ macro_file->f_name              = keyword->k_name;
+ macro_file->f_namesize          = keyword->k_size;
+ macro_file->f_namehash          = keyword->k_hash;
+ macro_file->f_text              = value_string; /*< Inherit reference. */
+ macro_file->f_begin             = value_string->s_text;
+ macro_file->f_end               = value_string->s_text+value_string->s_size;
+ macro_file->f_pos               = value_string->s_text;
+ macro_file->f_macro.m_flags     = TPP_MACROFILE_KIND_KEYWORD;
+ macro_file->f_macro.m_deffile   = NULL;
+ macro_file->f_macro.m_defline   = 0;
+ macro_file->f_macro.m_pushprev  = NULL;
+ macro_file->f_macro.m_pushcount = 0;
+ oldfile          = keyword->k_macro; /*< Inherit reference. */
+ keyword->k_macro = macro_file;       /*< Inherit reference. */
+ if (oldfile) TPPFile_Decref(oldfile);
+ return oldfile ? 2 : 1;
+err_value_string: TPPString_Decref(value_string); return 0;
+}
+
+
 
 PRIVATE struct TPPFile *
 open_normal_file(char *filename, size_t filename_size,
@@ -2546,6 +2587,7 @@ end_buffer: free(buffer);
  return result;
 err_buffer: result = NULL; goto end_buffer;
 }
+
 
 
 PRIVATE struct TPPKeyword *
@@ -4082,7 +4124,7 @@ create_int_file:
      TPPString_Decref(val.c_data.c_string);
      goto again;
     }
-    string_text = val.c_data.c_string; /* Inherit reference. */
+    string_text = val.c_data.c_string; /*< Inherit reference. */
     goto create_string_file;
    } break;
 
@@ -4158,7 +4200,7 @@ create_int_file:
      basestring = empty_string;
      TPPString_Incref(empty_string);
     } else {
-     basestring = val.c_data.c_string; /* Inherit reference. */
+     basestring = val.c_data.c_string; /*< Inherit reference. */
     }
     if (TOK != ',') TPPLexer_Warn(W_EXPECTED_COMMA);
     else yield_fetch();

@@ -273,13 +273,11 @@ struct TPPMacroFile {
 #define TPP_MACROFILE_KIND_EXPANDED        0x00000002 /*< Expanded version of a function macro. */
  uint32_t               m_flags;         /*< [const] Macro flags. */
  /*ref*/struct TPPFile *m_deffile;       /*< [const][0..1][(!= NULL) == (m_textref != NULL)] The file that originally defined this macro (or NULL if predefined, or from the commandline). */
- int                    m_defline;       /*< [const] Line in which this macro was defined (based on first character of macro name) */
+ int                    m_defline;       /*< [const] Line in which this macro was defined (based on first character of the macro's name). */
  /*ref*/struct TPPFile *m_pushprev;      /*< [0..1] Previous version of a pushed macro. */
  size_t                 m_pushcount;     /*< The amount of times this macro was pushed (used to handle multiple calls to 'push_macro'). */
  /* The following */
 union{struct{
-}                       m_keyword;       /*< [TPP_MACROFILE_KIND_KEYWORD] */
-struct{
  size_t                 f_argc;          /*< [const] Amount of arguments this function takes. */
  size_t                 f_expansions;    /*< The amount of existing expansions of this macro.
                                           *  NOTE: Depending on the 'TPP_MACROFILE_FLAG_FUNC_SELFEXPAND' flag,
@@ -301,7 +299,7 @@ struct {
 
 /* Minimum malloc-sizes of various kinds of TPP files types. */
 #define TPPFILE_SIZEOF_TEXT           TPP_OFFSETAFTER(struct TPPFile,f_textfile)
-#define TPPFILE_SIZEOF_MACRO_KEYWORD  TPP_OFFSETAFTER(struct TPPFile,f_macro.m_keyword)
+#define TPPFILE_SIZEOF_MACRO_KEYWORD  TPP_OFFSETOF(struct TPPFile,f_macro.m_function)
 #define TPPFILE_SIZEOF_MACRO_FUNCTION TPP_OFFSETAFTER(struct TPPFile,f_macro.m_function)
 #define TPPFILE_SIZEOF_MACRO_EXPANDED TPP_OFFSETAFTER(struct TPPFile,f_macro.m_expand)
 #define TPPFILE_SIZEOF_PROXY          TPP_OFFSETAFTER(struct TPPFile,f_proxy)
@@ -819,6 +817,14 @@ TPPFUN struct TPPKeyword *TPPLexer_LookupKeywordID(TPP(tok_t) id);
 // @return: 1: The given path was successfully added.
 // @return: 2: The given path had already been added before.
 TPPFUN int TPPLexer_AddIncludePath(char *path, size_t pathsize);
+
+//////////////////////////////////////////////////////////////////////////
+// Define a regular, keyword-style macro 'name' as 'value'.
+// @return: 0: Not enough available memory.
+// @return: 1: Successfully defined the given macro.
+// @return: 2: A macro named 'name' was already defined, and was overwritten.
+TPPFUN int TPPLexer_Define(char const *__restrict name, size_t name_size,
+                           char const *__restrict value, size_t value_size);
 
 //////////////////////////////////////////////////////////////////////////
 // Similar to 'TPPLexer_Yield' and used to implement it, but

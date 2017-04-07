@@ -224,9 +224,14 @@ int main(int argc, char *argv[]) {
    TPPLexer_Current->l_flags &= ~(TPPLEXER_FLAG_WANTSPACE|
                                   TPPLEXER_FLAG_WANTLF),
    outline_tokens = OUTLINE_MODE_ZERO;
-  else if (*arg == 'I') { if (!arg[1] && argc > 1) arg = argv[1],++argv,--argc;
-                          
-  } else {
+  else if (*arg == 'I') { if (!*arg++ && argc > 1) arg = argv[1],++argv,--argc;
+                          if (!TPPLexer_AddIncludePath(arg,strlen(arg))) _exit(1); }
+  else if (*arg == 'D') { char *val;
+                          if (!*arg++ && argc > 1) arg = argv[1],++argv,--argc;
+                          val = strchr(arg,'=');
+                          if (val) *val++ = '\0'; else val = "1";
+                          if (!TPPLexer_Define(arg,strlen(arg),val,strlen(val))) _exit(1); }
+  else {
    fprintf(stderr,
            "Unknown option: \"%s\"\n"
            "See '%s --help' for more help\n",
