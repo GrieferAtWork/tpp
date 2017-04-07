@@ -237,7 +237,7 @@ do{uint32_t const _oldflags = current.l_flags
 #define breakf() (void)(current.l_flags = _oldflags)
 #define popf() \
    /* NOTE: Don't override the error-flag! */\
-   current.l_flags = _oldflags|(current.l_flags&TPPLEXER_FLAG_ERROR);\
+   current.l_flags = _oldflags|(current.l_flags&TPPLEXER_FLAG_MERGEMASK);\
 }while(FALSE)
 
 #define pusheob() \
@@ -364,6 +364,7 @@ do{ tok_t              _old_tok_id    = token.t_id;\
 #define HAVE_EXTENSION_TPP_UNIQUE       (current.l_extensions&TPPLEXER_EXTENSION_TPP_UNIQUE)
 #define HAVE_EXTENSION_TPP_LOAD_FILE    (current.l_extensions&TPPLEXER_EXTENSION_TPP_LOAD_FILE)
 #define HAVE_EXTENSION_TPP_COUNTER      (current.l_extensions&TPPLEXER_EXTENSION_TPP_COUNTER)
+#define HAVE_EXTENSION_TPP_RANDOM       (current.l_extensions&TPPLEXER_EXTENSION_TPP_RANDOM)
 
 
 
@@ -1924,7 +1925,7 @@ PUBLIC int
 TPP_ISBUILTINMACRO(TPP(tok_t) id) {
  int result = 0;
  switch (id) {
-#define MACRO(name,if)              case name: result = if; break;
+#define MACRO(name,if)              case name: result = !!(if); break;
 #include "tpp-defs.inl"
 #undef MACRO
   default: break;
@@ -3394,6 +3395,7 @@ PUBLIC tok_t TPPLexer_Yield(void) {
  struct TPPFile *macro;
  struct TPPString *string_text;
  tok_t result;
+ int_t intval;
 again:
  result = TPPLexer_YieldPP();
  if (TPP_ISKEYWORD(result)) {
@@ -3511,7 +3513,9 @@ use_string_text:
     if (!HAVE_EXTENSION_BASEFILE) goto end;
     name = TPPLexer_BASEFILE(&size);
     goto put_filename;
-   {
+   }
+
+   { /* STD-C Date/Time strings. */
     time_t timenow; struct tm *tmnow;
    case KWD___TIME__:
     string_text = (struct TPPString *)malloc(TPP_OFFSETOF(struct TPPString,s_text)+
@@ -3552,11 +3556,9 @@ use_string_text:
                  tmnow->tm_sec,1900+tmnow->tm_year);
     goto use_string_text;
    }
-   }
 
    { /* Generate an integral constant representing
       * the 1-based index of the current source-line. */
-    int_t intval;
     size_t intsize;
     struct TPPString *int_text;
     struct TPPFile   *int_file;
@@ -3575,6 +3577,7 @@ create_int_file:
     if unlikely(!int_file) { TPPString_Decref(int_text); goto seterr; }
     pushfile_inherited(int_file);
     goto again;
+   }
 
    { /* Expand into an integral constant representing the current include level. */
     struct TPPFile *file_iter;
@@ -3815,7 +3818,6 @@ create_int_file:
     }
     goto create_int_file;
    } break;
-   } /* End integral generators. */
 
    { /* MSVC-style pragma. */
     char *old_filepos;
@@ -3886,6 +3888,53 @@ create_int_file:
     if unlikely(!val_file) { TPPString_Decref(val_str); goto seterr; }
     pushfile_inherited(val_file);
     goto again;
+   } break;
+
+   { /* Expand into a random integral. */
+    int_t random_begin,random_end;
+    struct TPPConst val;
+   case KWD___TPP_RANDOM:
+    if (!HAVE_EXTENSION_TPP_RANDOM) goto end;
+    pushf();
+    current.l_flags &= ~(TPPLEXER_FLAG_WANTCOMMENTS|
+                         TPPLEXER_FLAG_WANTSPACE|
+                         TPPLEXER_FLAG_WANTLF);
+    yield_fetch();
+    if (TOK == '(') yield_fetch();
+    else TPPLexer_Warn(W_EXPECTED_LPAREN);
+    /* Evaluate a constant preprocessor-expression. */
+    if unlikely(!TPPLexer_Eval(&val)) {err_randomf: breakf(); return TOK_ERR; }
+    TPPConst_ToInt(&val);
+    if (TOK == ',') {
+     yield_fetch();
+     random_begin = val.c_data.c_int;
+     if unlikely(!TPPLexer_Eval(&val)) goto err_randomf;
+     TPPConst_ToInt(&val);
+     random_end = val.c_data.c_int;
+    } else {
+     random_begin = 0;
+     random_end = val.c_data.c_int;
+    }
+    popf();
+    if (TOK != ')') {
+     TPPLexer_Warn(W_EXPECTED_RPAREN);
+     token.t_file->f_pos = token.t_begin;
+    }
+    /* Generate a random integer between 'random_begin..random_end-1' */
+    if (random_begin >= random_end) intval = random_begin;
+    else {
+     if (!(current.l_flags&TPPLEXER_FLAG_RANDOM_INITIALIZED)) {
+      /* Initialize the RNG generate. */
+      srand((unsigned int)time(NULL));
+      current.l_flags |= TPPLEXER_FLAG_RANDOM_INITIALIZED;
+     }
+     random_end -= random_begin;
+     /* NOTE: The module here ~should~ be unnecessary
+      *      (But I don't trust nofin I didn't screw up myself)... */
+     intval      = (((int_t)rand()*random_end)/RAND_MAX) % random_end;
+     intval     += random_begin;
+    }
+    goto create_int_file;
    } break;
 
    { /* Various (true) predefined macros. */
