@@ -2307,11 +2307,12 @@ do_fix_filename(char *filename, size_t *pfilename_size) {
            (size_t)((text_end-text_iter)+1)*sizeof(char));
     --text_iter,--text_end;
    }
-   while (isspace(text_iter[1])) {
+   while (text_end != text_iter && isspace(text_iter[1])) {
     memmove(text_iter+1,text_iter+2, /* NOTE: This also moves the '\0'-terminator. */
            (size_t)((text_end-text_iter)-1)*sizeof(char));
     --text_end;
    }
+   if (text_end == text_iter) break;
   }
   ++text_iter;
  }
