@@ -195,7 +195,18 @@ struct TPPTextFile {
  size_t                   f_cacheinc;    /*< Used to track how often a given file is loaded onto the #include-stack.
                                           * (Only used for cached entires themself; aka. when 'f_cacheentry == NULL'). */
  size_t                   f_rdata;       /*< (In bytes) The amount of data already read from the stream. */
- char                     f_prefixdel;   /*< The original character at ':f_end' that was overwritten with a '\0' */
+ char                     f_prefixdel;   /*< The original character at ':f_end' that was overwritten with a '\0'. */
+ char                     f_noguard;     /*< Set to non-ZERO after a secondary #ifdef block was detected at the top level of this file:
+                                          *  >> // File: "myfile.h"
+                                          *  >> #ifndef foo
+                                          *  >> #endif
+                                          *  >> #ifndef bar // This #ifndef will set 'f_noppguard' to non-ZERO
+                                          *  >> #endif
+                                          */
+ char                     f_padding[2];  /*< Padding data... */
+ struct TPPKeyword       *f_newguard;    /*< [0..1] The keyword of the #ifndef block that was determined to be located at the start of the file.
+                                          *         When the file is popped from the #include-stack, this is non-NULL and 'f_noppguard' is ZERO,
+                                          *         this keyword will be copied into the 'f_guard' field if not already set. */
 };
 
 /* HINT: something like
@@ -661,6 +672,10 @@ TPP_LOCAL int TPPLexer_COLUMN(void) { struct TPPFile *f = TPPLexer_Textfile(); r
 #define TPPLEXER_FLAG_NO_COLLONCOLLON       0x00020000 /*< Disable recognition of '::' tokens. */
 #define TPPLEXER_FLAG_INCLUDESTRING         0x00040000 /*< Parse strings as #include strings (without \-escape sequences). */
 #define TPPLEXER_FLAG_KEEP_ARG_WHITESPACE   0x00080000 /*< When set, keep whitespace surrounding macro arguments. */
+#define TPPLEXER_FLAG_NO_LEGACY_GUARDS      0x00100000 /*< Don't recognize legacy #include-guards
+                                                        *  WARNING: Not setting this option may lead to whitespace and comments at the
+                                                        *           start and end of a guarded file to not be emit on a second pass.
+                                                        *        >> Disable this option when either is important to your compiler. */
 #define TPPLEXER_FLAG_MSVC_MESSAGEFORMAT    0x01000000 /*< Use msvc's file+line format '%s(%d,%d) : ' instead of GCC's '%s:%d:%d: '. */
 #define TPPLEXER_FLAG_RANDOM_INITIALIZED    0x20000000 /*< Set when rand() has been initialized. */
 #define TPPLEXER_FLAG_NO_WARNINGS           0x40000000 /*< Don't emit warnings. */

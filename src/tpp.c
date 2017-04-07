@@ -374,6 +374,31 @@ do{ tok_t              _old_tok_id    = token.t_id;\
 
 
 
+//////////////////////////////////////////////////////////////////////////
+// Debug logging helpers
+#define LOG_CALLMACRO   1
+#define LOG_LEGACYGUARD 2
+#if TPP_CONFIG_DEBUG
+#define HAVELOG(level) ((level) == LOG_LEGACYGUARD) /* Change this to select active logs. */
+LOCAL void tpp_log(char const *fmt, ...) {
+ va_list args;
+ assert(TPPLexer_Current);
+ va_start(args,fmt);
+ fprintf(stderr,current.l_flags&TPPLEXER_FLAG_MSVC_MESSAGEFORMAT
+                ? "%s(%d,%d) : " : "%s:%d:%d: "
+               ,TPPLexer_FILE(NULL),TPPLexer_LINE()+1,TPPLexer_COLUMN()+1);
+ fwrite("DEBUG: ",sizeof(char),7,stderr);
+ vfprintf(stderr,fmt,args);
+ va_end(args);
+ fflush(stderr);
+}
+#define LOG(level,x)   (HAVELOG(level) ? tpp_log x : (void)0)
+#else
+#define HAVELOG(level) 0
+#define LOG(level,x)   (void)0
+#endif
+
+
 struct TPPExplicitFile {
  /* NOTE: Keep in sync with 'TPPFile'! */
  unsigned int             f_refcnt;
@@ -673,7 +698,10 @@ PRIVATE struct TPPFile TPPFile_Empty = {
  /* f_textfile.f_guard       */NULL,
  /* f_textfile.f_cacheinc    */0,
  /* f_textfile.f_rdata       */0,
- /* f_textfile.f_prefixdel   */0}
+ /* f_textfile.f_prefixdel   */0,
+ /* f_textfile.f_noguard     */1,
+ /* f_textfile.f_padding     */{0,0},
+ /* f_textfile.f_newguard    */NULL}
 };
 
 
@@ -797,6 +825,8 @@ TPPFile_OpenStream(TPP(stream_t) stream, char const *name) {
  result->f_textfile.f_cacheinc    = 0;
  result->f_textfile.f_rdata       = 0;
  result->f_textfile.f_prefixdel   = 0;
+ result->f_textfile.f_noguard     = 0;
+ result->f_textfile.f_newguard    = NULL;
  result->f_refcnt                 = 1;
  result->f_kind                   = TPPFILE_KIND_TEXT;
  result->f_prev                   = NULL;
@@ -2899,6 +2929,20 @@ PRIVATE int at_start_of_line(void) {
 
 PRIVATE void on_popfile(struct TPPFile *file) {
  struct TPPIfdefStackSlot *slot;
+ if (file->f_kind == TPPFILE_KIND_TEXT && /*< Is this a textfile. */
+    !file->f_textfile.f_cacheentry &&     /*< Make sure isn't not a cache-reference. */
+     file->f_textfile.f_newguard &&       /*< Make sure there is a possibility for a guard. */
+    !file->f_textfile.f_guard &&          /*< Make sure the file doesn't already have a guard. */
+    !file->f_textfile.f_noguard) {        /*< Make sure the file is allowed to have a guard. */
+  /* DEBUG: Log detection of legacy #include-guards. */
+  LOG(LOG_LEGACYGUARD,("Determined #include-guard '%s' for '%s'\n",
+                       file->f_textfile.f_newguard->k_name,file->f_name));
+  /* This entire file is protected by a guard. */
+  file->f_textfile.f_guard    = file->f_textfile.f_newguard;
+  /* Prevent overhead from future checks. */
+  file->f_textfile.f_noguard  = 1;
+  file->f_textfile.f_newguard = NULL;
+ }
  while (current.l_ifdef.is_slotc &&
        (slot = &current.l_ifdef.is_slotv[current.l_ifdef.is_slotc-1],
         slot->iss_file == file)) {
@@ -3164,6 +3208,44 @@ def_skip_until_lf:
      TPPLexer_Warn(W_EXPECTED_KEYWORD_AFTER_IFDEF);
      ifndef_keyword = NULL;
     }
+    if (block_mode) {
+     struct TPPFile *curfile = token.t_file;
+     /* #ifndef: Check if we're at the start of the file to setup a #include guard.
+      * WARNING: This detection code will fail to recognize guards when the
+      *          #ifndef isn't located within the first chunk of the file.
+      *          But since this detection is only used for optimization, that's OK. */
+     if (!(current.l_flags&TPPLEXER_FLAG_NO_LEGACY_GUARDS) && /*< Detection of legacy guard is allowed. */
+          (curfile->f_kind == TPPFILE_KIND_TEXT) &&           /*< The current file is a text-file. */
+          (!curfile->f_textfile.f_cacheentry) &&              /*< The current file isn't a cache-reference. */
+          (!current.l_ifdef.is_slotc ||                       /*< This is an outer-most block for this file. */
+            current.l_ifdef.is_slotv[current.l_ifdef.is_slotc-1].iss_file != curfile) &&
+          (!curfile->f_textfile.f_guard) &&                   /*< The current file doesn't already have a guard. */
+          (!curfile->f_textfile.f_noguard)) {                 /*< The current file is allowed to contain a guard. */
+      if (curfile->f_textfile.f_newguard) {
+       /* Special case: We already found a potential guard in this file.
+        *               The fact that we're here again means that this file
+        *               has multiple preprocessor-blocks at its top-level,
+        *               meaning that the file is no longer a candidate for
+        *               a legacy #include-guard. */
+       curfile->f_textfile.f_noguard  = 1;
+       curfile->f_textfile.f_newguard = NULL;
+      } else if (/* We are inside the first chunk, meaning we can correctly
+                  * determine if this is the first thing inside the file. */
+                (curfile->f_textfile.f_rdata == curfile->f_text->s_size) &&
+                 /* Check if the '#' points to the first non-comment, non-space/lf character. */
+                (assert(hash_begin >= curfile->f_text->s_text),
+                 assert(hash_begin <= curfile->f_text->s_text+curfile->f_text->s_size),
+                 skip_whitespace_and_comments(curfile->f_text->s_text,hash_begin) == hash_begin)
+                 ) {
+       /* Potential guard-block! Store the #ifndef-keyword as the potential future guard. */
+       curfile->f_textfile.f_newguard = ifndef_keyword;
+      } else {
+       /* There are other (important) tokens before the first #ifndef block
+        * >> Don't allow this file to have a guard! */
+       curfile->f_textfile.f_noguard  = 1;
+      }
+     }
+    }
     block_mode ^= ifndef_keyword && TPPKeyword_ISDEFINED(ifndef_keyword);
 create_block:
     /* Enter a #ifdef block, that is enabled when 'guard_mode' is '1' */
@@ -3189,6 +3271,7 @@ create_block:
     struct TPPConst ifval;
    case KWD_if:
     yield_fetch();
+    /* TODO: Automatically detect '#if !defined FOO'/'#if !defined(FOO)'-style guards. */
     if unlikely(!TPPLexer_Eval(&ifval)) goto err;
     TPPConst_ToBool(&ifval);
     block_mode = (int)ifval.c_data.c_int;
@@ -3306,6 +3389,8 @@ skip_block_and_parse:
     if (include_file->f_textfile.f_guard &&
         TPPKeyword_ISDEFINED(include_file->f_textfile.f_guard)) {
      /* File is guarded by an active preprocessor macro (Don't #include it). */
+     LOG(LOG_LEGACYGUARD,("Skip include for file '%s' is guarded by active guard '%s'\n",
+                          include_file->f_name,include_file->f_textfile.f_guard->k_name));
      break;
     }
     /* Make sure we're not exceeding the #include recursion limit. */
@@ -5648,18 +5733,11 @@ TPPLexer_ParsePragma(tok_t endat) {
     TPPLexer_Warn(W_EXPECTED_STRING_AFTER_MESSAGE,&message);
    } else {
     if (current.l_flags&TPPLEXER_FLAG_MESSAGE_LOCATION) {
-     if (current.l_flags&TPPLEXER_FLAG_MSVC_MESSAGEFORMAT) {
-      fprintf(stderr,"%s(%d,%d) : ",
-              TPPLexer_FILE(NULL),
-              TPPLexer_LINE()+1,
-              TPPLexer_COLUMN()+1);
-     } else {
-      fprintf(stderr,"%s:%d:%d: ",
-              TPPLexer_FILE(NULL),
-              TPPLexer_LINE()+1,
-              TPPLexer_COLUMN()+1);
-     }
+     fprintf(stderr,current.l_flags&TPPLEXER_FLAG_MSVC_MESSAGEFORMAT
+             ? "%s(%d,%d) : " : "%s:%d:%d: ",
+             TPPLexer_FILE(NULL),TPPLexer_LINE()+1,TPPLexer_COLUMN()+1);
      fprintf(stderr,"#pragma message: ",TPPLexer_FILE(NULL),TPPLexer_LINE()+1);
+     fflush(stderr);
     }
     if (!(current.l_flags&TPPLEXER_FLAG_MESSAGE_NOLINEFEED)) {
      register char oldch,*poldch;
@@ -5820,15 +5898,9 @@ PUBLIC int TPPLexer_Warn(int wnum, ...) {
  switch (wnum) {
   case W_IF_WITHOUT_ENDIF:
    ifdef_slot = ARG(struct TPPIfdefStackSlot *);
-   if (current.l_flags&TPPLEXER_FLAG_MSVC_MESSAGEFORMAT) {
-    WARNF("%s(%d) : ",
-          ifdef_slot->iss_file->f_name,
-          ifdef_slot->iss_line+1);
-   } else {
-    WARNF("%s:%d: ",
-          ifdef_slot->iss_file->f_name,
-          ifdef_slot->iss_line+1);
-   }
+   WARNF(current.l_flags&TPPLEXER_FLAG_MSVC_MESSAGEFORMAT
+         ? "%s(%d) : " : "%s:%d: ",
+         ifdef_slot->iss_file->f_name,ifdef_slot->iss_line+1);
    WARNF("#if without #endif\n");
    goto end;
   default: break; 
@@ -5841,11 +5913,9 @@ PUBLIC int TPPLexer_Warn(int wnum, ...) {
  } else {
   true_filename = used_filename;
  }
- if (current.l_flags&TPPLEXER_FLAG_MSVC_MESSAGEFORMAT) {
-  WARNF("%s(%d,%d) : ",true_filename,TPPLexer_TRUE_LINE()+1,TPPLexer_TRUE_COLUMN()+1);
- } else {
-  WARNF("%s:%d:%d: ",true_filename,TPPLexer_TRUE_LINE()+1,TPPLexer_TRUE_COLUMN()+1);
- }
+ WARNF(current.l_flags&TPPLEXER_FLAG_MSVC_MESSAGEFORMAT
+       ? "%s(%d,%d) : " : "%s:%d:%d: "
+       ,true_filename,TPPLexer_TRUE_LINE()+1,TPPLexer_TRUE_COLUMN()+1);
  if (macro_name) WARNF("In macro '%.*s': ",macro_name_size,macro_name);
  switch (wnum) {
   case W_STARSLASH_OUTSIDE_OF_COMMENT    : WARNF("'*" "/' outside of comment"); break;
@@ -5901,27 +5971,17 @@ PUBLIC int TPPLexer_Warn(int wnum, ...) {
   case W_ELIF_WITHOUT_IF                 : WARNF("#elif without #if"); break;
   case W_ELSE_AFTER_ELSE                 : WARNF("#else after #else\n");
                                            ifdef_slot = ARG(struct TPPIfdefStackSlot *);
-                                           if (current.l_flags&TPPLEXER_FLAG_MSVC_MESSAGEFORMAT) {
-                                            WARNF("%s(%d) : See reference to previous #else",
-                                                  ifdef_slot->iss_file->f_name,
-                                                  ifdef_slot->iss_line+1);
-                                           } else {
-                                            WARNF("%s:%d: See reference to previous #else",
-                                                  ifdef_slot->iss_file->f_name,
-                                                  ifdef_slot->iss_line+1);
-                                           }
+                                           WARNF(current.l_flags&TPPLEXER_FLAG_MSVC_MESSAGEFORMAT
+                                                 ? "%s(%d) : " : "%s:%d: ",
+                                                 ifdef_slot->iss_file->f_name,ifdef_slot->iss_line+1);
+                                           WARNF("See reference to previous #else");
                                            break;
   case W_ELIF_AFTER_ELSE                 : WARNF("#elif after #else\n");
                                            ifdef_slot = ARG(struct TPPIfdefStackSlot *);
-                                           if (current.l_flags&TPPLEXER_FLAG_MSVC_MESSAGEFORMAT) {
-                                            WARNF("%s(%d) : See reference to #else",
-                                                  ifdef_slot->iss_file->f_name,
-                                                  ifdef_slot->iss_line+1);
-                                           } else {
-                                            WARNF("%s:%d: See reference to #else",
-                                                  ifdef_slot->iss_file->f_name,
-                                                  ifdef_slot->iss_line+1);
-                                           }
+                                           WARNF(current.l_flags&TPPLEXER_FLAG_MSVC_MESSAGEFORMAT
+                                                 ? "%s(%d) : " : "%s:%d: ",
+                                                 ifdef_slot->iss_file->f_name,ifdef_slot->iss_line+1);
+                                           WARNF("See reference to #else");
                                            break;
   case W_ENDIF_WITHOUT_IF                : WARNF("#endif without #if"); break;
   case W_DEPRECATED_IDENTIFIER           : WARNF("DEPRECATED : '%s'",KWDNAME()); break;
