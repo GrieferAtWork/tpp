@@ -236,7 +236,7 @@ PUBLIC struct TPPLexer *TPPLexer_Current = NULL;
 
 #define pushf() \
 do{uint32_t const _oldflags = current.l_flags
-#define breakf() (void)(current.l_flags = _oldflags)
+#define breakf() (void)(current.l_flags = _oldflags|(current.l_flags&TPPLEXER_FLAG_MERGEMASK))
 #define popf() \
    /* NOTE: Don't override the error-flag! */\
    current.l_flags = _oldflags|(current.l_flags&TPPLEXER_FLAG_MERGEMASK);\
@@ -368,6 +368,7 @@ do{ tok_t              _old_tok_id    = token.t_id;\
 #define HAVE_EXTENSION_TPP_COUNTER      (current.l_extensions&TPPLEXER_EXTENSION_TPP_COUNTER)
 #define HAVE_EXTENSION_TPP_RANDOM       (current.l_extensions&TPPLEXER_EXTENSION_TPP_RANDOM)
 #define HAVE_EXTENSION_TPP_STR_DECOMPILE (current.l_extensions&TPPLEXER_EXTENSION_TPP_STR_DECOMPILE)
+#define HAVE_EXTENSION_TPP_STR_PACK     (current.l_extensions&TPPLEXER_EXTENSION_TPP_STR_PACK)
 
 
 
@@ -1704,7 +1705,7 @@ common_call_extension:
      if unlikely(!TPPLexer_Warn(W_SPECIAL_ARGUMENT_NAME,token.t_kwd)) goto err_arginfo;
     }
 add_macro_argument:
-    /* TODO: Check if an argument named 'argument_name' already exists. */
+    /* Check if an argument named 'argument_name' already exists. */
     new_arginfo_v = arginfo_v+result->f_macro.m_function.f_argc;
     while (new_arginfo_v-- != arginfo_v) if (new_arginfo_v->ai_id == argument_name) {
      if unlikely(!TPPLexer_Warn(W_ARGUMENT_NAMED_ALREADY_TAKEN,argument_name)) goto err_arginfo;
@@ -3844,8 +3845,7 @@ create_int_file:
     if (TOK == '(') TPPLexer_Yield();
     else TPPLexer_Warn(W_EXPECTED_LPAREN);
     /* WARNING: We leave macros turned on for this, because (perhaps surprisingly),
-    /*          visual studio _does_ expand macros in
-     */
+    /*          visual studio _does_ expand macros inside its __pragma helper. */
     pragma_error = TPPLexer_ParsePragma(')');
     while (token.t_file != current.l_eof_file) popfile();
     if (pragma_error) {
@@ -3944,7 +3944,7 @@ create_int_file:
     goto create_int_file;
    } break;
 
-   {
+   { /* Expand a given string into the contained tokens. */
     struct TPPConst val;
    case KWD___TPP_STR_DECOMPILE:
     if (!HAVE_EXTENSION_TPP_STR_DECOMPILE) break;
@@ -3974,6 +3974,52 @@ create_int_file:
      goto again;
     }
     string_text = val.c_data.c_string; /* Inherit reference. */
+    goto create_string_file;
+   } break;
+
+   { /* Pack a string from a variadic list of comma-separated integrals. */
+    struct TPPConst val; size_t allocsize,cursize;
+    struct TPPString *newtext; size_t reqsize; char ch;
+   case KWD___TPP_STR_PACK:
+    pushf();
+    current.l_flags &= ~(TPPLEXER_FLAG_WANTCOMMENTS|
+                         TPPLEXER_FLAG_WANTSPACE|
+                         TPPLEXER_FLAG_WANTLF);
+    yield_fetch();
+    if (TOK == '(') yield_fetch();
+    else TPPLexer_Warn(W_EXPECTED_LPAREN);
+    allocsize = cursize = 0,string_text = NULL;
+    TPPString_Incref(empty_string);
+    while (TOK != ')') {
+     if unlikely(!TPPLexer_Eval(&val)) { breakf(); return TOK_ERR; }
+     TPPConst_ToInt(&val);
+     ch = (char)val.c_data.c_int;
+     reqsize = cursize+TPP_SizeofEscape(&ch,1);
+     if (reqsize > allocsize) {
+      do allocsize = allocsize ? allocsize*2 : 2;
+      while (reqsize > allocsize);
+      newtext = (struct TPPString *)realloc(string_text,TPP_OFFSETOF(struct TPPString,s_text)+
+                                           (allocsize+3)*sizeof(char));
+      if unlikely(!newtext) { breakf(); goto seterr; }
+      string_text = newtext;
+     }
+     TPP_Escape(string_text->s_text+(cursize+1),&ch,1);
+     cursize = reqsize;
+          if (TOK == ',') yield_fetch();
+     else if (TOK != ')') TPPLexer_Warn(W_EXPECTED_COMMA);
+    }
+    popf();
+    if (!string_text) {
+     assert(!cursize);
+     string_text = (struct TPPString *)malloc(TPP_OFFSETOF(struct TPPString,s_text)+3*sizeof(char));
+     if unlikely(!string_text) goto seterr;
+    }
+    /* Fill in common text data. */
+    string_text->s_refcnt = 1;
+    string_text->s_size = cursize+2;
+    string_text->s_text[0] = '\"';
+    string_text->s_text[cursize+1] = '\"';
+    string_text->s_text[cursize+2] = '\0';
     goto create_string_file;
    } break;
 
