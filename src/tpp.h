@@ -696,6 +696,7 @@ TPP_LOCAL int TPPLexer_COLUMN(void) { struct TPPFile *f = TPPLexer_Textfile(); r
 #define TPPLEXER_EXTENSION_TPP_EVAL         0x0000000010000000ull /*< Enable the '__TPP_EVAL(...)' builtin macro. */
 #define TPPLEXER_EXTENSION_TPP_UNIQUE       0x0000000020000000ull /*< Enable the '__TPP_UNIQUE(...)' builtin macro. */
 #define TPPLEXER_EXTENSION_TPP_LOAD_FILE    0x0000000040000000ull /*< Enable the '__TPP_LOAD_FILE(...)' builtin macro. */
+#define TPPLEXER_EXTENSION_TPP_COUNTER      0x0000000080000000ull /*< Enable the '__TPP_COUNTER(...)' builtin macro. */
 #define TPPLEXER_EXTENSION_DEFAULT          0xffffffffffffffffull /*< Enable all extensions. */
 
 struct TPPLexer {

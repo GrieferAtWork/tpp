@@ -363,6 +363,7 @@ do{ tok_t              _old_tok_id    = token.t_id;\
 #define HAVE_EXTENSION_TPP_EVAL         (current.l_extensions&TPPLEXER_EXTENSION_TPP_EVAL)
 #define HAVE_EXTENSION_TPP_UNIQUE       (current.l_extensions&TPPLEXER_EXTENSION_TPP_UNIQUE)
 #define HAVE_EXTENSION_TPP_LOAD_FILE    (current.l_extensions&TPPLEXER_EXTENSION_TPP_LOAD_FILE)
+#define HAVE_EXTENSION_TPP_COUNTER      (current.l_extensions&TPPLEXER_EXTENSION_TPP_COUNTER)
 
 
 
@@ -3617,6 +3618,11 @@ create_int_file:
      if (!HAVE_EXTENSION_TPP_UNIQUE) goto end;
      create_missing_keyword = 1;
     }
+    if (FALSE) {
+   case KWD___TPP_COUNTER:
+     if (!HAVE_EXTENSION_TPP_COUNTER) goto end;
+     create_missing_keyword = 1;
+    }
     mode = TOK;
     pushf();
     current.l_flags &= ~(TPPLEXER_FLAG_WANTCOMMENTS|
@@ -3650,8 +3656,10 @@ create_int_file:
                                       create_missing_keyword);
     }
     /* Handle case: Unknown/unused keyword. */
-    if (!keyword) intval = 0;
-    else switch (mode) {
+    if (!keyword) {
+     if (create_missing_keyword) goto seterr;
+     intval = 0;
+    } else switch (mode) {
    //case KWD___is_identifier:
      default: intval = 1; break;
      case KWD___is_builtin_identifier:
@@ -3660,6 +3668,10 @@ create_int_file:
      case KWD___TPP_UNIQUE:
       assert(keyword->k_id >= TOK_KEYWORD_BEGIN);
       intval = (keyword->k_id-TOK_KEYWORD_BEGIN);
+      break;
+     case KWD___TPP_COUNTER:
+      if unlikely(!TPPKeyword_MAKERARE(keyword)) goto seterr;
+      intval = keyword->k_rare->kr_counter++;
       break;
      { /* Flag-based keyword properties. */
       uint32_t mask;
