@@ -705,6 +705,7 @@ TPP_LOCAL int TPPLexer_COLUMN(void) { struct TPPFile *f = TPPLexer_Textfile(); r
 #define TPPLEXER_EXTENSION_TPP_STR_DECOMPILE 0x0000000200000000ull/*< Enable the '__TPP_STR_DECOMPILE(...)' builtin macro. */
 #define TPPLEXER_EXTENSION_TPP_STR_SUBSTR   0x0000000400000000ull /*< Enable the '__TPP_STR_AT(...)' and '__TPP_STR_SUBSTR(...)' builtin macros. */
 #define TPPLEXER_EXTENSION_TPP_STR_PACK     0x0000000800000000ull /*< Enable the '__TPP_STR_PACK(...)' builtin macro. */
+#define TPPLEXER_EXTENSION_TPP_STR_SIZE     0x0000001000000000ull /*< Enable the '__TPP_STR_SIZE(...)' builtin macro. */
 #define TPPLEXER_EXTENSION_DEFAULT          0xffffffffffffffffull /*< Enable all extensions. */
 
 struct TPPLexer {

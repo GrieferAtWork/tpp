@@ -369,6 +369,7 @@ do{ tok_t              _old_tok_id    = token.t_id;\
 #define HAVE_EXTENSION_TPP_RANDOM       (current.l_extensions&TPPLEXER_EXTENSION_TPP_RANDOM)
 #define HAVE_EXTENSION_TPP_STR_DECOMPILE (current.l_extensions&TPPLEXER_EXTENSION_TPP_STR_DECOMPILE)
 #define HAVE_EXTENSION_TPP_STR_SUBSTR   (current.l_extensions&TPPLEXER_EXTENSION_TPP_STR_SUBSTR)
+#define HAVE_EXTENSION_TPP_STR_SIZE     (current.l_extensions&TPPLEXER_EXTENSION_TPP_STR_SIZE)
 #define HAVE_EXTENSION_TPP_STR_PACK     (current.l_extensions&TPPLEXER_EXTENSION_TPP_STR_PACK)
 
 
@@ -3985,6 +3986,7 @@ create_int_file:
     struct TPPConst val; size_t allocsize,cursize;
     struct TPPString *newtext; size_t reqsize; char ch;
    case KWD___TPP_STR_PACK:
+    if (!HAVE_EXTENSION_TPP_STR_PACK) break;
     pushf();
     current.l_flags &= ~(TPPLEXER_FLAG_WANTCOMMENTS|
                          TPPLEXER_FLAG_WANTSPACE|
@@ -4037,6 +4039,7 @@ create_int_file:
     char *sub_begin,*sub_end;
    case KWD___TPP_STR_AT:
    case KWD___TPP_STR_SUBSTR:
+    if (!HAVE_EXTENSION_TPP_STR_SUBSTR) break;
     escape_char = TOK == KWD___TPP_STR_AT ? '\'' : '\"';
     pushf();
     current.l_flags &= ~(TPPLEXER_FLAG_WANTCOMMENTS|
@@ -4092,6 +4095,31 @@ err_substr:  TPPString_Decref(basestring);
     string_text->s_text[escape_size+1] = escape_char;
     string_text->s_text[escape_size+2] = '\0';
     goto create_string_file;
+   } break;
+
+   { /* Returns the size (in characters) of a given string.
+      * NOTE: This is only here for backwards-compatibility. */
+    struct TPPConst val;
+   case KWD___TPP_STR_SIZE:
+    if (!HAVE_EXTENSION_TPP_STR_SIZE) break;
+    pushf();
+    current.l_flags &= ~(TPPLEXER_FLAG_WANTCOMMENTS|
+                         TPPLEXER_FLAG_WANTSPACE|
+                         TPPLEXER_FLAG_WANTLF);
+    yield_fetch();
+    if (TOK != '(') TPPLexer_Warn(W_EXPECTED_LPAREN);
+    else yield_fetch();
+    if unlikely(!TPPLexer_Eval(&val)) { breakf(); return TOK_ERR; }
+    if (TOK != ')') TPPLexer_Warn(W_EXPECTED_RPAREN);
+    popf();
+    if (val.c_kind != TPP_CONST_STRING) {
+     TPPLexer_Warn(W_EXPECTED_STRING_AFTER_TPP_STRAT,&val);
+     intval = 0;
+    } else {
+     intval = (int_t)val.c_data.c_string->s_size;
+     TPPString_Decref(val.c_data.c_string);
+    }
+    goto create_int_file;
    } break;
 
    { /* Various (true) predefined macros. */
