@@ -2746,7 +2746,10 @@ parse_multichar:
     if (forward == end) ch = 0;
     else for (;;) {
      ch = *forward;
-     if (!ch) break;
+     if (!ch && forward == end) {
+      if unlikely(!TPPLexer_Warn(W_COMMENT_TERMINATED_BY_EOF)) goto err;
+      break;
+     }
      ++forward;
      if (ch == '*') {
       while (SKIP_WRAPLF(forward,end));
@@ -6018,6 +6021,7 @@ PUBLIC int TPPLexer_Warn(int wnum, ...) {
   case W_EXPECTED_COLLON_AFTER_QUESTION  : WARNF("Expected ':' after '?'"); break;
   case W_STRING_TERMINATED_BY_LINEFEED   : WARNF("String was terminated by a linefeed"); break;
   case W_STRING_TERMINATED_BY_EOF        : WARNF("String was terminated by EOF"); break;
+  case W_COMMENT_TERMINATED_BY_EOF       : WARNF("Comment was terminated by EOF"); break;
   case W_UNKNOWN_TOKEN_IN_EXPR_IS_ZERO   : WARNF("Unrecognized token " TOK_S " is replaced with '0' in expression",TOK_A); break;
   case W_EXPECTED_RPAREN_IN_EXPRESSION   : WARNF("Expected ')' in expression, but got " TOK_S,TOK_A); break;
   case W_EXPECTED_RBRACKET_IN_EXPRESSION : WARNF("Expected ']' in expression, but got " TOK_S,TOK_A); break;
