@@ -38,6 +38,29 @@
 #include <unistd.h>
 #endif
 
+#define STR2(x) #x
+#define STR(x) STR2(x)
+#if defined(_MSC_FULL_VER) && defined(__cplusplus)
+#   define TPP_COMPILER "VC++ " STR(_MSC_FULL_VER)
+#elif defined(_MSC_FULL_VER) && !defined(__cplusplus)
+#   define TPP_COMPILER "VC " STR(_MSC_FULL_VER)
+#elif defined(__clang__) && defined(__cplusplus)
+#   define TPP_COMPILER "clang++ " STR(__clang__)
+#elif defined(__clang__) && !defined(__cplusplus)
+#   define TPP_COMPILER "clang " STR(__clang__)
+#elif defined(__GNUC__) && defined(__cplusplus)
+#   define TPP_COMPILER "g++ " STR(__GNUC__) "." STR(__GNUC_MINOR__) "." STR(__GNUC_PATCHLEVEL__)
+#elif defined(__GNUC__) && !defined(__cplusplus)
+#   define TPP_COMPILER "gcc " STR(__GNUC__) "." STR(__GNUC_MINOR__) "." STR(__GNUC_PATCHLEVEL__)
+#elif defined(__TINYC__)
+#   define TPP_COMPILER "tcc " STR(__TINYC__)
+#elif defined(__cplusplus)
+#   define TPP_COMPILER "Unknown c++ compiler"
+#else
+#   define TPP_COMPILER "Unknown c compiler"
+#endif
+
+
 #define OUTLINE_MODE_NONE 0
 #define OUTLINE_MODE_TOK  1 /* Outline with [...] */
 #define OUTLINE_MODE_ZERO 2 /* Separate with '\0' */
@@ -147,9 +170,31 @@ count_linefeeds(char const *iter, char const *end) {
  return result;
 }
 
+static char const version[] =
+"tpp version "
+STR(TPP_API_VERSION) "/"
+STR(TPP_PREPROCESSOR_VERSION) " - New Tiny PreProcessor - "
+"Copyright (C) 2017 Griefer@Work "
+"["
+#if TPP_CONFIG_DEBUG
+"DEBUG|"
+#endif /* TPP_CONFIG_DEBUG */
+#if TPP_CONFIG_ONELEXER
+"ONE|"
+#endif /* TPP_CONFIG_ONELEXER */
+#ifdef __TPP_VERSION__
+"TPP " STR(__TPP_VERSION__) "|"
+#endif
+TPP_COMPILER
+#if defined(__TIME__) && defined(__DATE__)
+"|" __TIME__ " " __DATE__
+#endif
+"]\n\n";
+
 void usage(char *appname) {
- fprintf(stderr,"usage: %s [ARGS...] [INFILE]\n"
-                "ARGS:\n"
+ fprintf(stderr,"Usage: %s [options...] [-o outfile] [infile]\n"
+                "       %s [options...] [-o outfile] -i string...\n"
+                "options:\n"
                 "\t" "--tok                       Outline all tokens using the [...] notation (Default: off).\n"
                 "\t" "--pp                        Enable preprocess-mode, which emits all tokens separated by '\\0'-bytes.\n"
                 "\t" "-f[no-]spc                  Configure emission of SPACE tokens (Default: on).\n"
@@ -160,19 +205,85 @@ void usage(char *appname) {
                 "\t" "-f[no-]longstring           Enable/Disable string continuation between lines (Default: off).\n"
                 "\t" "                            Enabling this option also disabled SPACE and LF tokens, though\n"
                 "\t" "                            they can be re-enabled using the -spc and -lf switches.\n"
+                "\t" "-i <text>                   Preprocess the remained of the commandline\n"
+                "\t" "-Idir                       Adds 'dir' to the list of #include <...> paths\n"
+                "\t" "-Dsym[=val=1]               Defines 'sym' as 'val'\n"
                 "\t" "-o <name>                   Redirect output to a given file (defauls to STDOUT).\n"
                 "\t" "--name <name>               Set the name used for __FILE__ in INFILE (Useful when INFILE is stdin).\n"
                 "\t" "--help                      Display this help and exit.\n"
+                "\t" "--version                   Display version information and exit.\n"
 #ifdef _WIN32
                 "\t" "--message-format={msvc|gcc} Set the format for error message (Default: msvc).\n"
 #else
                 "\t" "--message-format={msvc|gcc} Set the format for error message (Default: gcc).\n"
 #endif
-                "INFILE:\n"
+                "infile:\n"
                 "\t" "-                When not specified or set to '-', use STDIN as input\n"
                 "\t" "<filename>       The name of a file to preprocess, as well as the default value for '--name'\n"
          ,appname);
 }
+
+static /*ref*/struct TPPString *
+merge_argv_str(int argc, char **argv) {
+ struct TPPString *result;
+ char **iter,**end,*dest;
+ size_t total_size;
+ if (!argc) return TPPString_New("",0);
+ total_size = argc-1; /* All arguments are separated by ' '. */
+ end = (iter = argv)+argc;
+ for (; iter != end; ++iter) total_size += strlen(*iter);
+ result = (struct TPPString *)malloc(TPP_OFFSETOF(struct TPPString,s_text)+
+                                    (total_size+1)*sizeof(char));
+ if (!result) return NULL;
+ result->s_refcnt = 1;
+ result->s_size = total_size;
+ dest = result->s_text;
+ for (iter = argv; iter != end; ++iter) {
+  size_t len = strlen(*iter);
+  memcpy(dest,*iter,len*sizeof(char));
+  dest += len;
+  *dest++ = ' ';
+ }
+ result->s_text[total_size] = '\0';
+ return result;
+}
+
+static /*ref*/struct TPPFile *
+merge_argv(int argc, char **argv) {
+ struct TPPString *argv_string;
+ struct TPPFile *result;
+ argv_string = merge_argv_str(argc,argv);
+ if (!argv_string) return NULL;
+ result = (struct TPPFile *)malloc(TPPFILE_SIZEOF_TEXT);
+ if (!result) goto err_argv_string;
+ result->f_refcnt                 = 1;
+ result->f_kind                   = TPPFILE_KIND_TEXT;
+ result->f_prev                   = NULL;
+ result->f_name                   = strdup("<commandline>");
+ if (!result->f_name) goto err_r;
+ result->f_namesize               = 13;
+ result->f_namehash               = 3330511802;
+ result->f_text                   = argv_string; /* Inherit reference. */
+ result->f_begin                  = argv_string->s_text;
+ result->f_end                    = argv_string->s_text+argv_string->s_size;
+ result->f_pos                    = argv_string->s_text;
+ result->f_textfile.f_cacheentry  = NULL;
+ result->f_textfile.f_usedname    = NULL;
+ result->f_textfile.f_lineoff     = 0;
+ result->f_textfile.f_stream      = TPP_STREAM_INVALID;
+ result->f_textfile.f_ownedstream = TPP_STREAM_INVALID;
+ result->f_textfile.f_guard       = NULL;
+ result->f_textfile.f_cacheinc    = 0;
+ result->f_textfile.f_rdata       = argv_string->s_size;
+ result->f_textfile.f_prefixdel   = '\0';
+ result->f_textfile.f_noguard     = 1;
+ result->f_textfile.f_newguard    = NULL;
+ return result;
+err_r:           free(result);
+err_argv_string: TPPString_Decref(argv_string);
+ return NULL;
+}
+
 
 int main(int argc, char *argv[]) {
  struct TPPFile *infile,*last_token_file;
@@ -214,6 +325,8 @@ int main(int argc, char *argv[]) {
   else if (!strcmp(arg,"-message-format=gcc")) TPPLexer_Current->l_flags &= ~(TPPLEXER_FLAG_MSVC_MESSAGEFORMAT);
   else if (!strcmp(arg,"-message-format=msvc")) TPPLexer_Current->l_flags |= TPPLEXER_FLAG_MSVC_MESSAGEFORMAT;
   else if (!strcmp(arg,"-help")) usage(appname),_exit(2);
+  else if (!strcmp(arg,"-version")) fwrite(version,sizeof(char),sizeof(version)/sizeof(char)-1,stderr),_exit(2);
+  else if (!strcmp(arg,"i")) { !argc || --argc,++argv; infile = merge_argv(argc,argv); goto use_infile; }
   else if (!strcmp(arg,"-pp"))
    /* Intermediate preprocessor mode:
     *  - Very useful for invoking tpp from another
@@ -231,6 +344,10 @@ int main(int argc, char *argv[]) {
                           val = strchr(arg,'=');
                           if (val) *val++ = '\0'; else val = "1";
                           if (!TPPLexer_Define(arg,strlen(arg),val,strlen(val))) _exit(1); }
+#if 1 /* Backwards-compatibility with old TPP */
+  else if (!strcmp(arg,"no-line")) no_line_directives = 1;
+  else if (!strcmp(arg,"tok")) outline_tokens = OUTLINE_MODE_TOK;
+#endif
   else {
    fprintf(stderr,
            "Unknown option: \"%s\"\n"
@@ -275,6 +392,7 @@ int main(int argc, char *argv[]) {
   infile = TPPFile_OpenStream(STDIN_FILENO,firstname);
 #endif
  }
+use_infile:
  if (!infile) { result = 1; goto end; }
  infile->f_prev = TPPLexer_Current->l_token.t_file;
  TPPLexer_Current->l_token.t_file = infile;

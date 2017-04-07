@@ -2151,7 +2151,8 @@ PUBLIC int TPPLexer_Init(struct TPPLexer *__restrict self) {
  self->l_ifdef.is_slotc    = 0;
  self->l_ifdef.is_slota    = 0;
  self->l_ifdef.is_slotv    = NULL;
- assert(EMPTY_STRING_HASH == hashof("",0));
+ assert(hashof("",0) == EMPTY_STRING_HASH);
+ assert(hashof("<commandline>",13) == 3330511802);
  assert(TPPFile_Empty.f_namehash ==
         hashof(TPPFile_Empty.f_name,
                TPPFile_Empty.f_namesize));
