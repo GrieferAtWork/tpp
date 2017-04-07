@@ -368,6 +368,7 @@ do{ tok_t              _old_tok_id    = token.t_id;\
 #define HAVE_EXTENSION_TPP_COUNTER      (current.l_extensions&TPPLEXER_EXTENSION_TPP_COUNTER)
 #define HAVE_EXTENSION_TPP_RANDOM       (current.l_extensions&TPPLEXER_EXTENSION_TPP_RANDOM)
 #define HAVE_EXTENSION_TPP_STR_DECOMPILE (current.l_extensions&TPPLEXER_EXTENSION_TPP_STR_DECOMPILE)
+#define HAVE_EXTENSION_TPP_STR_SUBSTR   (current.l_extensions&TPPLEXER_EXTENSION_TPP_STR_SUBSTR)
 #define HAVE_EXTENSION_TPP_STR_PACK     (current.l_extensions&TPPLEXER_EXTENSION_TPP_STR_PACK)
 
 
@@ -4026,6 +4027,73 @@ create_int_file:
     goto create_string_file;
    } break;
 
+   { /* Returns a sub-portion of a given string, either
+      * encoded as character, or as another string.
+      * NOTE: Except for the encode-as-char functionality,
+      *       this is only here for backwards-compatibility. */
+    char escape_char; struct TPPConst val;
+    /*ref*/struct TPPString *basestring;
+    int_t subindex; size_t sublen,escape_size;
+    char *sub_begin,*sub_end;
+   case KWD___TPP_STR_AT:
+   case KWD___TPP_STR_SUBSTR:
+    escape_char = TOK == KWD___TPP_STR_AT ? '\'' : '\"';
+    pushf();
+    current.l_flags &= ~(TPPLEXER_FLAG_WANTCOMMENTS|
+                         TPPLEXER_FLAG_WANTSPACE|
+                         TPPLEXER_FLAG_WANTLF);
+    yield_fetch();
+    if (TOK != '(') TPPLexer_Warn(W_EXPECTED_LPAREN);
+    else yield_fetch();
+    if unlikely(!TPPLexer_Eval(&val)) { breakf(); return TOK_ERR; }
+    if (val.c_kind != TPP_CONST_STRING) {
+     TPPLexer_Warn(W_EXPECTED_STRING_AFTER_TPP_STRAT,&val);
+     basestring = empty_string;
+     TPPString_Incref(empty_string);
+    } else {
+     basestring = val.c_data.c_string; /* Inherit reference. */
+    }
+    if (TOK != ',') TPPLexer_Warn(W_EXPECTED_COMMA);
+    else yield_fetch();
+    if unlikely(!TPPLexer_Eval(&val)) {
+err_substrf: breakf();
+err_substr:  TPPString_Decref(basestring);
+     goto seterr;
+    }
+    TPPConst_ToInt(&val);
+    subindex = val.c_data.c_int;
+    if (TOK != ',') sublen = basestring->s_size;
+    else {
+     yield_fetch();
+     if unlikely(!TPPLexer_Eval(&val)) goto err_substrf;
+     TPPConst_ToInt(&val);
+     sublen = (size_t)val.c_data.c_int;
+    }
+    if (TOK != ')') TPPLexer_Warn(W_EXPECTED_RPAREN);
+    popf();
+    if (basestring->s_size) {
+     subindex %= (int_t)basestring->s_size;
+     if (subindex < 0) subindex += basestring->s_size;
+    } else subindex = 0;
+    if (sublen) sublen %= (int_t)basestring->s_size;
+    if (sublen > basestring->s_size-subindex) sublen = basestring->s_size-(size_t)subindex;
+    sub_end = (sub_begin = basestring->s_text+(size_t)subindex)+sublen;
+    assert(sub_begin <= sub_end);
+    assert(sub_begin >= basestring->s_text);
+    assert(sub_end <= basestring->s_text+basestring->s_size);
+    escape_size = TPP_SizeofEscape(sub_begin,(size_t)(sub_end-sub_begin));
+    string_text = (struct TPPString *)malloc(TPP_OFFSETOF(struct TPPString,s_text)+
+                                            (escape_size+3)*sizeof(char));
+    if unlikely(!string_text) goto err_substr;
+    string_text->s_refcnt = 1;
+    string_text->s_size = escape_size+2;
+    string_text->s_text[0] = escape_char;
+    TPP_Escape(string_text->s_text+1,sub_begin,(size_t)(sub_end-sub_begin));
+    string_text->s_text[escape_size+1] = escape_char;
+    string_text->s_text[escape_size+2] = '\0';
+    goto create_string_file;
+   } break;
+
    { /* Various (true) predefined macros. */
     struct TPPExplicitFile *predefined_macro;
     /* Predefined macros. */
@@ -5795,6 +5863,7 @@ PUBLIC int TPPLexer_Warn(int wnum, ...) {
   case W_EXPECTED_STRING_AFTER_TPP_EXEC  : WARNF("Expected string after tpp_exec, but got '%s'",CONST_STR()); break;
   case W_EXPECTED_STRING_AFTER_TPP_SETF  : WARNF("Expected string after tpp_set_keyword_flags, but got '%s'",CONST_STR()); break;
   case W_EXPECTED_STRING_AFTER_TPP_STRD  : WARNF("Expected string after __TPP_STR_DECOMPILE, but got '%s'",CONST_STR()); break;
+  case W_EXPECTED_STRING_AFTER_TPP_STRAT : WARNF("Expected string after __TPP_STR_AT|__TPP_STR_SUBSTR, but got '%s'",CONST_STR()); break;
   case W_FILE_NOT_FOUND                  : WARNF("File not found: '%s'",ARG(char *)); break;
   case W_ERROR                           : temp = ARG(char *),WARNF("ERROR : %.*s",(int)ARG(size_t),temp); break;
   case W_WARNING                         : temp = ARG(char *),WARNF("WARNING : %.*s",(int)ARG(size_t),temp); break;
