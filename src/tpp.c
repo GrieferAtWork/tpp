@@ -961,7 +961,7 @@ reuse_self:
  *       buffer size requirements for pipe input again those
  *       more effective for file input.
  */
-#if TPP_CONFIG_DEBUG && 0
+#if TPP_CONFIG_DEBUG 
 #define STREAM_BUFSIZE  1 /* This must still work, but also makes errors show up more easily. */
 #else
 #define STREAM_BUFSIZE  4096
@@ -2743,7 +2743,7 @@ set_comment:
     goto settok_forward1;
    }
    if (*forward == (char)ch &&
-      (!(current.l_flags&TPPLEXER_FLAG_NO_ROOFROOF)) || ch != '^') {
+      (!(current.l_flags&TPPLEXER_FLAG_NO_ROOFROOF) || ch != '^')) {
     ch = (ch == '&') ? TOK_LAND :
          (ch == '|') ? TOK_LOR :
                        TOK_LXOR;
@@ -4660,6 +4660,10 @@ add_arg:
    arg_iter->ac_offset_end   *= sizeof(char);
    arg_iter->ac_offset_begin += text_offset;
    arg_iter->ac_offset_end   += text_offset;
+   if (!(current.l_flags&TPPLEXER_FLAG_KEEP_ARG_WHITESPACE)) {
+    arg_iter->ac_begin = skip_whitespace_and_comments(arg_iter->ac_begin,arg_iter->ac_end);
+    arg_iter->ac_end = skip_whitespace_and_comments_rev(arg_iter->ac_end,arg_iter->ac_begin);
+   }
   }
   /* Check for special case: No-arguments macro. */
   if (!macro->f_macro.m_function.f_argc) {

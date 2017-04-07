@@ -660,6 +660,7 @@ TPP_LOCAL int TPPLexer_COLUMN(void) { struct TPPFile *f = TPPLexer_Textfile(); r
 #define TPPLEXER_FLAG_NO_ROOFROOF           0x00010000 /*< Disable recognition of '^^' tokens. */
 #define TPPLEXER_FLAG_NO_COLLONCOLLON       0x00020000 /*< Disable recognition of '::' tokens. */
 #define TPPLEXER_FLAG_INCLUDESTRING         0x00040000 /*< Parse strings as #include strings (without \-escape sequences). */
+#define TPPLEXER_FLAG_KEEP_ARG_WHITESPACE   0x00080000 /*< When set, keep whitespace surrounding macro arguments. */
 #define TPPLEXER_FLAG_MSVC_MESSAGEFORMAT    0x01000000 /*< Use msvc's file+line format '%s(%d,%d) : ' instead of GCC's '%s:%d:%d: '. */
 #define TPPLEXER_FLAG_RANDOM_INITIALIZED    0x20000000 /*< Set when rand() has been initialized. */
 #define TPPLEXER_FLAG_NO_WARNINGS           0x40000000 /*< Don't emit warnings. */
