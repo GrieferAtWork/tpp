@@ -2770,7 +2770,8 @@ parse_multichar:
       if (!TPPLexer_Warn(W_LINE_COMMENT_CONTINUED)) goto err;
      }
     } while (!islf(*forward));
-    if (*forward++ == '\r' && *forward == '\n') ++forward;
+    if (!(current.l_flags&TPPLEXER_FLAG_COMMENT_NOOWN_LF) &&
+       (*forward && *forward++ == '\r' && *forward == '\n')) ++forward;
     iter = forward;
     if unlikely(!(current.l_flags&TPPLEXER_FLAG_WANTCOMMENTS)) goto startover_iter;
 set_comment:
@@ -4609,7 +4610,7 @@ struct incback_slot_t {
 #define incback_slot_quit(self) TPPFile_Decref((self)->is_file)
 
 PRIVATE void
-incback_slot_pop(struct incback_slot_t *__restrict self) {
+incback_slot_backup(struct incback_slot_t *__restrict self) {
  assert(self);
  assert(token.t_file);
  assert(token.t_file != &TPPFile_Empty);
@@ -4619,14 +4620,19 @@ incback_slot_pop(struct incback_slot_t *__restrict self) {
  self->is_file = token.t_file; /*< Inherit reference. */
  self->is_fpos = token.t_file->f_pos;
  token.t_file = token.t_file->f_prev;
+#if TPP_CONFIG_DEBUG
+ self->is_file->f_prev = NULL;
+#endif
 }
 PRIVATE void
-incback_slot_push(struct incback_slot_t *self) {
+incback_slot_restore(struct incback_slot_t *self) {
  struct TPPFile *file;
  assert(self);
  file = self->is_file;
  assert(file);
+#if TPP_CONFIG_DEBUG
  assert(!file->f_prev);
+#endif
  assert(self->is_fpos >= file->f_text->s_text);
  assert(self->is_fpos <= file->f_text->s_text+
                          file->f_text->s_size);
@@ -4660,7 +4666,7 @@ incback_pushdyn(struct incback_t *__restrict self) {
   slot = self->ib_morev;
  }
  slot += self->ib_morec++;
- incback_slot_push(slot);
+ incback_slot_backup(slot);
  return 1;
 }
 PRIVATE int
@@ -4697,7 +4703,7 @@ incback_restore(struct incback_t *__restrict self,
  /* Restore all include-backups. */
  struct incback_slot_t *iter,*begin;
  iter = (begin = self->ib_morev)+self->ib_morec;
- while (iter-- != begin) incback_slot_pop(iter);
+ while (iter-- != begin) incback_slot_restore(iter);
  free(begin);
  self->ib_morec = self->ib_morea = 0;
  self->ib_morev = NULL;

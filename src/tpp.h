@@ -675,6 +675,7 @@ TPP_LOCAL int TPPLexer_COLUMN(void) { struct TPPFile *f = TPPLexer_Textfile(); r
 #define TPPLEXER_FLAG_DIRECTIVE_NOOWN_LF    0x00001000 /*< Linefeeds terminating preprocessor directives are not part of those directives and are instead re-emit.
                                                         *  WARNING: Using this flag is not recommended, as a freshly defined macro will re-use
                                                         *           text from the file and set the first character of that linefeed to '\0'. */
+#define TPPLEXER_FLAG_COMMENT_NOOWN_LF      0x00001000 /*< Linefeeds terminating a '// foo'-style comment are not owned by that comment, but are re-emit. */
 #define TPPLEXER_FLAG_MESSAGE_LOCATION      0x00002000 /*< Print the file+line location in messages from '#pragma message'. */
 #define TPPLEXER_FLAG_MESSAGE_NOLINEFEED    0x00004000 /*< Don't print a linefeed following the user-provided message in '#pragma message'. */
 #define TPPLEXER_FLAG_NO_TILDETILDE         0x00008000 /*< Disable recognition of '~~' tokens. */
