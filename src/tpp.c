@@ -2462,6 +2462,46 @@ err_value_string: TPPString_Decref(value_string); return 0;
 }
 
 
+#ifdef _WIN32
+PRIVATE int
+check_path_spelling(char *filename, size_t filename_size) {
+ char *part_begin,*next_sep,*end,backup,*temp; int error = 1;
+ WIN32_FIND_DATAA filename_data; HANDLE find_handle;
+ assert(filename);
+ assert(filename_size);
+ assert(!filename[filename_size]);
+#if SEP != '\\'
+ while ((temp = strchr(filename,SEP)) != NULL) *temp = '\\';
+#endif
+ end = filename+filename_size;
+ part_begin = filename;
+ for (;;) {
+  next_sep = strchr(part_begin,'\\');
+  if (!next_sep) next_sep = end;
+  backup = *next_sep,*next_sep = '\0';
+  find_handle = FindFirstFileA(filename,&filename_data);
+  if (find_handle && find_handle != INVALID_HANDLE_VALUE) {
+   if (strcmp(filename_data.cFileName,part_begin)) {
+    *next_sep = backup; /* This part of the path is cased differently. */
+    error = TPPLexer_Warn(W_NONPARTABLE_FILENAME_CASING,filename,part_begin,
+                         (size_t)(next_sep-part_begin),filename_data.cFileName);
+   } else {
+    error = 1;
+   }
+   FindClose(find_handle);
+  }
+  *next_sep = backup;
+  if unlikely(!error) break;
+  if (next_sep == end) break;
+  part_begin = next_sep+1;
+ }
+#if SEP != '\\'
+ while ((temp = strchr(filename,'\\')) != NULL) *temp = SEP;
+#endif
+ return error;
+}
+#endif
+
 
 PRIVATE struct TPPFile *
 open_normal_file(char *filename, size_t filename_size,
@@ -2501,8 +2541,16 @@ TPPLexer_OpenFile(int mode, char *filename, size_t filename_size,
  size_t buffersize,newbuffersize;
  assert(mode != (TPPLEXER_OPENFILE_MODE_NORMAL|TPPLEXER_OPENFILE_FLAG_NEXT));
  fix_filename(filename,&filename_size);
- if (mode == TPPLEXER_OPENFILE_MODE_NORMAL) {
+ if ((mode&3) == TPPLEXER_OPENFILE_MODE_NORMAL) {
+#ifdef _WIN32
+  result = open_normal_file(filename,filename_size,pkeyword_entry);
+  if (result && !(mode&TPPLEXER_OPENFILE_FLAG_NOCASEWARN) &&
+     !check_path_spelling(filename,filename_size)
+      ) {err_r: TPPFile_Decref(result); result = NULL; }
+  return result;
+#else
   return open_normal_file(filename,filename_size,pkeyword_entry);
+#endif
  }
  buffer = NULL,buffersize = 0;
  if (mode&TPPLEXER_OPENFILE_MODE_RELATIVE) {
@@ -2540,6 +2588,11 @@ TPPLexer_OpenFile(int mode, char *filename, size_t filename_size,
    }
    result = open_normal_file(used_filename,newbuffersize,pkeyword_entry);
    if (result) { /* Goti! */
+#ifdef _WIN32
+    if (!(mode&TPPLEXER_OPENFILE_FLAG_NOCASEWARN) &&
+        !check_path_spelling(filename,filename_size)
+        ) {err_buffer_r: free(buffer); goto err_r; }
+#endif
     /* When running in include_next-mode, make sure
      * that the file isn't already being included. */
     if (!(mode&TPPLEXER_OPENFILE_FLAG_NEXT) ||
@@ -2580,7 +2633,14 @@ next_syspath:
     /* When running in include_next-mode, make sure
      * that the file isn't already being included. */
     if (!(mode&TPPLEXER_OPENFILE_FLAG_NEXT) ||
-        !(result->f_prev)) goto end_buffer;
+        !(result->f_prev)) {
+#ifdef _WIN32
+     if (!(mode&TPPLEXER_OPENFILE_FLAG_NOCASEWARN) &&
+         !check_path_spelling(filename,filename_size)
+         ) goto err_buffer_r;
+#endif
+     goto end_buffer;
+    }
    }
   }
  }
@@ -6057,7 +6117,7 @@ PUBLIC int TPPLexer_Warn(int wnum, ...) {
   case W_CHARACTER_TOO_LONG              : WARNF("Character sequence is too long"); break;
   case W_MULTICHAR_NOT_ALLOWED           : temp = ARG(char *),WARNF("The multi-character sequence '%.*s' is not not allowed",(int)ARG(size_t),temp); break;
   case W_DIVIDE_BY_ZERO                  : WARNF("Divide by ZERO"); break;
-  case W_INTEX_OUT_OF_BOUNDS             : WARNF("Index %ld is out-of-bounds of 0..%lu",ARG(ptrdiff_t),ARG(struct TPPString *)->s_size); break;
+  case W_INTEX_OUT_OF_BOUNDS             : { ptrdiff_t temp2 = ARG(ptrdiff_t); WARNF("Index %ld is out-of-bounds of 0..%lu",temp2,ARG(struct TPPString *)->s_size); } break;
   case W_EXPECTED_MACRO_ARGUMENT_NAME    : WARNF("Expected argument name"); break;
   case W_ARGUMENT_NAMED_ALREADY_TAKEN    : WARNF("Argument name '%s' is already in use",TOK_NAME()); break;
   case W_EXPECTED_COMMA_OR_ARGEND        : WARNF("Expected ',' or end of argument list, but got " TOK_S,TOK_A); break;
@@ -6093,6 +6153,7 @@ PUBLIC int TPPLexer_Warn(int wnum, ...) {
   case W_EXPECTED_STRING_AFTER_TPP_STRD  : WARNF("Expected string after __TPP_STR_DECOMPILE, but got '%s'",CONST_STR()); break;
   case W_EXPECTED_STRING_AFTER_TPP_STRAT : WARNF("Expected string after __TPP_STR_AT|__TPP_STR_SUBSTR, but got '%s'",CONST_STR()); break;
   case W_FILE_NOT_FOUND                  : WARNF("File not found: '%s'",ARG(char *)); break;
+  case W_NONPARTABLE_FILENAME_CASING     : { char *temp2; size_t temp3; temp = ARG(char *),temp2 = ARG(char *),temp3 = ARG(size_t); WARNF("Non-portable casing in '%s': '%.*s' should be '%s' instead",temp,(int)temp3,temp2,ARG(char *)); } break;
   case W_ERROR                           : temp = ARG(char *),WARNF("ERROR : %.*s",(int)ARG(size_t),temp); break;
   case W_WARNING                         : temp = ARG(char *),WARNF("WARNING : %.*s",(int)ARG(size_t),temp); break;
   case W_MACRO_RECURSION_LIMIT_EXCEEDED  : WARNF("Macro recursion limit exceeded when expanding '%s'",FILENAME()); break;

@@ -222,6 +222,7 @@ WARNING(W_EXPECTED_STRING_AFTER_TPP_SETF,  WG_SYNTAX,  WSTATE_WARN)    /*< [stru
 WARNING(W_EXPECTED_STRING_AFTER_TPP_STRD,  WG_SYNTAX,  WSTATE_WARN)    /*< [struct TPPConst *]. */
 WARNING(W_EXPECTED_STRING_AFTER_TPP_STRAT, WG_SYNTAX,  WSTATE_WARN)    /*< [struct TPPConst *]. */
 WARNING(W_FILE_NOT_FOUND,                  WG_ENVIRON, WSTATE_WARN)    /*< [char const *]. */
+WARNING(W_NONPARTABLE_FILENAME_CASING,     WG_ENVIRON, WSTATE_WARN)    /*< [char const *,char const *,size_t,char const *]. (path,wrong_begin,wrong_size,corrent_begin) */
 WARNING(W_ERROR,                           WG_USER,    WSTATE_ERROR)   /*< [char const *,size_t]. */
 WARNING(W_WARNING,                         WG_USER,    WSTATE_WARN)    /*< [char const *,size_t]. */
 WARNING(W_MACRO_RECURSION_LIMIT_EXCEEDED,  WG_LIMIT,   WSTATE_WARN)    /*< [struct TPPFile *]. */
