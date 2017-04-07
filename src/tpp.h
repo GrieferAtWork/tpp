@@ -687,10 +687,10 @@ TPP_LOCAL int TPPLexer_COLUMN(void) { struct TPPFile *f = TPPLexer_Textfile(); r
                                                         *           start and end of a guarded file to not be emit on a second pass.
                                                         *        >> Disable this option when either is important to your compiler. */
 #define TPPLEXER_FLAG_MSVC_MESSAGEFORMAT    0x01000000 /*< Use msvc's file+line format '%s(%d,%d) : ' instead of GCC's '%s:%d:%d: '. */
-#define TPPLEXER_FLAG_RANDOM_INITIALIZED    0x20000000 /*< Set when rand() has been initialized. */
-#define TPPLEXER_FLAG_NO_WARNINGS           0x40000000 /*< Don't emit warnings. */
+#define TPPLEXER_FLAG_NO_WARNINGS           0x02000000 /*< Don't emit warnings. */
+#define TPPLEXER_FLAG_RANDOM_INITIALIZED    0x40000000 /*< Set when rand() has been initialized. */
 #define TPPLEXER_FLAG_ERROR                 0x80000000 /*< When set, the lexer is in an error-state in which calls to yield() will return TOK_ERR. */
-#define TPPLEXER_FLAG_MERGEMASK             0xff000000 /*< A mask of flags that are merged (or'd together) during popf(). */
+#define TPPLEXER_FLAG_MERGEMASK             0xf0000000 /*< A mask of flags that are merged (or'd together) during popf(). */
 #define TPPLEXER_FLAG_DEFAULT               0x00000000 /*< Default set of flags (suitable for use with most token-based compilers). */
 
 #define TPPLEXER_EXTENSION_NONE             0x0000000000000000ull

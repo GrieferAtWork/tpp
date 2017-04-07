@@ -157,8 +157,9 @@ void usage(char *appname) {
                 "\t" "-f[no-]line                 Configure emission of #line adjustment directives (Default: on).\n"
                 "\t" "-f[no-]comments             Configure emission of COMMENT tokens (Default: off).\n"
                 "\t" "-f[no-]magiclf              Enable/Disable magic linefeeds sometimes used in place of #line (Default: off).\n"
-                "\t" "                            Enabling this option also disabled SPACE and LF tokens, though they can\n"
-                "\t" "                            be re-enabled using the -spc and -lf switches\n"
+                "\t" "-f[no-]longstring           Enable/Disable string continuation between lines (Default: off).\n"
+                "\t" "                            Enabling this option also disabled SPACE and LF tokens, though\n"
+                "\t" "                            they can be re-enabled using the -spc and -lf switches.\n"
                 "\t" "-o <name>                   Redirect output to a given file (defauls to STDOUT).\n"
                 "\t" "--name <name>               Set the name used for __FILE__ in INFILE (Useful when INFILE is stdin).\n"
                 "\t" "--help                      Display this help and exit.\n"
@@ -206,6 +207,8 @@ int main(int argc, char *argv[]) {
   else if (!strcmp(arg,"fno-comments")) TPPLexer_Current->l_flags &= ~(TPPLEXER_FLAG_WANTCOMMENTS);
   else if (!strcmp(arg,"fmagiclf")) no_magic_tokens = 0;
   else if (!strcmp(arg,"fno-magiclf")) no_magic_tokens = 1;
+  else if (!strcmp(arg,"flongstring")) TPPLexer_Current->l_flags &= ~(TPPLEXER_FLAG_TERMINATE_STRING_LF);
+  else if (!strcmp(arg,"fno-longstring")) TPPLexer_Current->l_flags |= TPPLEXER_FLAG_TERMINATE_STRING_LF;
   else if (!strcmp(arg,"o")) argc > 1 ? (output_filename = argv[1],++argv,--argc) : 0;
   else if (!strcmp(arg,"-name")) argc > 1 ? (firstname = argv[1],++argv,--argc) : 0;
   else if (!strcmp(arg,"-message-format=gcc")) TPPLexer_Current->l_flags &= ~(TPPLEXER_FLAG_MSVC_MESSAGEFORMAT);

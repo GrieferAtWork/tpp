@@ -2652,7 +2652,8 @@ parse_multichar:
       !(current.l_flags&TPPLEXER_FLAG_INCLUDESTRING)) ++iter;
     ++iter;
    }
-   if (*iter == (char)ch) ++iter;
+        if (*iter == (char)ch) ++iter;
+   else if (iter == end && !TPPLexer_Warn(W_STRING_TERMINATED_BY_EOF)) goto err;
    /* Warn amount if multi-char constants if they are not enabled. */
    if (ch == '\'' && !HAVE_EXTENSION_MULTICHAR_CONST) {
     char *char_begin = token.t_begin+1,*char_end = iter;
@@ -6015,7 +6016,8 @@ PUBLIC int TPPLexer_Warn(int wnum, ...) {
   case W_UNKNOWN_PREPROCESSOR_DIRECTIVE  : WARNF("Unknown preprocessor directive " TOK_S,TOK_A); break;
   case W_INVALID_INTEGER_SUFFIX          : temp = ARG(char *),WARNF("Invalid integer suffix '%.*s'",(int)ARG(size_t),temp); break;
   case W_EXPECTED_COLLON_AFTER_QUESTION  : WARNF("Expected ':' after '?'"); break;
-  case W_STRING_TERMINATED_BY_LINEFEED   : WARNF("String is was terminated by a linefeed"); break;
+  case W_STRING_TERMINATED_BY_LINEFEED   : WARNF("String was terminated by a linefeed"); break;
+  case W_STRING_TERMINATED_BY_EOF        : WARNF("String was terminated by EOF"); break;
   case W_UNKNOWN_TOKEN_IN_EXPR_IS_ZERO   : WARNF("Unrecognized token " TOK_S " is replaced with '0' in expression",TOK_A); break;
   case W_EXPECTED_RPAREN_IN_EXPRESSION   : WARNF("Expected ')' in expression, but got " TOK_S,TOK_A); break;
   case W_EXPECTED_RBRACKET_IN_EXPRESSION : WARNF("Expected ']' in expression, but got " TOK_S,TOK_A); break;
