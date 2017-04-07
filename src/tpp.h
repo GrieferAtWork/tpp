@@ -56,6 +56,7 @@
 // [defined(foo)] #if defined(foo)              /*< Recognize 'defined' in preprocessor expressions. */
 // [foo ?: bar]   #if foo ?: bar                /*< Recognize gcc's 'a ?: b' as alias for 'a ? a : b'. */
 // ["\e"]         printf("\e[10mHello\e[0m\n"); /*< Recognize \e in strings as alias for '\33' (ESC). */
+// ['abc']        int x = 'abc';                /*< Recognize multi-character char-constants. */
 //
 //PREPROCESSOR DIRECTIVES:
 // [#]             #[LF]             /*< Ignore empty (NULL) directives. */
@@ -86,6 +87,8 @@
 //BUILTIN MACROS:
 // [__FILE__]          printf("%s\n",__FILE__);          /*< Expand to the string representation of the current file. */
 // [__LINE__]          printf("%d\n",__LINE__);          /*< Expand to the integral representation of the current line. */
+// [__TIME__]          printf("%s\n",__TIME__);          /*< Expand to the string representation of the current time. */
+// [__DATE__]          printf("%s\n",__DATE__);          /*< Expand to the string representation of the current date. */
 // [__BASE_FILE__]     printf("%s\n",__BASE_FILE__);     /*< Expand to the name of the original source file used to startup the preprocessor. */
 // [__INCLUDE_LEVEL__] printf("%d\n",__INCLUDE_LEVEL__); /*< Expand to the integral representation of how many files away the original source file is (this counter starts at '0'). */
 // [__COUNTER__]       printf("%d\n",__COUNTER__);       /*< Expand to the integral representation an integral that increments by 1 every time it is expanded (starts at '0'). */
@@ -100,6 +103,7 @@
 // [pop_macro]         #pragma pop_macro("foo")          /*< Restore a previously stored definition of a macro. */
 // [{end}region]       #pragma {end}region my region     /*< Highlight named regions of code in IDEs (the preprocessor must, and does simply ignore this directive). */
 // [message]           #pragma message "Hello"           /*< Emit a message to 'stderr' from inside the preprocessor (NOTE: Also supports optional parenthesis surrounding the text). */
+// [deprecated]        #pragma deprecated("foobar")      /*< Declare a given identifier as deprecated, causing subsequent use to emit a deprecation warning. */
 
 
 #if defined(GUARD_TPP_C) && \
@@ -709,18 +713,19 @@ TPP_LOCAL int TPPLexer_COLUMN(void) { struct TPPFile *f = TPPLexer_Textfile(); r
 #define TPPLEXER_EXTENSION_CLANG_FEATURES   0x0000000000400000ull /*< Recognize clang's __has_(feature|extension|attribute|...) and __is_(deprecated|{builtin_}identifier) special macros. */
 #define TPPLEXER_EXTENSION_HAS_INCLUDE      0x0000000000800000ull /*< Recognize clang's __has_{next_}include special macros. */
 #define TPPLEXER_EXTENSION_LXOR             0x0000000001000000ull /*< Allow the use of '^^' in expressions as logical xor. */
-#define TPPLEXER_EXTENSION_DATEUTILS        0x0000000002000000ull /*< Recognize a set of macros to expand to integral parts of the current date. */
-#define TPPLEXER_EXTENSION_TIMEUTILS        0x0000000004000000ull /*< Recognize a set of macros to expand to integral parts of the current time. */
-#define TPPLEXER_EXTENSION_TIMESTAMP        0x0000000008000000ull /*< Recognize the '__TIMESTAMP__' preprocessor macro. */
-#define TPPLEXER_EXTENSION_TPP_EVAL         0x0000000010000000ull /*< Enable the '__TPP_EVAL(...)' builtin macro. */
-#define TPPLEXER_EXTENSION_TPP_UNIQUE       0x0000000020000000ull /*< Enable the '__TPP_UNIQUE(...)' builtin macro. */
-#define TPPLEXER_EXTENSION_TPP_LOAD_FILE    0x0000000040000000ull /*< Enable the '__TPP_LOAD_FILE(...)' builtin macro. */
-#define TPPLEXER_EXTENSION_TPP_COUNTER      0x0000000080000000ull /*< Enable the '__TPP_COUNTER(...)' builtin macro. */
-#define TPPLEXER_EXTENSION_TPP_RANDOM       0x0000000100000000ull /*< Enable the '__TPP_RANDOM(...)' builtin macro. */
-#define TPPLEXER_EXTENSION_TPP_STR_DECOMPILE 0x0000000200000000ull/*< Enable the '__TPP_STR_DECOMPILE(...)' builtin macro. */
-#define TPPLEXER_EXTENSION_TPP_STR_SUBSTR   0x0000000400000000ull /*< Enable the '__TPP_STR_AT(...)' and '__TPP_STR_SUBSTR(...)' builtin macros. */
-#define TPPLEXER_EXTENSION_TPP_STR_PACK     0x0000000800000000ull /*< Enable the '__TPP_STR_PACK(...)' builtin macro. */
-#define TPPLEXER_EXTENSION_TPP_STR_SIZE     0x0000001000000000ull /*< Enable the '__TPP_STR_SIZE(...)' builtin macro. */
+#define TPPLEXER_EXTENSION_MULTICHAR_CONST  0x0000000002000000ull /*< Recognize multi-character constants (e.g.: [x][=]['abc']). */
+#define TPPLEXER_EXTENSION_DATEUTILS        0x0000000004000000ull /*< Recognize a set of macros to expand to integral parts of the current date. */
+#define TPPLEXER_EXTENSION_TIMEUTILS        0x0000000008000000ull /*< Recognize a set of macros to expand to integral parts of the current time. */
+#define TPPLEXER_EXTENSION_TIMESTAMP        0x0000000010000000ull /*< Recognize the '__TIMESTAMP__' preprocessor macro. */
+#define TPPLEXER_EXTENSION_TPP_EVAL         0x0000000020000000ull /*< Enable the '__TPP_EVAL(...)' builtin macro. */
+#define TPPLEXER_EXTENSION_TPP_UNIQUE       0x0000000040000000ull /*< Enable the '__TPP_UNIQUE(...)' builtin macro. */
+#define TPPLEXER_EXTENSION_TPP_LOAD_FILE    0x0000000080000000ull /*< Enable the '__TPP_LOAD_FILE(...)' builtin macro. */
+#define TPPLEXER_EXTENSION_TPP_COUNTER      0x0000000100000000ull /*< Enable the '__TPP_COUNTER(...)' builtin macro. */
+#define TPPLEXER_EXTENSION_TPP_RANDOM       0x0000000200000000ull /*< Enable the '__TPP_RANDOM(...)' builtin macro. */
+#define TPPLEXER_EXTENSION_TPP_STR_DECOMPILE 0x0000000400000000ull/*< Enable the '__TPP_STR_DECOMPILE(...)' builtin macro. */
+#define TPPLEXER_EXTENSION_TPP_STR_SUBSTR   0x0000000800000000ull /*< Enable the '__TPP_STR_AT(...)' and '__TPP_STR_SUBSTR(...)' builtin macros. */
+#define TPPLEXER_EXTENSION_TPP_STR_PACK     0x0000001000000000ull /*< Enable the '__TPP_STR_PACK(...)' builtin macro. */
+#define TPPLEXER_EXTENSION_TPP_STR_SIZE     0x0000002000000000ull /*< Enable the '__TPP_STR_SIZE(...)' builtin macro. */
 #define TPPLEXER_EXTENSION_DEFAULT          0xffffffffffffffffull /*< Enable all extensions. */
 
 struct TPPLexer {

@@ -360,6 +360,7 @@ do{ tok_t              _old_tok_id    = token.t_id;\
 #define HAVE_EXTENSION_CLANG_FEATURES   (current.l_extensions&TPPLEXER_EXTENSION_CLANG_FEATURES)
 #define HAVE_EXTENSION_HAS_INCLUDE      (current.l_extensions&TPPLEXER_EXTENSION_HAS_INCLUDE)
 #define HAVE_EXTENSION_LXOR             (current.l_extensions&TPPLEXER_EXTENSION_LXOR)
+#define HAVE_EXTENSION_MULTICHAR_CONST  (current.l_extensions&TPPLEXER_EXTENSION_MULTICHAR_CONST)
 #define HAVE_EXTENSION_DATEUTILS        (current.l_extensions&TPPLEXER_EXTENSION_DATEUTILS)
 #define HAVE_EXTENSION_TIMEUTILS        (current.l_extensions&TPPLEXER_EXTENSION_TIMEUTILS)
 #define HAVE_EXTENSION_TIMESTAMP        (current.l_extensions&TPPLEXER_EXTENSION_TIMESTAMP)
@@ -2652,6 +2653,16 @@ parse_multichar:
     ++iter;
    }
    if (*iter == (char)ch) ++iter;
+   /* Warn amount if multi-char constants if they are not enabled. */
+   if (ch == '\'' && !HAVE_EXTENSION_MULTICHAR_CONST) {
+    char *char_begin = token.t_begin+1,*char_end = iter;
+    assert(char_end >= char_begin);
+    if (char_end != char_begin && char_end[-1] == '\'') --char_end;
+    if (TPP_SizeofUnescape(char_begin,(size_t)(char_end-char_begin)) != 1) {
+     if unlikely(!TPPLexer_Warn(W_MULTICHAR_NOT_ALLOWED,char_begin,
+                               (size_t)(char_end-char_begin))) goto err;
+    }
+   }
    /* The string/char token ID is the startup character. */
    goto settok;
 
@@ -5179,15 +5190,17 @@ PRIVATE void EVAL_CALL eval_unary(struct TPPConst *result) {
 
   {
    char buf[sizeof(int_t)];
-   char *begin; size_t size;
+   char *begin; size_t size,esc_size;
   case TOK_CHAR:
    if (result) {
-    begin = token.t_begin;
-    size  = (size_t)(token.t_end-begin);
-    if (TPP_SizeofUnescape(begin,size) > sizeof(buf)) {
+    begin    = token.t_begin;
+    size     = (size_t)(token.t_end-begin);
+    esc_size = TPP_SizeofUnescape(begin,size);
+    if (esc_size > sizeof(buf)) {
      if unlikely(!TPPLexer_Warn(W_CHARACTER_TOO_LONG)) return;
      do --size; while (TPP_SizeofUnescape(begin,size) > sizeof(buf));
     }
+
     *(int_t *)buf = 0;
     size = TPP_Unescape(buf,begin,size)-buf;
     /* WARNING: This is a _bad_ way of detecting endian! */
@@ -5988,6 +6001,7 @@ PUBLIC int TPPLexer_Warn(int wnum, ...) {
   case W_TOO_MANY_MACRO_ARGUMENTS        : WARNF("Too many arguments for '%s'",FILENAME()); break;
   case W_NOT_ENGOUH_MACRO_ARGUMENTS      : WARNF("Too enough arguments for '%s'",FILENAME()); break;
   case W_CHARACTER_TOO_LONG              : WARNF("Character sequence is too long"); break;
+  case W_MULTICHAR_NOT_ALLOWED           : temp = ARG(char *),WARNF("The multi-character sequence '%.*s' is not not allowed",(int)ARG(size_t),temp); break;
   case W_DIVIDE_BY_ZERO                  : WARNF("Divide by ZERO"); break;
   case W_INTEX_OUT_OF_BOUNDS             : WARNF("Index %ld is out-of-bounds of 0..%lu",ARG(ptrdiff_t),ARG(struct TPPString *)->s_size); break;
   case W_EXPECTED_MACRO_ARGUMENT_NAME    : WARNF("Expected argument name"); break;
