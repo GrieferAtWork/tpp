@@ -111,7 +111,7 @@
 #define FALSE    TPP_MACRO_FALSE
 
 #define SEP    '/'  /* The path-separator used in sanitized pathnames. */
-#ifdef _WIN32
+#if defined(_WIN32) || defined(__CYGWIN__) || defined(__MINGW32__)
 /* An alternate path-separator that is replaced with 'SEP' during sanitization.
  * >> We're going all-out linux here! (No backslashes allowed, because they _suck_!) */
 #define ALTSEP '\\'
@@ -380,6 +380,7 @@ do{ tok_t              _old_tok_id    = token.t_id;\
 // Debug logging helpers
 #define LOG_CALLMACRO   1
 #define LOG_LEGACYGUARD 2
+#define LOG_PRAGMA      3
 #if TPP_CONFIG_DEBUG
 #define HAVELOG(level) (0 && (level) == LOG_LEGACYGUARD) /* Change this to select active logs. */
 LOCAL void tpp_log(char const *fmt, ...) {
@@ -2137,14 +2138,12 @@ PRIVATE struct {
 #include "tpp-defs.inl"
 #undef WARNING
 } const default_warnings_state = {
-#ifndef __INTELLISENSE__
 #define WGROUP(name,str,default)     default,
 #include "tpp-defs.inl"
 #undef WGROUP
 #define WARNING(name,groups,default) default,
 #include "tpp-defs.inl"
 #undef WARNING
-#endif
 };
 #define DEFAULT_WARNING_STATE(wid) \
  (wstate_t)((((uint8_t *)&default_warnings_state)[(wid)/(8/TPP_WARNING_BITS)] \
@@ -6196,9 +6195,30 @@ TPPLexer_ParsePragma(tok_t endat) {
     }
    }
    TPPConst_Quit(&message);
-   if (with_paren && TOK != ')') TPPLexer_Warn(W_EXPECTED_RPAREN);
+   if (with_paren && unlikely(TOK != ')')) TPPLexer_Warn(W_EXPECTED_RPAREN);
    else yield_fetch();
    return 1;
+  } break;
+
+  { /* Do exactly the same as we'd do for '#error',
+     * with a syntax identical to '#pragma message'. */
+   struct TPPConst error_message;
+   int warning_error;
+  case KWD_error:
+   yield_fetch();
+   if unlikely(TOK != '(') TPPLexer_Warn(W_EXPECTED_LPAREN);
+   else yield_fetch();
+   if unlikely(!TPPLexer_Eval(&error_message)) return 0;
+   if (error_message.c_kind != TPP_CONST_STRING) {
+    if (!TPPLexer_Warn(W_EXPECTED_STRING_AFTER_PRGERROR,&error_message)) return 0;
+   } else {
+    warning_error = TPPLexer_Warn(W_ERROR,error_message.c_data.c_string->s_text,
+                                          error_message.c_data.c_string->s_size);
+    TPPString_Decref(error_message.c_data.c_string);
+    if (!warning_error) return 0;
+   }
+   if unlikely(TOK != ')') TPPLexer_Warn(W_EXPECTED_RPAREN);
+   else yield_fetch();
   } break;
 
   { /* Mark a given identifier as deprecated. */
@@ -6407,9 +6427,9 @@ set_warning_newstate:
   } break;
 
   default:
-   if (TPP_ISKEYWORD(TOK)) {
-    printf("PRAGMA: %s\n",token.t_kwd->k_name);
-   }
+   LOG(LOG_PRAGMA,("Unknown pragma '%.*s'\n",
+                  (int)(token.t_end-token.t_begin),
+                   token.t_begin));
    break;
  }
  return 0;
