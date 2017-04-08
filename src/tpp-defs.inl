@@ -174,16 +174,17 @@ PREDEFINED_MACRO(__TPP_VERSION__,TPP_PP_STR(TPP_PREPROCESSOR_VERSION))
 
 
 
-WGROUP(WG_COMMENT,  "comment",  WSTATE_ERROR)
-WGROUP(WG_COMMENTS, "comments", WSTATE_ERROR)
-WGROUP(WG_MACROS,   "macros",   WSTATE_ERROR)
-WGROUP(WG_SYNTAX,   "syntax",   WSTATE_ERROR)
-WGROUP(WG_VALUE,    "value",    WSTATE_ERROR)
-WGROUP(WG_USER,     "user",     WSTATE_ERROR)
-WGROUP(WG_ENVIRON,  "environ",  WSTATE_ERROR)
-WGROUP(WG_LIMIT,    "limit",    WSTATE_ERROR)
-WGROUP(WG_UNDEF,    "undef",    WSTATE_ERROR)
-WGROUP(WG_TRIGRAPHS,"trigraphs",WSTATE_DISABLE)
+WGROUP(WG_COMMENT,             "comment",             WSTATE_ERROR)
+WGROUP(WG_COMMENTS,            "comments",            WSTATE_ERROR)
+WGROUP(WG_MACROS,              "macros",              WSTATE_ERROR)
+WGROUP(WG_SYNTAX,              "syntax",              WSTATE_ERROR)
+WGROUP(WG_VALUE,               "value",               WSTATE_ERROR)
+WGROUP(WG_USER,                "user",                WSTATE_ERROR)
+WGROUP(WG_ENVIRON,             "environ",             WSTATE_ERROR)
+WGROUP(WG_LIMIT,               "limit",               WSTATE_ERROR)
+WGROUP(WG_UNDEF,               "undef",               WSTATE_ERROR)
+WGROUP(WG_TRIGRAPHS,           "trigraphs",           WSTATE_DISABLE)
+WGROUP(WG_EXPANSION_TO_DEFINED,"expansion-to-defined",WSTATE_DISABLE)
 
 /* NOTE: These warnings are arranged to mirror those from the old TPP. */
 /* 0*/WARNING(W_EXPECTED_KEYWORD_AFTER_DEFINE,   (WG_SYNTAX),  WSTATE_WARN)    /*< OLD(TPPWarn_ExpectedKeywordAfterDefine). */
@@ -287,6 +288,7 @@ WARNING(W_EXPECTED_STRING_AFTER_EXTENSION, (WG_VALUE),   WSTATE_WARN)    /*< [st
 WARNING(W_MACRO_RECURSION_LIMIT_EXCEEDED,  (WG_LIMIT),   WSTATE_WARN)    /*< [struct TPPFile *]. */
 WARNING(W_INCLUDE_RECURSION_LIMIT_EXCEEDED,(WG_LIMIT),   WSTATE_WARN)    /*< [struct TPPFile *]. */
 WARNING(W_UNKNOWN_EXTENSION,               (WG_VALUE),   WSTATE_WARN)    /*< [struct TPPConst *]. */
+WARNING(W_DEFINED_IN_MACRO_BODY,           (WG_EXPANSION_TO_DEFINED),WSTATE_WARN)
 
 #ifdef TPP_DEFS_DEFINES_BUILTIN_MACRO
 #undef TPP_DEFS_DEFINES_BUILTIN_MACRO

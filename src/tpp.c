@@ -1879,7 +1879,7 @@ strop_normal:
    if ((TOK == KWD___VA_COMMA__ && HAVE_EXTENSION_VA_COMMA) ||
        (TOK == KWD___VA_NARGS__ && HAVE_EXTENSION_VA_NARGS)) {
     if (!(self->f_macro.m_flags&TPP_MACROFILE_FLAG_FUNC_VARIADIC)) {
-     if (!TPPLexer_Warn(W_VA_KEYWORD_IN_REGULAR_MACRO,token.t_kwd)) goto err;
+     if unlikely(!TPPLexer_Warn(W_VA_KEYWORD_IN_REGULAR_MACRO,token.t_kwd)) goto err;
     } else {
      if (token.t_begin != last_text_pointer) {
       if (!codewriter_put1(&writer,TPP_FUNOP_ADV,
@@ -1887,8 +1887,8 @@ strop_normal:
      }
      if (TOK == KWD___VA_COMMA__) {
       /* Replace __VA_COMMA__ with ',' if necessary. */
-      if (!codewriter_put1(&writer,TPP_FUNOP_VA_COMMA,
-         (size_t)(token.t_end-token.t_begin))) goto err;
+      if unlikely(!codewriter_put1(&writer,TPP_FUNOP_VA_COMMA,
+                 (size_t)(token.t_end-token.t_begin))) goto err;
       ++func.f_n_vacomma;
      } else {
       /* Replace __VA_NARGS__ with the integral representation of the argument argument size. */
@@ -1899,6 +1899,8 @@ strop_normal:
      func.f_deltotal += (size_t)(token.t_end-token.t_begin);
      last_text_pointer = token.t_end;
     }
+   } else if (TOK == KWD_defined) {
+    if unlikely(!TPPLexer_Warn(W_DEFINED_IN_MACRO_BODY)) goto err;
    }
   }
   preglue_begin = token.t_begin;
@@ -6923,6 +6925,7 @@ PUBLIC int TPPLexer_Warn(int wnum, ...) {
   case W_REDEFINING_BUILTIN_KEYWORD      : WARNF("Redefining builtin macro '%s'",KWDNAME()); break;
   case W_SPECIAL_ARGUMENT_NAME           : WARNF("Special keyword '%s' used as argument name",KWDNAME()); break;
   case W_VA_KEYWORD_IN_REGULAR_MACRO     : WARNF("Variadic keyword '%s' used in regular macro",KWDNAME()); break;
+  case W_DEFINED_IN_MACRO_BODY           : WARNF("'defined' found in macro body"); break;
   case W_KEYWORD_MACRO_ALREADY_ONSTACK   : WARNF("Keyword-style macro '%s' is already being expanded",FILENAME()); break;
   case W_EOF_IN_MACRO_ARGUMENT_LIST      : WARNF("EOF in macro argument list"); break;
   case W_TOO_MANY_MACRO_ARGUMENTS        : WARNF("Too many arguments for '%s'",FILENAME()); break;
