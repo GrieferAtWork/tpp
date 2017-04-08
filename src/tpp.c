@@ -1819,13 +1819,13 @@ strop_normal:
       /* It does! */
       if (strop_begin != last_text_pointer) {
        /* Advance the text pointer to cover the gap. */
-       if (!codewriter_put1(&writer,TPP_FUNOP_ADV,
-          (size_t)(strop_begin-last_text_pointer))) goto err;
+       if unlikely(!codewriter_put1(&writer,TPP_FUNOP_ADV,
+                  (size_t)(strop_begin-last_text_pointer))) goto seterr;
       }
       last_was_glue = 0;
-      if (!codewriter_put2(&writer,strop,
-         (size_t)(iter-begin),
-         (size_t)(token.t_end-strop_begin))) goto err;
+      if unlikely(!codewriter_put2(&writer,strop,
+                 (size_t)(iter-begin),
+                 (size_t)(token.t_end-strop_begin))) goto seterr;
       func.f_deltotal += (size_t)(token.t_end-strop_begin);
       last_text_pointer = token.t_end;
       if (strop != TPP_FUNOP_INS) ++iter->ai_ins_str;
@@ -1844,8 +1844,8 @@ strop_normal:
      /* Got a regular argument reference. */
      if (token.t_begin != last_text_pointer) {
       /* Advance the text pointer to cover the gap. */
-      if (!codewriter_put1(&writer,TPP_FUNOP_ADV,
-         (size_t)(token.t_begin-last_text_pointer))) goto err;
+      if unlikely(!codewriter_put1(&writer,TPP_FUNOP_ADV,
+                 (size_t)(token.t_begin-last_text_pointer))) goto seterr;
      }
      namesize = (size_t)(token.t_end-token.t_begin);
      last_text_pointer = token.t_end;
@@ -1859,17 +1859,17 @@ strop_normal:
        * whitespace to what should be deleted by the ins operation. */
       namesize += (size_t)(token.t_begin-last_text_pointer);
       last_text_pointer = token.t_begin;
-      if (!codewriter_put2(&writer,TPP_FUNOP_INS,argi,namesize)) goto err;
+      if unlikely(!codewriter_put2(&writer,TPP_FUNOP_INS,argi,namesize)) goto seterr;
       last_was_glue = 1;
      } else if (last_was_glue) {
       /* Insert the argument without expansion. */
       ++iter->ai_ins;
-      if (!codewriter_put2(&writer,TPP_FUNOP_INS,argi,namesize)) goto err;
+      if unlikely(!codewriter_put2(&writer,TPP_FUNOP_INS,argi,namesize)) goto seterr;
       last_was_glue = 0; /* The last token is no longer glue. */
      } else {
       /* Insert the argument with expansion. */
       ++iter->ai_ins_exp;
-      if (!codewriter_put2(&writer,TPP_FUNOP_INS_EXP,argi,namesize)) goto err;
+      if unlikely(!codewriter_put2(&writer,TPP_FUNOP_INS_EXP,argi,namesize)) goto seterr;
      }
      func.f_deltotal += namesize;
      goto next;
@@ -1882,18 +1882,18 @@ strop_normal:
      if unlikely(!TPPLexer_Warn(W_VA_KEYWORD_IN_REGULAR_MACRO,token.t_kwd)) goto err;
     } else {
      if (token.t_begin != last_text_pointer) {
-      if (!codewriter_put1(&writer,TPP_FUNOP_ADV,
-         (size_t)(token.t_begin-last_text_pointer))) goto err;
+      if unlikely(!codewriter_put1(&writer,TPP_FUNOP_ADV,
+                 (size_t)(token.t_begin-last_text_pointer))) goto seterr;
      }
      if (TOK == KWD___VA_COMMA__) {
       /* Replace __VA_COMMA__ with ',' if necessary. */
       if unlikely(!codewriter_put1(&writer,TPP_FUNOP_VA_COMMA,
-                 (size_t)(token.t_end-token.t_begin))) goto err;
+                 (size_t)(token.t_end-token.t_begin))) goto seterr;
       ++func.f_n_vacomma;
      } else {
       /* Replace __VA_NARGS__ with the integral representation of the argument argument size. */
-      if (!codewriter_put1(&writer,TPP_FUNOP_VA_NARGS,
-         (size_t)(token.t_end-token.t_begin))) goto err;
+      if unlikely(!codewriter_put1(&writer,TPP_FUNOP_VA_NARGS,
+                 (size_t)(token.t_end-token.t_begin))) goto seterr;
       ++func.f_n_vanargs;
      }
      func.f_deltotal += (size_t)(token.t_end-token.t_begin);
@@ -1901,6 +1901,13 @@ strop_normal:
     }
    } else if (TOK == KWD_defined) {
     if unlikely(!TPPLexer_Warn(W_DEFINED_IN_MACRO_BODY)) goto err;
+    /* TODO: GCC has an extension that prevents expansion of arguments after 'defined' in a macro body.
+     *       Similar to our '#!' operator, gcc implicitly compiles:
+     *    >> #define is_defined(x)  defined(x)
+     *       as the TPP equivalent for:
+     *    >> #define is_defined(x)  defined(#!x)
+     *       With that in mind, implement that extension here.
+     */
    }
   }
   preglue_begin = token.t_begin;
@@ -1916,23 +1923,23 @@ strop_normal:
     assert(preglue_begin >= last_text_pointer);
     /* Create a GCC-style __VA_COMMA__: ',##__VA_ARGS__' */
     if (preglue_begin != last_text_pointer) {
-     if (!codewriter_put1(&writer,TPP_FUNOP_ADV,
-        (size_t)(preglue_begin-last_text_pointer))) goto err;
+     if unlikely(!codewriter_put1(&writer,TPP_FUNOP_ADV,
+                (size_t)(preglue_begin-last_text_pointer))) goto seterr;
     }
     /* Insert a __VA_COMMA__ and override the ',' and '##'
      * tokens up to the start of whatever follows. */
-    if (!codewriter_put1(&writer,TPP_FUNOP_VA_COMMA,
-       (size_t)(token.t_begin-preglue_begin))) goto err;
+    if unlikely(!codewriter_put1(&writer,TPP_FUNOP_VA_COMMA,
+               (size_t)(token.t_begin-preglue_begin))) goto seterr;
     func.f_deltotal += (size_t)(token.t_begin-preglue_begin);
     ++func.f_n_vacomma;
    } else {
     if (preglue_end != last_text_pointer) {
      /* Delete characters between 'preglue_end' and 'token.t_begin' */
-     if (!codewriter_put1(&writer,TPP_FUNOP_ADV,
-      (size_t)(preglue_end-last_text_pointer))) goto err;
+     if unlikely(!codewriter_put1(&writer,TPP_FUNOP_ADV,
+                (size_t)(preglue_end-last_text_pointer))) goto seterr;
     }
-    if (!codewriter_put1(&writer,TPP_FUNOP_DEL,
-       (size_t)(token.t_begin-preglue_end))) goto err;
+    if unlikely(!codewriter_put1(&writer,TPP_FUNOP_DEL,
+               (size_t)(token.t_begin-preglue_end))) goto seterr;
     func.f_deltotal += (size_t)(token.t_begin-preglue_end);
    }
    last_text_pointer = token.t_begin;
@@ -1943,6 +1950,7 @@ strop_normal:
 done:
  popf();
  return TOK >= 0 && result;
+seterr: TPPLexer_SetErr();
 err: result = 0; codewriter_quit(&writer); goto done;
 }
 #undef func
@@ -1990,7 +1998,7 @@ common_call_extension:
  result = (struct TPPFile *)malloc((macro_flags & TPP_MACROFILE_KIND_FUNCTION)
                                    ? TPPFILE_SIZEOF_MACRO_FUNCTION
                                    : TPPFILE_SIZEOF_MACRO_KEYWORD);
- if unlikely(!result) return NULL;
+ if unlikely(!result) { TPPLexer_SetErr(); return NULL; }
  result->f_refcnt            = 1;
  result->f_kind              = TPPFILE_KIND_MACRO;
  result->f_prev              = NULL;
@@ -2034,7 +2042,7 @@ add_macro_argument:
      arginfo_a = arginfo_a ? arginfo_a*2 : 2;
      new_arginfo_v = (struct arginfo_t *)realloc(arginfo_v,arginfo_a*
                                                  sizeof(struct arginfo_t));
-     if unlikely(!new_arginfo_v) goto err_arginfo;
+     if unlikely(!new_arginfo_v) goto seterr_arginfo;
      arginfo_v = new_arginfo_v;
     } else {
      new_arginfo_v = arginfo_v;
@@ -2185,6 +2193,7 @@ skip_argument_name:
  }
  keyword_entry->k_macro = result; /*< Inherit reference. */
  return result;
+seterr_arginfo: TPPLexer_SetErr();
 err_arginfo: free(arginfo_v);
 /*err_r:*/
  TPPFile_Decref(result->f_macro.m_deffile);
@@ -3984,14 +3993,14 @@ create_block:
     /* Enter a #ifdef block, that is enabled when 'guard_mode' is '1' */
     if (block_mode & TPP_IFDEFMODE_TRUE) {
      /* Push a new enabled #ifdef entry. */
-     if unlikely(!alloc_ifdef(block_mode)) goto err;
+     if unlikely(!alloc_ifdef(block_mode)) goto seterr;
     } else {
      breakeob();
      if unlikely(!skip_pp_block() && TOK < 0) goto err;
      result = TOK;
      if (!result || result == KWD_else || result == KWD_elif) {
       /* There's more to this block. - We must allocate it and parse additional directives. */
-      if unlikely(!alloc_ifdef(block_mode)) goto err;
+      if unlikely(!alloc_ifdef(block_mode)) goto seterr;
       goto parse_result_directive;
      } else {
       assert(result <= 0 || result == KWD_endif);
@@ -4160,8 +4169,21 @@ skip_block_and_parse:
      break;
     }
     final_file = TPPFile_CopyForInclude(include_file);
-    if unlikely(!final_file) goto err;
+    if unlikely(!final_file) goto seterr;
     pushfile_inherited(final_file);
+   } break;
+
+   { /* I still don't fully understand _why_.
+      * >> https://gcc.gnu.org/onlinedocs/cpp/Other-Directives.html */
+    struct TPPConst ident_string; int werror;
+   case KWD_ident:
+   case KWD_sccs:
+    TPPLexer_Yield();
+    if unlikely(!TPPLexer_Eval(&ident_string)) goto err;
+    werror = TPPLexer_Warn(W_IDENT_SCCS_IGNORED,&ident_string);
+    TPPConst_Quit(&ident_string);
+    if unlikely(!werror) goto err;
+    goto def_skip_until_lf;
    } break;
 
    default:
@@ -4206,10 +4228,10 @@ asm_comment:
     breakeob();
     return result;
 
-err:
-    breakeob();
-    breakf();
-    return TOK_ERR;
+seterr: TPPLexer_SetErr();
+err:    breakeob();
+        breakf();
+        return TOK_ERR;
 
   }
   popeob();
@@ -6995,6 +7017,7 @@ PUBLIC int TPPLexer_Warn(int wnum, ...) {
   case W_IF_WITHOUT_ENDIF                : WARNF("#if without #endif"); break;
   case W_ENDIF_WITHOUT_IF                : WARNF("#endif without #if"); break;
   case W_DEPRECATED_IDENTIFIER           : WARNF("DEPRECATED : '%s'",KWDNAME()); break;
+  case W_IDENT_SCCS_IGNORED              : WARNF("#ident/sccs with '%s' is ignored",CONST_STR()); break;
   default: WARNF("? %d",wnum); break;
  }
  if (temp_string) TPPString_Decref(temp_string);

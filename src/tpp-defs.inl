@@ -64,6 +64,8 @@ DEF_K(import)
 DEF_K(line)
 DEF_K(error)
 DEF_K(warning)
+DEF_K(ident)
+DEF_K(sccs)
 
 /* Various names for #pragma-directives (TPP supports everything) */
 DEF_K(pragma)
@@ -185,10 +187,11 @@ WGROUP(WG_LIMIT,               "limit",               WSTATE_ERROR)
 WGROUP(WG_UNDEF,               "undef",               WSTATE_ERROR)
 WGROUP(WG_TRIGRAPHS,           "trigraphs",           WSTATE_DISABLE)
 WGROUP(WG_EXPANSION_TO_DEFINED,"expansion-to-defined",WSTATE_DISABLE)
+WGROUP(WG_DIRECTIVE,           "directive",           WSTATE_ERROR)
 
 /* NOTE: These warnings are arranged to mirror those from the old TPP. */
 /* 0*/WARNING(W_EXPECTED_KEYWORD_AFTER_DEFINE,   (WG_SYNTAX),  WSTATE_WARN)    /*< OLD(TPPWarn_ExpectedKeywordAfterDefine). */
-/* 1*/WARNING(W_REDEFINING_BUILTIN_KEYWORD,      (WG_MACROS),  WSTATE_WARN)    /*< [struct TPPKeyword *] OLD(TPPWarn_RedefiningBuiltinKeyword). */
+/* 1*/WARNING(W_REDEFINING_BUILTIN_KEYWORD,      (WG_MACROS),  WSTATE_DISABLE) /*< [struct TPPKeyword *] OLD(TPPWarn_RedefiningBuiltinKeyword). */
 /* 2*/WARNING(W_UNKNOWN_PREPROCESSOR_DIRECTIVE,  (WG_SYNTAX),  WSTATE_WARN)    /*< OLD(TPPWarn_UnknownPreprocessorDirective). */
 /* 3*/WARNING(W_STARSLASH_OUTSIDE_OF_COMMENT,    (WG_COMMENT,WG_COMMENTS),WSTATE_WARN) /*< [char *] OLD(TPPWarn_StarSlashOutsideOfComment). */
 /* 4*/WARNING(W_ERROR,                           (WG_USER),    WSTATE_ERROR)   /*< [char const *,size_t] OLD(TPPWarn_DirectiveError). */
@@ -289,6 +292,7 @@ WARNING(W_MACRO_RECURSION_LIMIT_EXCEEDED,  (WG_LIMIT),   WSTATE_WARN)    /*< [st
 WARNING(W_INCLUDE_RECURSION_LIMIT_EXCEEDED,(WG_LIMIT),   WSTATE_WARN)    /*< [struct TPPFile *]. */
 WARNING(W_UNKNOWN_EXTENSION,               (WG_VALUE),   WSTATE_WARN)    /*< [struct TPPConst *]. */
 WARNING(W_DEFINED_IN_MACRO_BODY,           (WG_EXPANSION_TO_DEFINED),WSTATE_WARN)
+WARNING(W_IDENT_SCCS_IGNORED,              (WG_DIRECTIVE),WSTATE_WARN)   /*< [struct TPPConst *]. */
 
 #ifdef TPP_DEFS_DEFINES_BUILTIN_MACRO
 #undef TPP_DEFS_DEFINES_BUILTIN_MACRO
