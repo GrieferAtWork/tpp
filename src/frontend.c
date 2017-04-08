@@ -323,7 +323,7 @@ int main(int argc, char *argv[]) {
   else if (!strcmp(arg,"fno-magiclf")) no_magic_tokens = 1;
   else if (!strcmp(arg,"flongstring")) TPPLexer_Current->l_flags &= ~(TPPLEXER_FLAG_TERMINATE_STRING_LF);
   else if (!strcmp(arg,"fno-longstring")) TPPLexer_Current->l_flags |= TPPLEXER_FLAG_TERMINATE_STRING_LF;
-  else if (!strcmp(arg,"trigraphs")) TPPLexer_Current->l_flags |= TPPLEXER_EXTENSION_TRIGRAPHS;
+  else if (!strcmp(arg,"trigraphs")) TPPLexer_Current->l_extensions |= TPPLEXER_EXTENSION_TRIGRAPHS;
   else if (!strcmp(arg,"P")) no_line_directives = 0;
   else if (!strcmp(arg,"o")) argc > 1 ? (output_filename = argv[1],++argv,--argc) : 0;
   else if (!strcmp(arg,"-name")) argc > 1 ? (firstname = argv[1],++argv,--argc) : 0;

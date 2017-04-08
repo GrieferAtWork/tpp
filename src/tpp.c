@@ -3262,6 +3262,7 @@ PUBLIC tok_t TPPLexer_YieldRaw(void) {
  struct TPPFile *file,*prev_file;
  char *iter,*end,*forward; tok_t ch;
  assert(TPPLexer_Current);
+ /* Refuse parsing more data if an error occurred. */
  if (current.l_flags&TPPLEXER_FLAG_ERROR) return TOK_ERR;
  file = token.t_file;
 again:
@@ -3327,7 +3328,7 @@ parse_multichar:
    while (iter != end && *iter != (char)ch) {
     while (SKIP_WRAPLF(iter,end));
     if ((current.l_flags&TPPLEXER_FLAG_TERMINATE_STRING_LF) && islf(*iter)) {
-     if (!TPPLexer_Warn(W_STRING_TERMINATED_BY_LINEFEED)) goto err;
+     if unlikely(!TPPLexer_Warn(W_STRING_TERMINATED_BY_LINEFEED)) goto err;
      break;
     }
     if (*iter == '\\' && iter != end &&
@@ -3335,7 +3336,7 @@ parse_multichar:
     ++iter;
    }
         if (*iter == (char)ch) ++iter;
-   else if (iter == end && !TPPLexer_Warn(W_STRING_TERMINATED_BY_EOF)) goto err;
+   else if (iter == end && unlikely(!TPPLexer_Warn(W_STRING_TERMINATED_BY_EOF))) goto err;
    /* Warn amount if multi-char constants if they are not enabled. */
    if (ch == '\'' && !HAVE_EXTENSION_MULTICHAR_CONST) {
     char *char_begin = token.t_begin+1,*char_end = iter;
@@ -3349,20 +3350,25 @@ parse_multichar:
    /* The string/char token ID is the startup character. */
    goto settok;
 
-  case '?':
-   /* Check for trigraphs. */
+  case '?': /* Check for trigraphs. */
    if (HAVE_FEATURE_TRIGRAPHS &&
-      (iter <= end-1 && *iter == '?')) switch (iter[1]) {
-    case '=':  iter += 2,ch = '#';  goto parse_multichar; /* ??= */
-    case '(':  iter += 2,ch = '[';  break;                /* ??( */
-    case '/':  iter += 2,ch = '\\'; break;                /* ??/ */
-    case ')':  iter += 2,ch = ']';  break;                /* ??) */
-    case '\'': iter += 2,ch = '^';  goto parse_multichar; /* ??' */
-    case '<':  iter += 2,ch = '{';  break;                /* ??< */
-    case '!':  iter += 2,ch = '|';  goto parse_multichar; /* ??! */
-    case '>':  iter += 2,ch = '}';  break;                /* ??> */
-    case '-':  iter += 2,ch = '~';  goto parse_multichar; /* ??- */
-    default: break;
+      (iter <= end-1 && *iter == '?')) {
+    switch (iter[1]) {
+     case '=':  ch = '#';  break; /* ??= */
+     case '(':  ch = '[';  break; /* ??( */
+     case '/':  ch = '\\'; break; /* ??/ */
+     case ')':  ch = ']';  break; /* ??) */
+     case '\'': ch = '^';  break; /* ??' */
+     case '<':  ch = '{';  break; /* ??< */
+     case '!':  ch = '|';  break; /* ??! */
+     case '>':  ch = '}';  break; /* ??> */
+     case '-':  ch = '~';  break; /* ??- */
+     case '?':             break; /* ??? */
+     default: goto settok;
+    }
+    if unlikely(!TPPLexer_Warn(W_ENCOUNTERED_TRIGRAPH,iter-1)) goto err;
+    iter += 2;
+    if (ismultichar(ch)) goto parse_multichar;
    }
    goto settok;
 
@@ -3436,6 +3442,10 @@ parse_multichar:
      if (ch == '*') {
       while (SKIP_WRAPLF(forward,end));
       if (*forward == '/') break;
+     } else if (ch == '/') {
+      while (SKIP_WRAPLF(forward,end));
+      if (*forward == '*' &&
+          !TPPLexer_Warn(W_SLASHSTAR_INSIDE_OF_COMMENT,forward)) goto err;
      }
     }
     iter = forward;
@@ -3449,7 +3459,7 @@ parse_multichar:
     do {
      ++forward;
      while (SKIP_WRAPLF(forward,end)) {
-      if (!TPPLexer_Warn(W_LINE_COMMENT_CONTINUED)) goto err;
+      if unlikely(!TPPLexer_Warn(W_LINE_COMMENT_CONTINUED)) goto err;
      }
     } while (!islf(*forward));
     if (!(current.l_flags&TPPLEXER_FLAG_COMMENT_NOOWN_LF) &&
@@ -3535,7 +3545,7 @@ set_comment:
     } else {
      kwd_entry = lookup_escaped_keyword(token.t_begin,name_escapesize,name_size,1);
     }
-    if unlikely(!kwd_entry) {err: ch = (tok_t)TOK_ERR; goto settok; }
+    if unlikely(!kwd_entry) goto seterr;
     ch = kwd_entry->k_id;
     token.t_id = kwd_entry->k_id;
     token.t_kwd = kwd_entry;
@@ -3607,6 +3617,8 @@ done:
  token.t_end = iter;
  ++token.t_num;
  return token.t_id;
+seterr: TPPLexer_SetErr();
+err: ch = (tok_t)TOK_ERR; goto settok;
 }
 
 #ifdef _MSC_VER
@@ -6802,6 +6814,31 @@ set_warning_newstate:
    return 1;
   } break;
 
+  { /* Configure TPP extensions from usercode. */
+   struct TPPConst extname;
+  case KWD_extension:
+   yield_fetch();
+   if unlikely(TOK != '(') TPPLexer_Warn(W_EXPECTED_LPAREN);
+   else yield_fetch();
+   if unlikely(!TPPLexer_Eval(&extname)) return 0;
+   if (extname.c_kind != TPP_CONST_STRING) {
+    if unlikely(!TPPLexer_Warn(W_EXPECTED_STRING_AFTER_EXTENSION,&extname)) return 0;
+   } else {
+    int ext_error,mode = 1;
+    char const *name = extname.c_data.c_string->s_text;
+    if (*name == '-') ++name;
+    if (*name == 'f') ++name;
+    if (!memcmp(name,"no-",3)) name += 3,mode = 0;
+    ext_error = TPPLexer_SetExtension(name,mode);
+    if unlikely(!ext_error) ext_error = TPPLexer_Warn(W_UNKNOWN_EXTENSION,&extname);
+    TPPString_Decref(extname.c_data.c_string);
+    if unlikely(!ext_error) return 0;
+   }
+   if unlikely(TOK != ')') TPPLexer_Warn(W_EXPECTED_RPAREN);
+   else yield_fetch();
+   return 1;
+  } break;
+
   default:
    LOG(LOG_PRAGMA,("Unknown pragma '%.*s'\n",
                   (int)(token.t_end-token.t_begin),
@@ -6868,15 +6905,20 @@ PUBLIC int TPPLexer_Warn(int wnum, ...) {
  WARNF("%c%04d(",(behavior == TPP_WARNINGMODE_ERROR) ? 'E' : 'W',wnum);
  /* print a list of all groups associated with the warning. */
  wgroups = w_associated_groups[wnum];
+#if 1
+ if (*wgroups >= 0) WARNF("\"-W%s\"",wgroup_names[*wgroups]);
+#else
  while (*wgroups >= 0) {
   char const *name = wgroup_names[*wgroups++];
   WARNF("\"-W%s\"%s",name,(*wgroups >= 0) ? "," : "");
  }
+#endif
  WARNF("): ");
  switch (wnum) {
   case W_STARSLASH_OUTSIDE_OF_COMMENT    : WARNF("'*" "/' outside of comment"); break;
   case W_SLASHSTAR_INSIDE_OF_COMMENT     : WARNF("'/" "*' repeated inside of comment"); break;
   case W_LINE_COMMENT_CONTINUED          : WARNF("Line-comment continued"); break;
+  case W_ENCOUNTERED_TRIGRAPH            : WARNF("Encountered trigraph character sequence '%.3s'",ARG(char *)); break;
   case W_REDEFINING_MACRO                : WARNF("Redefining macro '%s'",KWDNAME()); break;
   case W_REDEFINING_BUILTIN_KEYWORD      : WARNF("Redefining builtin macro '%s'",KWDNAME()); break;
   case W_SPECIAL_ARGUMENT_NAME           : WARNF("Special keyword '%s' used as argument name",KWDNAME()); break;
