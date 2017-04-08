@@ -658,6 +658,19 @@ struct TPPIncludeList {
  struct TPPIncludePath *il_pathv; /*< [0..il_pathc][owned] Vector of sanitized #include path. */
 };
 
+struct TPPAssertion {
+ struct TPPAssertion *as_next; /*< [0..1][owned] Next assertion. */
+ size_t               as_size; /*< Size of this assertion's text in characters. */
+ TPP(hash_t)          as_hash; /*< Hash of the assertion's text. */
+ char                 as_text[TPP_SYMARRAY_SIZE]; /*< [as_size] Assertion text. */
+};
+struct TPPAssertions {
+ /* s.a.: 'https://gcc.gnu.org/onlinedocs/cpp/Obsolete-Features.html' */
+ size_t                as_size;       /*< Amount of defined assertions. */
+ size_t                as_alloc;      /*< Allocated amount of assertions. */
+ struct TPPAssertion **as_assertions; /*< [0..1][owned][0..as_alloc][owned] Hash-map of existing assertions. */
+};
+
 struct TPPRareKeyword {
  /* Keyword-specific data that is only rarely used. */
  /*ref*/struct TPPFile    *kr_file;     /*< [0..1] Set if this keyword is actually the name of a file, when that file was already included.
@@ -680,6 +693,7 @@ struct TPPRareKeyword {
 #define TPP_KEYWORDFLAG_IS_DEPRECATED          0x00000040
 #define TPP_KEYWORDFLAG_USERMASK               0x0000007f /*< Set of flags modifiable through pragmas. */
  uint32_t                  kr_flags;    /*< A set of 'TPP_KEYWORDFLAG_*'. */
+ struct TPPAssertions      kr_asserts;  /*< Assertions (aka. #assert/#unassert associated with this keyword) */
 };
 
 struct TPPKeyword {

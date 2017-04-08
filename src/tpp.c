@@ -2317,6 +2317,7 @@ destroy_keyword_map(struct TPPKeywordMap *__restrict self) {
    /* Drop all macro definitions. */
    if (iter->k_macro) TPPFile_Decref(iter->k_macro);
    if ((rare = iter->k_rare) != NULL) {
+    struct TPPAssertion **ass_iter,**ass_end,*aiter,*anext;
     if (rare->kr_file) TPPFile_Decref(rare->kr_file);
     fileiter = rare->kr_oldmacro;
     while (fileiter) {
@@ -2325,10 +2326,23 @@ destroy_keyword_map(struct TPPKeywordMap *__restrict self) {
      TPPFile_Decref(fileiter);
      fileiter = filenext;
     }
+    assert((rare->kr_asserts.as_assertions != NULL) ==
+           (rare->kr_asserts.as_alloc != 0));
+    ass_end = (ass_iter = rare->kr_asserts.as_assertions)+
+                          rare->kr_asserts.as_alloc;
+    for (; ass_iter != ass_end; ++ass_iter) {
+     aiter = *ass_iter;
+     while (aiter) {
+      anext = aiter->as_next;
+      free(aiter);
+      aiter = anext;
+     }
+    }
+    free(rare->kr_asserts.as_assertions);
     free(rare);
    }
 #if TPP_CONFIG_ONELEXER
-   /* Must still free if the keyword isn't a builtin. */
+   /* Must only free if the keyword isn't a builtin. */
    if (TPP_ISUSERKEYWORD(iter->k_id))
 #endif
    {
