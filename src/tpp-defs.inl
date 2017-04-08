@@ -22,7 +22,7 @@
 #endif
 #ifndef WGROUP
 #define TPP_DEFS_DEFINES_WGROUP
-#define WGROUP(name,str)
+#define WGROUP(name,str,default)
 #endif
 #ifndef WARNING
 #define TPP_DEFS_DEFINES_WARNING
@@ -173,13 +173,13 @@ PREDEFINED_MACRO(__TPP_VERSION__,TPP_PP_STR(TPP_PREPROCESSOR_VERSION))
 
 
 
-WGROUP(WG_COMMENTS,"comments")
-WGROUP(WG_MACROS,  "macros")
-WGROUP(WG_SYNTAX,  "syntax")
-WGROUP(WG_VALUE,   "value")
-WGROUP(WG_USER,    "user")
-WGROUP(WG_ENVIRON, "environ")
-WGROUP(WG_LIMIT,   "limit")
+WGROUP(WG_COMMENTS,"comments",WSTATE_ERROR)
+WGROUP(WG_MACROS,  "macros",  WSTATE_ERROR)
+WGROUP(WG_SYNTAX,  "syntax",  WSTATE_ERROR)
+WGROUP(WG_VALUE,   "value",   WSTATE_ERROR)
+WGROUP(WG_USER,    "user",    WSTATE_ERROR)
+WGROUP(WG_ENVIRON, "environ", WSTATE_ERROR)
+WGROUP(WG_LIMIT,   "limit",   WSTATE_ERROR)
 
 /* NOTE: These warnings are arranged to mirror those from the old TPP. */
 /* 0*/WARNING(W_EXPECTED_KEYWORD_AFTER_DEFINE,   (WG_SYNTAX),  WSTATE_WARN)    /*< OLD(TPPWarn_ExpectedKeywordAfterDefine). */

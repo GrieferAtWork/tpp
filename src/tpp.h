@@ -528,10 +528,11 @@ typedef enum { /* Warning states. */
  TPP(WSTATE_ERROR)    = 1,
  TPP(WSTATE_WARN)     = 2,
  TPP(WSTATE_SUPPRESS) = 3, /*< Can be set multiple times for recursion. */
+ TPP(WSTATE_DEFAULT)  = 4,
 } TPP(wstate_t);
 
 enum{
-#define WGROUP(name,str) TPP(name),
+#define WGROUP(name,str,default) TPP(name),
 #include "tpp-defs.inl"
 #undef WGROUP
  TPP(WG_COUNT)

@@ -2130,7 +2130,7 @@ err:
 
 /* Figure out the default state of warnings. */
 PRIVATE struct {
-#define WGROUP(name,str)             unsigned int s_##name : TPP_WARNING_BITS;
+#define WGROUP(name,str,default)     unsigned int s_##name : TPP_WARNING_BITS;
 #include "tpp-defs.inl"
 #undef WGROUP
 #define WARNING(name,groups,default) unsigned int s_##name : TPP_WARNING_BITS;
@@ -2138,7 +2138,7 @@ PRIVATE struct {
 #undef WARNING
 } const default_warnings_state = {
 #ifndef __INTELLISENSE__
-#define WGROUP(name,str)             WSTATE_ERROR,
+#define WGROUP(name,str,default)     default,
 #include "tpp-defs.inl"
 #undef WGROUP
 #define WARNING(name,groups,default) default,
@@ -2146,14 +2146,14 @@ PRIVATE struct {
 #undef WARNING
 #endif
 };
-#define DEFAULT_WARNING_STATE(wnum) \
- (wstate_t)((((uint8_t *)&default_warnings_state)[(wnum)/(8/TPP_WARNING_BITS)] \
-          >> ((wnum)%(8/TPP_WARNING_BITS))*TPP_WARNING_BITS) & 3)
+#define DEFAULT_WARNING_STATE(wid) \
+ (wstate_t)((((uint8_t *)&default_warnings_state)[(wid)/(8/TPP_WARNING_BITS)] \
+          >> ((wid)%(8/TPP_WARNING_BITS))*TPP_WARNING_BITS) & 3)
 
 
 PRIVATE char const *const wgroup_names[WG_COUNT+1] = {
 #ifndef __INTELLISENSE__
-#define WGROUP(name,str) str,
+#define WGROUP(name,str,default) str,
 #include "tpp-defs.inl"
 #undef WGROUP
 #endif
@@ -2227,6 +2227,7 @@ PRIVATE int set_wstate(int wid, wstate_t state) {
  assert((curstate == &current.l_warnings.w_basestate) ==
         (curstate->ws_prev == NULL));
  assert(wid < TPP_WARNING_TOTAL);
+ if (state == WSTATE_DEFAULT) state = DEFAULT_WARNING_STATE(wid);
  end = (iter = curstate->ws_extendedv)+curstate->ws_extendeda;
  while (iter != end && iter->wse_wid < wid) ++iter;
  assert(iter == end || iter->wse_wid >= wid);
@@ -6307,8 +6308,8 @@ TPPLexer_ParsePragma(tok_t endat) {
    if unlikely(TOK != '(') TPPLexer_Warn(W_EXPECTED_LPAREN);
    else yield_fetch();
    for (;;) {
-    wstate_t newstate,used_newstate; int wset_error;
-    struct TPPConst val; int wnum;
+    wstate_t newstate; int wset_error;
+    struct TPPConst val; char *warning_text;
     switch (TOK) {
      case KWD_push: /* Push warnings. */
       if unlikely(!TPPLexer_PushWarnings()) goto seterr;
@@ -6321,7 +6322,6 @@ TPPLexer_ParsePragma(tok_t endat) {
       break;
 
      { /* Set the state of a given set of warnings. */
-#define WSTATE_DEFAULT  ((wstate_t)4)
       if (FALSE) { case KWD_disable:  newstate = WSTATE_DISABLE; }
       if (FALSE) { /*case KWD_warning:*/
                    case KWD_enable:   newstate = WSTATE_WARN; }
@@ -6338,14 +6338,12 @@ set_warning_newstate:
        while (TOK > 0 && TOK != ',' && TOK != ')') {
         if unlikely(!TPPLexer_Eval(&val)) return 0;
         if (val.c_kind == TPP_CONST_INTEGRAL) {
-         wnum          = (int)val.c_data.c_int;
-         used_newstate = (newstate == WSTATE_DEFAULT)
-          ? (wnum < W_COUNT ? DEFAULT_WARNING_STATE(wnum) : WSTATE_DISABLE)
-          : newstate;
-         wset_error = TPPLexer_SetWarning(wnum,used_newstate);
+         wset_error = TPPLexer_SetWarning((int)val.c_data.c_int,newstate);
         } else {
-         used_newstate = newstate == WSTATE_DEFAULT ? WSTATE_ERROR : newstate;
-         wset_error = TPPLexer_SetWarnings(val.c_data.c_string->s_text,used_newstate);
+         warning_text = val.c_data.c_string->s_text;
+         if (*warning_text == '-') ++warning_text;
+         if (*warning_text == 'W') ++warning_text;
+         wset_error = TPPLexer_SetWarnings(warning_text,newstate);
         }
         if (wset_error == 2) wset_error = TPPLexer_Warn(W_INVALID_WARNING,&val);
         TPPConst_Quit(&val);
@@ -6380,7 +6378,6 @@ set_warning_newstate:
        else newstate = WSTATE_SUPPRESS;
        goto set_warning_newstate;
       } else {
-       char *warning_text;
        /* Very nice-looking warning directives:
         * >> #pragma warning(push,"-Wno-syntax")
         * >> ... // Do something ~nasty~.
@@ -6390,7 +6387,10 @@ set_warning_newstate:
        warning_text = val.c_data.c_string->s_text;
        if (*warning_text == '-') ++warning_text;
        if (*warning_text == 'W') ++warning_text;
-       if (!memcmp(warning_text,"no-",3)) warning_text += 3,newstate = WSTATE_DISABLE;
+            if (!memcmp(warning_text,"no-",3*sizeof(char))) warning_text += 3,newstate = WSTATE_DISABLE;
+       else if (!memcmp(warning_text,"def-",4*sizeof(char))) warning_text += 4,newstate = WSTATE_DEFAULT;
+       else if (!memcmp(warning_text,"sup-",4*sizeof(char))) warning_text += 4,newstate = WSTATE_SUPPRESS;
+       else if (!memcmp(warning_text,"suppress-",9*sizeof(char))) warning_text += 9,newstate = WSTATE_SUPPRESS;
        wset_error = TPPLexer_SetWarnings(warning_text,newstate);
        if (wset_error == 2) wset_error = TPPLexer_Warn(W_INVALID_WARNING,&val);
        TPPString_Decref(val.c_data.c_string);
