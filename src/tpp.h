@@ -569,7 +569,7 @@ struct TPPWarningStateEx { /* Extended state for a 11-warning. */
 };
 #define TPP_WARNING_BITS          2 /*< One of WSTATE_*. */
 #define TPP_WARNING_TOTAL        (TPP(WG_COUNT)+TPP(W_COUNT))
-#define TPP_WARNING_BITSETSIZE  ((TPP_WARNING_TOTAL*TPP_WARNING_BITS)/8)
+#define TPP_WARNING_BITSETSIZE  (((TPP_WARNING_TOTAL*TPP_WARNING_BITS+7))/8)
 struct TPPWarningState {
  /* Bitset describing the current warning state.
   * NOTE: Warning groups come before warning numbers. */
