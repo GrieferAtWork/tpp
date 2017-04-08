@@ -102,19 +102,47 @@
 #include <Windows.h>
 #define stream_close(fd) CloseHandle(fd)
 #else
+#include <endian.h>
 #include <fcntl.h>
 #include <unistd.h>
 #define stream_close(fd) close(fd)
 #endif
 
+#ifdef _MSC_VER
+#include <intrin.h>
+#define __builtin_bswap16 _byteswap_ushort
+#define __builtin_bswap32 _byteswap_ulong
+#define __builtin_bswap64 _byteswap_uint64
+#endif
+
 #undef FALSE
 #define FALSE    TPP_MACRO_FALSE
+
+#if defined(__BYTE_ORDER__)
+#   define TPP_BYTEORDER   __BYTE_ORDER__
+#elif defined(__BYTE_ORDER)
+#   define TPP_BYTEORDER   __BYTE_ORDER
+#elif defined(_BYTE_ORDER)
+#   define TPP_BYTEORDER   _BYTE_ORDER
+#elif defined(BYTE_ORDER)
+#   define TPP_BYTEORDER   BYTE_ORDER
+#elif (defined(__hppa__))\
+   || (defined(__m68k__) || defined(__MC68000__) || defined(_M_M68K))\
+   || (defined(__MIPS__) && defined(__MISPEB__))\
+   || (defined(__ppc__) || defined(__powerpc__) || defined(_M_PPC))\
+   || (defined(__ARMEB__) || defined(__sparc__)) /* Big endian... */
+#   define TPP_BYTEORDER  4321
+#else /* Fallback: Assume little-endian. */
+#   define TPP_BYTEORDER  1234
+#endif
+
 
 #define SEP    '/'  /* The path-separator used in sanitized pathnames. */
 #if defined(_WIN32) || defined(__CYGWIN__) || defined(__MINGW32__)
 /* An alternate path-separator that is replaced with 'SEP' during sanitization.
  * >> We're going all-out linux here! (No backslashes allowed, because they _suck_!) */
 #define ALTSEP '\\'
+#define HAVE_INSENSITIVE_PATHS
 #endif
 
 #ifdef __cplusplus
@@ -381,6 +409,7 @@ do{ tok_t              _old_tok_id    = token.t_id;\
 #define LOG_CALLMACRO   1
 #define LOG_LEGACYGUARD 2
 #define LOG_PRAGMA      3
+#define LOG_ENCODING    4
 #if TPP_CONFIG_DEBUG
 #define HAVELOG(level) (0 && (level) == LOG_LEGACYGUARD) /* Change this to select active logs. */
 LOCAL void tpp_log(char const *fmt, ...) {
@@ -702,8 +731,9 @@ PRIVATE struct TPPFile TPPFile_Empty = {
  /* f_textfile.f_cacheinc    */0,
  /* f_textfile.f_rdata       */0,
  /* f_textfile.f_prefixdel   */0,
- /* f_textfile.f_noguard     */1,
- /* f_textfile.f_padding     */{0,0},
+ /* f_textfile.f_flags       */TPP_TEXTFILE_FLAG_NOGUARD,
+ /* f_textfile.f_encoding    */TPP_ENCODING_UTF8,
+ /* f_textfile.f_padding     */{0},
  /* f_textfile.f_newguard    */NULL}
 };
 
@@ -828,7 +858,8 @@ TPPFile_OpenStream(TPP(stream_t) stream, char const *name) {
  result->f_textfile.f_cacheinc    = 0;
  result->f_textfile.f_rdata       = 0;
  result->f_textfile.f_prefixdel   = 0;
- result->f_textfile.f_noguard     = 0;
+ result->f_textfile.f_flags       = TPP_TEXTFILE_FLAG_NONE;
+ result->f_textfile.f_encoding    = TPP_ENCODING_UTF8;
  result->f_textfile.f_newguard    = NULL;
  result->f_refcnt                 = 1;
  result->f_kind                   = TPPFILE_KIND_TEXT;
@@ -990,6 +1021,208 @@ reuse_self:
  return self;
 }
 
+/* Determine the encoding from a given chunk
+ * of data located at the start of a file. */
+LOCAL encoding_t
+determine_encoding(char **pdata, size_t data_size) {
+ static unsigned char const seq_utf32_be[] = {0x00,0x00,0xFE,0xFF};
+ static unsigned char const seq_utf32_le[] = {0xFF,0xFE,0x00,0x00};
+ static unsigned char const seq_utf16_be[] = {0xFE,0xFF};
+ static unsigned char const seq_utf16_le[] = {0xFF,0xFE};
+ static unsigned char const seq_utf8[]     = {0xEF,0xBB,0xBF};
+ encoding_t result = TPP_ENCODING_UTF8;
+#define CHECK_SEQ(seq) (sizeof(seq) <= data_size && !memcmp(data,seq,sizeof(seq)) && (data += sizeof(seq),1))
+ char *data;
+ assert(pdata);
+ assert(*pdata);
+ assert(data_size);
+ data = *pdata;
+ if (CHECK_SEQ(seq_utf8)) /*result = TPP_ENCODING_UTF8*/;
+ else if (CHECK_SEQ(seq_utf32_be)) result = TPP_ENCODING_UTF32_BE;
+ else if (CHECK_SEQ(seq_utf32_le)) result = TPP_ENCODING_UTF32_LE;
+ else if (CHECK_SEQ(seq_utf16_be)) result = TPP_ENCODING_UTF16_BE;
+ else if (CHECK_SEQ(seq_utf16_le)) result = TPP_ENCODING_UTF16_LE;
+ /* Detect from recurring patterns. */
+ else if (data_size >= 8 &&  data[0] && !data[1] && !data[2] && !data[3] &&
+                             data[4] && !data[5] && !data[6] && !data[7]) result = TPP_ENCODING_UTF32_LE;
+ else if (data_size >= 8 && !data[0] && !data[1] && !data[2] &&  data[3] &&
+                            !data[4] && !data[5] && !data[6] &&  data[7]) result = TPP_ENCODING_UTF32_BE;
+ else if (data_size >= 4 &&  data[0] && !data[1] &&
+                             data[2] && !data[3]) result = TPP_ENCODING_UTF16_LE;
+ else if (data_size >= 4 && !data[0] &&  data[1] &&
+                            !data[2] &&  data[3]) result = TPP_ENCODING_UTF16_BE;
+ else {
+  /* Default: Continue assuming no special encoding. */
+ }
+ *pdata = data;
+ return result;
+#undef CHECK_SEQ
+}
+
+static unsigned char const uni_bytemarks[] = {0x00,0x00,0xC0,0xE0,0xF0/*,0xF8,0xFC*/};
+
+PRIVATE size_t TPP_SizeofDecodeUtf32(uint32_t *iter, size_t datalength) {
+ uint32_t ch; size_t result = 0;
+ uint32_t *end = iter+datalength;
+ while (iter != end) {
+  ch = *iter++;
+       if (ch >= 0xD800 && ch <= 0xDFFF) result += 1;
+  else if (ch < 0x80)                    result += 1;
+  else if (ch < 0x800)                   result += 2;
+  else if (ch < 0x10000)                 result += 3;
+  else if (ch <= 0x0010FFFF)             result += 4;
+  else                                   result += 1;
+ }
+ return result;
+}
+PRIVATE char *TPP_DecodeUtf32(char *buf, uint32_t *iter, size_t datalength) {
+ uint32_t ch; size_t dst_size;
+ uint32_t *end = iter+datalength;
+ while (iter != end) {
+  ch = *iter++;
+       if (ch >= 0xD800 && ch <= 0xDFFF) dst_size = 1;
+  else if (ch < 0x80) dst_size = 1;
+  else if (ch < 0x800) dst_size = 2;
+  else if (ch < 0x10000) dst_size = 3;
+  else if (ch <= 0x0010FFFF) dst_size = 4;
+  else dst_size = 1;
+  switch (dst_size) {
+   case 4: buf[3] = (char)((ch|0x80)&0xBF); ch >>= 6;
+   case 3: buf[2] = (char)((ch|0x80)&0xBF); ch >>= 6;
+   case 2: buf[1] = (char)((ch|0x80)&0xBF); ch >>= 6;
+   case 1: buf[0] = (char) (ch|uni_bytemarks[dst_size]);
+  }
+  buf += dst_size;
+ }
+ return buf;
+}
+
+PRIVATE size_t TPP_SizeofDecodeUtf16(uint16_t *iter, size_t datalength) {
+ uint16_t const *end = iter+datalength;
+ uint32_t ch,ch2; size_t result = 0;
+ while (iter != end) {
+  ch = *iter++; /* Convert surrogate pair to Utf32 */
+  if (ch >= 0xD800 && ch <= 0xDBFF) {
+   if (iter == end) ch = (unsigned char)ch;
+   else if ((ch2 = *iter,ch2 >= 0xDC00 && ch2 <= 0xDFFF)) {
+    ch = ((ch-0xD800)<<10)+(ch2-0xDC00)+0x0010000;
+    ++iter;
+   }
+  } else if (ch >= 0xDC00 && ch <= 0xDFFF) {
+   ch = (unsigned char)ch;
+  }
+       if (ch < 0x80)     result += 1;
+  else if (ch < 0x800)    result += 2;
+  else if (ch < 0x10000)  result += 3;
+  else if (ch < 0x110000) result += 4;
+  else                    result += 1;
+ }
+ return result;
+}
+PRIVATE char *TPP_DecodeUtf16(char *buf, uint16_t *iter, size_t datalength) {
+ uint16_t const *end = iter+datalength;
+ uint32_t ch,ch2; size_t dst_size;
+ while (iter != end) {
+  ch = *iter++; /* Convert surrogate pair to Utf32 */
+  if (ch >= 0xD800 && ch <= 0xDBFF) {
+   if (iter == end) ch = (unsigned char)ch;
+   else if ((ch2 = *iter,ch2 >= 0xDC00 && ch2 <= 0xDFFF)) {
+    ch = ((ch-0xD800)<<10)+(ch2-0xDC00)+0x0010000;
+    ++iter;
+   }
+  } else if (ch >= 0xDC00 && ch <= 0xDFFF) {
+   ch = (unsigned char)ch;
+  }
+       if (ch < 0x80) dst_size = 1;
+  else if (ch < 0x800) dst_size = 2;
+  else if (ch < 0x10000) dst_size = 3;
+  else if (ch < 0x110000) dst_size = 4;
+  else dst_size = 1;
+  switch (dst_size) {
+   case 4: buf[3] = (char)((ch|0x80)&0xBF); ch >>= 6;
+   case 3: buf[2] = (char)((ch|0x80)&0xBF); ch >>= 6;
+   case 2: buf[1] = (char)((ch|0x80)&0xBF); ch >>= 6;
+   case 1: buf[0] = (char)(ch|uni_bytemarks[dst_size]);
+  }
+  buf += dst_size;
+ }
+ return buf;
+}
+
+LOCAL void swap16(uint16_t *p, size_t n) { while (n--) *p = __builtin_bswap16(*p),++p; }
+LOCAL void swap32(uint32_t *p, size_t n) { while (n--) *p = __builtin_bswap32(*p),++p; }
+
+/* Convert a given chunk of data from 'encoding' to UTF-8. */
+LOCAL /*ref*/struct TPPString *
+convert_encoding(/*ref*/struct TPPString *data,
+                 char *data_start, size_t *pdata_size,
+                 encoding_t encoding) {
+ size_t data_size,size_avail,size_used,req_size;
+ struct TPPString *new_data;
+ assert(data);
+ assert(data_start);
+ assert(pdata_size);
+ data_size = *pdata_size;
+ assert(data_size);
+ assert(encoding != TPP_ENCODING_UTF8);
+ assert(data_start+data_size > data_start);
+ assert(data_start >= data->s_text);
+ assert(data_start+data_size <= data->s_text+data->s_size);
+ size_used  = (size_t)(data_start-data->s_text);
+ size_avail = data->s_size-size_used;
+ switch (encoding) {
+#if TPP_BYTEORDER == 1234
+  case TPP_ENCODING_UTF16_BE:
+   swap16((uint16_t *)data_start,data_size/2);
+  case TPP_ENCODING_UTF16_LE:
+#elif TPP_BYTEORDER == 4321
+  case TPP_ENCODING_UTF16_LE:
+   swap16((uint16_t *)data_start,data_size/2);
+  case TPP_ENCODING_UTF16_BE:
+#else
+#  error FIXME
+#endif
+   req_size = TPP_SizeofDecodeUtf16((uint16_t *)data_start,data_size/2);
+   new_data = (struct TPPString *)malloc(TPP_OFFSETOF(struct TPPString,s_text)+
+                                        (size_used+req_size+1)*sizeof(char));;
+   if unlikely(!new_data) return NULL;
+   memcpy(new_data->s_text,data->s_text,size_used*sizeof(char));
+   TPP_DecodeUtf16(new_data->s_text+size_used,(uint16_t *)data_start,data_size/2);
+   new_data->s_size = size_used+req_size;
+   new_data->s_text[new_data->s_size] = '\0';
+   new_data->s_refcnt = 1;
+   TPPString_Decref(data);
+   data = new_data;
+   break;
+#if TPP_BYTEORDER == 1234
+  case TPP_ENCODING_UTF32_BE:
+   swap32((uint32_t *)data_start,data_size/4);
+  case TPP_ENCODING_UTF32_LE:
+#elif TPP_BYTEORDER == 4321
+  case TPP_ENCODING_UTF32_LE:
+   swap32((uint32_t *)data_start,data_size/4);
+  case TPP_ENCODING_UTF32_BE:
+#else
+#  error FIXME
+#endif
+   req_size = TPP_SizeofDecodeUtf32((uint32_t *)data_start,data_size/4);
+   new_data = (struct TPPString *)malloc(TPP_OFFSETOF(struct TPPString,s_text)+
+                                        (size_used+req_size)*sizeof(char));;
+   if unlikely(!new_data) return NULL;
+   memcpy(new_data->s_text,data->s_text,size_used*sizeof(char));
+   TPP_DecodeUtf32(new_data->s_text+size_used,(uint32_t *)data_start,data_size/4);
+   new_data->s_size = size_used+req_size;
+   new_data->s_text[new_data->s_size] = '\0';
+   new_data->s_refcnt = 1;
+   TPPString_Decref(data);
+   data = new_data;
+   break;
+  default: break;
+ }
+
+ *pdata_size = data_size;
+ return data;
+}
 
 
 /* Buffer size hint when reading data.
@@ -1006,8 +1239,8 @@ reuse_self:
 #endif
 
 PUBLIC int
-TPPFile_NextChunk(struct TPPFile *__restrict self, int extend) {
- char *effective_end;
+TPPFile_NextChunk(struct TPPFile *__restrict self, int flags) {
+ char *effective_end,*old_textbegin;
  struct TPPString *newchunk;
  size_t end_offset,prefix_size;
 #ifdef _WIN32
@@ -1026,7 +1259,7 @@ TPPFile_NextChunk(struct TPPFile *__restrict self, int extend) {
  /* Load a new chunk from the associated stream. */
  for (;;) {
   end_offset = (size_t)(self->f_end-self->f_text->s_text);
-  if (extend) {
+  if (flags&TPPFILE_NEXTCHUNK_FLAG_EXTEND) {
    /* Extend the existing chunk (not dropping existing
     * data and creating a continuous character-stream) */
    prefix_size = self->f_text->s_size;
@@ -1085,18 +1318,53 @@ TPPFile_NextChunk(struct TPPFile *__restrict self, int extend) {
   if (read_bufsize < 0) read_bufsize = 0;
 #endif
   assert(read_bufsize <= STREAM_BUFSIZE);
-  self->f_textfile.f_rdata += read_bufsize;
   /* Clamp the chunk size to what was actually read. */
+  assert(newchunk == self->f_text);
   if (read_bufsize != STREAM_BUFSIZE) {
    /* Free unused buffer memory. */
-   self->f_text->s_size -= STREAM_BUFSIZE;
-   self->f_text->s_size += read_bufsize;
-   newchunk = (struct TPPString *)realloc(self->f_text,TPP_OFFSETOF(struct TPPString,s_text)+
-                                         (self->f_text->s_size+1)*sizeof(char));
+   newchunk->s_size -= STREAM_BUFSIZE;
+   newchunk->s_size += read_bufsize;
+   old_textbegin = newchunk->s_text;
+   newchunk = (struct TPPString *)realloc(newchunk,TPP_OFFSETOF(struct TPPString,s_text)+
+                                         (newchunk->s_size+1)*sizeof(char));
    if (newchunk) self->f_text = newchunk;
    else newchunk = self->f_text;
-   self->f_pos = self->f_begin = newchunk->s_text;
+   self->f_begin = newchunk->s_text+(self->f_begin-old_textbegin);
+   self->f_pos   = newchunk->s_text+(self->f_pos-old_textbegin);
   }
+  if (!(flags&TPPFILE_NEXTCHUNK_FLAG_BINARY) &&
+      !(current.l_flags&TPPLEXER_FLAG_NO_ENCODING) &&
+        read_bufsize) {
+   char *text_start = newchunk->s_text+prefix_size;
+   if (!self->f_textfile.f_rdata) {
+    char *new_text_start = text_start;
+    /* Determine encoding based on the initial chunk. */
+    self->f_textfile.f_encoding = determine_encoding(&new_text_start,read_bufsize);
+    if (text_start != new_text_start) {
+     size_t size_diff = (size_t)(new_text_start-text_start);
+     assert(new_text_start > text_start);
+     assert(size_diff <= read_bufsize);
+     read_bufsize -= size_diff;
+     memmove(text_start,new_text_start,read_bufsize*sizeof(char));
+     newchunk->s_size -= size_diff;
+     if (self->f_begin >= new_text_start) self->f_begin -= size_diff;
+     if (self->f_pos >= new_text_start) self->f_pos -= size_diff;
+    }
+   }
+   if (self->f_textfile.f_encoding != TPP_ENCODING_UTF8) {
+    /* Must translate encoding. */
+    size_t new_bufsize = read_bufsize;
+    old_textbegin = newchunk->s_text;
+    newchunk = convert_encoding(newchunk,text_start,&new_bufsize,
+                                self->f_textfile.f_encoding);
+    if unlikely(!newchunk) return 0;
+    self->f_text  = newchunk;
+    self->f_begin = newchunk->s_text+(self->f_begin-old_textbegin);
+    self->f_pos   = newchunk->s_text+(self->f_pos-old_textbegin);
+    read_bufsize  = new_bufsize;
+   }
+  }
+  self->f_textfile.f_rdata += read_bufsize;
   newchunk->s_text[newchunk->s_size] = '\0';
   if (!read_bufsize) {
    /* True input stream EOF. */
@@ -1176,7 +1444,7 @@ search_suitable_end_again:
    }
   }
   /* Check if the data that was read contains a suitable end. */
-  extend = 1; /* Extend the data some more... */
+  flags |= TPPFILE_NEXTCHUNK_FLAG_EXTEND; /* Extend the data some more... */
  }
  assert(self->f_pos   >= self->f_begin);
  assert(self->f_pos   <= self->f_end);
@@ -2380,6 +2648,13 @@ PUBLIC int TPPLexer_Init(struct TPPLexer *__restrict self) {
 #elif __SIZEOF_SIZE_T__ == 8
  assert(hashof("<commandline>",13) == 12182544704004658106ull);
 #endif
+#if TPP_BYTEORDER == 1234
+ assert(*(uint32_t *)"\x00\x44\x88\xaa" == 0xaa884400);
+#elif TPP_BYTEORDER == 4321
+ assert(*(uint32_t *)"\x00\x44\x88\xaa" == 0x008844aa);
+#elif TPP_BYTEORDER == 3412
+ assert(*(uint32_t *)"\x00\x44\x88\xaa" == 0x88aa0044);
+#endif
  assert(TPPFile_Empty.f_namehash ==
         hashof(TPPFile_Empty.f_name,
                TPPFile_Empty.f_namesize));
@@ -2703,7 +2978,7 @@ err_value_string: TPPString_Decref(value_string); return 0;
 }
 
 
-#ifdef _WIN32
+#ifdef HAVE_INSENSITIVE_PATHS
 PRIVATE int
 check_path_spelling(char *filename, size_t filename_size) {
  char *part_begin,*next_sep,*end,backup,*temp; int error = 1;
@@ -2783,7 +3058,7 @@ TPPLexer_OpenFile(int mode, char *filename, size_t filename_size,
  assert(mode != (TPPLEXER_OPENFILE_MODE_NORMAL|TPPLEXER_OPENFILE_FLAG_NEXT));
  fix_filename(filename,&filename_size);
  if ((mode&3) == TPPLEXER_OPENFILE_MODE_NORMAL) {
-#ifdef _WIN32
+#ifdef HAVE_INSENSITIVE_PATHS
   result = open_normal_file(filename,filename_size,pkeyword_entry);
   if (result && !(mode&TPPLEXER_OPENFILE_FLAG_NOCASEWARN) &&
      !check_path_spelling(filename,filename_size)
@@ -2829,12 +3104,12 @@ TPPLexer_OpenFile(int mode, char *filename, size_t filename_size,
    }
    result = open_normal_file(used_filename,newbuffersize,pkeyword_entry);
    if (result) { /* Goti! */
-#ifdef _WIN32
+#ifdef HAVE_INSENSITIVE_PATHS
     /* TODO: No need to check inherited path portion:
-     * >> // file "src/file.c"
-     * >> #include "foo/bar.c"
-     *    src/foo/bar.c
-     *        [-------] Only need to check this portion.
+     *  tpp src/file.c
+     *  >> #include "foo/bar.c"
+     *  src/foo/bar.c
+     *      [-------] Only need to check this portion.
      */
     if (!(mode&TPPLEXER_OPENFILE_FLAG_NOCASEWARN) &&
         !check_path_spelling(filename,filename_size)
@@ -2881,10 +3156,10 @@ next_syspath:
      * that the file isn't already being included. */
     if (!(mode&TPPLEXER_OPENFILE_FLAG_NEXT) ||
         !(result->f_prev)) {
-#ifdef _WIN32
+#ifdef HAVE_INSENSITIVE_PATHS
      /* TODO: No need to check the syspath portion:
-      *  -I/usr/include
-      *  #include <stdlib.h>
+      *  tpp -I/usr/include foo.c
+      *  >> #include <stdlib.h>
       *  /usr/includes/stdlib.h
       *                [------] Only need to check this
       */
@@ -2970,7 +3245,7 @@ parse_multichar:
         current.l_eob_file == file) goto settok;
    /* Check for more data chunks within the current file. */
    file->f_pos = iter;
-   if (TPPFile_NextChunk(file,0)) goto again;
+   if (TPPFile_NextChunk(file,TPPFILE_NEXTCHUNK_FLAG_EXTEND)) goto again;
    iter = file->f_pos,end = file->f_end;
    if ((current.l_flags&TPPLEXER_FLAG_NO_POP_ON_EOF) ||
         current.l_eof_file == file) goto settok;
@@ -3305,18 +3580,18 @@ PRIVATE int at_start_of_line(void) {
 
 PRIVATE void on_popfile(struct TPPFile *file) {
  struct TPPIfdefStackSlot *slot;
- if (file->f_kind == TPPFILE_KIND_TEXT && /*< Is this a textfile. */
-    !file->f_textfile.f_cacheentry &&     /*< Make sure isn't not a cache-reference. */
-     file->f_textfile.f_newguard &&       /*< Make sure there is a possibility for a guard. */
-    !file->f_textfile.f_guard &&          /*< Make sure the file doesn't already have a guard. */
-    !file->f_textfile.f_noguard) {        /*< Make sure the file is allowed to have a guard. */
+ if (file->f_kind == TPPFILE_KIND_TEXT &&                   /*< Is this a textfile. */
+    !file->f_textfile.f_cacheentry &&                       /*< Make sure isn't not a cache-reference. */
+     file->f_textfile.f_newguard &&                         /*< Make sure there is a possibility for a guard. */
+    !file->f_textfile.f_guard &&                            /*< Make sure the file doesn't already have a guard. */
+   !(file->f_textfile.f_flags&TPP_TEXTFILE_FLAG_NOGUARD)) { /*< Make sure the file is allowed to have a guard. */
   /* DEBUG: Log detection of legacy #include-guards. */
   LOG(LOG_LEGACYGUARD,("Determined #include-guard '%s' for '%s'\n",
                        file->f_textfile.f_newguard->k_name,file->f_name));
   /* This entire file is protected by a guard. */
   file->f_textfile.f_guard    = file->f_textfile.f_newguard;
   /* Prevent overhead from future checks. */
-  file->f_textfile.f_noguard  = 1;
+  file->f_textfile.f_flags   |= TPP_TEXTFILE_FLAG_NOGUARD;
   file->f_textfile.f_newguard = NULL;
  }
  while (current.l_ifdef.is_slotc &&
@@ -3571,11 +3846,11 @@ def_skip_until_lf:
 #define ALLOW_LEGACY_GUARD(curfile) \
     (!(current.l_flags&TPPLEXER_FLAG_NO_LEGACY_GUARDS) && /*< Detection of legacy guard is allowed. */\
       ((curfile)->f_kind == TPPFILE_KIND_TEXT) &&         /*< The current file is a text-file. */\
-      (!(curfile)->f_textfile.f_cacheentry) &&            /*< The current file isn't a cache-reference. */\
+      !((curfile)->f_textfile.f_cacheentry) &&            /*< The current file isn't a cache-reference. */\
       (!current.l_ifdef.is_slotc ||                       /*< This is an outer-most block for this file. */\
         current.l_ifdef.is_slotv[current.l_ifdef.is_slotc-1].iss_file != (curfile)) &&\
-      (!(curfile)->f_textfile.f_guard) &&                 /*< The current file doesn't already have a guard. */\
-      (!(curfile)->f_textfile.f_noguard))
+      !((curfile)->f_textfile.f_guard) &&                 /*< The current file doesn't already have a guard. */\
+      !((curfile)->f_textfile.f_flags&TPP_TEXTFILE_FLAG_NOGUARD)) /* The current file is allowed to have a guard. */
    {
     int line,block_mode;
     struct TPPKeyword *ifndef_keyword;
@@ -3611,7 +3886,7 @@ define_ifndef_guard:
        LOG(LOG_LEGACYGUARD,("Second top-level guard '%s' nullifies '%s'\n",
                             ifndef_keyword->k_name,
                             curfile->f_textfile.f_newguard->k_name));
-       curfile->f_textfile.f_noguard  = 1;
+       curfile->f_textfile.f_flags   |= TPP_TEXTFILE_FLAG_NOGUARD;
        curfile->f_textfile.f_newguard = NULL;
       } else if (/* We are inside the first chunk, meaning we can correctly
                   * determine if this is the first thing inside the file. */
@@ -3630,7 +3905,7 @@ define_ifndef_guard:
         * >> Don't allow this file to have a guard! */
        LOG(LOG_LEGACYGUARD,("Legacy-guard '%s' preceded by important tokens\n",
                             ifndef_keyword->k_name));
-       curfile->f_textfile.f_noguard  = 1;
+       curfile->f_textfile.f_flags |= TPP_TEXTFILE_FLAG_NOGUARD;
       }
      }
     }
@@ -3880,9 +4155,9 @@ PRIVATE /*ref*/struct TPPString *
 escape_entire_file(struct TPPFile *infile) {
  struct TPPString *result,*newresult;
  size_t insize,reqsize,allocsize;
- /* Load the initial chunk. */
+ /* Load the initial chunk (in binary mode, to prevent detection of encoding). */
  if unlikely(infile->f_begin == infile->f_end &&
-            !TPPFile_NextChunk(infile,0)) {
+            !TPPFile_NextChunk(infile,TPPFILE_NEXTCHUNK_FLAG_BINARY)) {
   /* Special case: Empty file. */
   TPPString_Incref(empty_string);
   return empty_string;
@@ -3897,7 +4172,7 @@ escape_entire_file(struct TPPFile *infile) {
  result->s_size = allocsize = reqsize;
  result->s_text[0] = '\"';
  TPP_Escape(result->s_text+1,infile->f_begin,insize);
- while (TPPFile_NextChunk(infile,0)) {
+ while (TPPFile_NextChunk(infile,TPPFILE_NEXTCHUNK_FLAG_BINARY)) {
   /* Escape and append this chunk. */
   insize = (size_t)(infile->f_end-infile->f_begin);
   reqsize = result->s_size+TPP_SizeofEscape(infile->f_begin,insize);
@@ -5266,7 +5541,7 @@ at_next_non_whitespace:
 
     case 0:
      /* Special case: Must load more data from the arguments file. */
-     if (!TPPFile_NextChunk(arguments_file,1)) {
+     if (!TPPFile_NextChunk(arguments_file,TPPFILE_NEXTCHUNK_FLAG_EXTEND)) {
       arg_iter->ac_offset_end = (size_t)(token.t_begin-token.t_file->f_text->s_text);
       if (!TPPLexer_Warn(W_EOF_IN_MACRO_ARGUMENT_LIST)) goto err_argv;
       goto done_args;
@@ -5614,11 +5889,12 @@ PRIVATE void EVAL_CALL eval_unary(struct TPPConst *result) {
 
     *(int_t *)buf = 0;
     size = TPP_Unescape(buf,begin,size)-buf;
-    /* WARNING: This is a _bad_ way of detecting endian! */
-    if (*(uint16_t *)"\x00\xff" == 0xff00) {
-     /* Adjust for little endian. */
-     *(int_t *)buf >>= (sizeof(int_t)-size)*8;
-    }
+#if TPP_BYTEORDER == 1234
+    /* Adjust for little endian. */
+    *(int_t *)buf >>= (sizeof(int_t)-size)*8;
+#elif TPP_BYTEORDER != 4321
+#   error FIXME
+#endif
     result->c_kind       = TPP_CONST_INTEGRAL;
     result->c_data.c_int = *(int_t *)buf;
    }
@@ -6167,7 +6443,7 @@ TPPLexer_ParsePragma(tok_t endat) {
    }
 #endif
    /* Prevent other code from attempting to detect a legacy guard. */
-   textfile->f_textfile.f_noguard  = 1;
+   textfile->f_textfile.f_flags   |= TPP_TEXTFILE_FLAG_NOGUARD;
    textfile->f_textfile.f_newguard = NULL;
    return 1;
   } break;
@@ -6397,7 +6673,8 @@ TPPLexer_ParsePragma(tok_t endat) {
       yield_fetch();
 set_warning_newstate:
       if (TOK != ':') {
-       /* TODO: Warning? (The old TPP didn't have one here, but... why shouldn't the new one add one?) */
+       /* NOTE: The old TPP didn't have a warning here. */
+       if unlikely(TPPLexer_Warn(W_EXPECTED_COLLON_AFTER_WARNING)) return 0;
       } else {
        yield_fetch();
        /* Parse warning numbers/names. */

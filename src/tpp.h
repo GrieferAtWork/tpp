@@ -157,8 +157,15 @@ typedef int TPP(stream_t);
 #define TPP_STREAM_INVALID  -1
 #endif
 
-typedef int    TPP(tok_t);  /* Unique token id. */
-typedef size_t TPP(hash_t); /* Hash-value of a string. */
+typedef int           TPP(tok_t);      /* Unique token id. */
+typedef size_t        TPP(hash_t);     /* Hash-value of a string. */
+typedef unsigned char TPP(encoding_t); /* File-encoding ID (One of 'TPP_ENCODING_*'). */
+
+#define TPP_ENCODING_UTF8     0
+#define TPP_ENCODING_UTF16_BE 1
+#define TPP_ENCODING_UTF16_LE 2
+#define TPP_ENCODING_UTF32_BE 3
+#define TPP_ENCODING_UTF32_LE 4
 
 struct TPPFile;
 struct TPPKeyword;
@@ -206,14 +213,17 @@ struct TPPTextFile {
                                           * (Only used for cached entires themself; aka. when 'f_cacheentry == NULL'). */
  size_t                   f_rdata;       /*< (In bytes) The amount of data already read from the stream. */
  char                     f_prefixdel;   /*< The original character at ':f_end' that was overwritten with a '\0'. */
- char                     f_noguard;     /*< Set to non-ZERO after a secondary #ifdef block was detected at the top level of this file:
+#define TPP_TEXTFILE_FLAG_NONE    0x00
+#define TPP_TEXTFILE_FLAG_NOGUARD 0x01   /*< Set after a secondary #ifdef block was detected at the top level of this file:
                                           *  >> // File: "myfile.h"
                                           *  >> #ifndef foo
                                           *  >> #endif
-                                          *  >> #ifndef bar // This #ifndef will set 'f_noguard' to non-ZERO
+                                          *  >> #ifndef bar // This #ifndef will set 'TPP_TEXTFILE_FLAG_NOGUARD'
                                           *  >> #endif
                                           */
- char                     f_padding[2];  /*< Padding data... */
+ unsigned char            f_flags;       /*< A set of 'TPP_TEXTFILE_FLAG_*' */
+ TPP(encoding_t)          f_encoding;    /*< Encoding determined to-be used by this file. */
+ char                     f_padding[1];  /*< Padding data... */
  struct TPPKeyword       *f_newguard;    /*< [0..1] The keyword of the #ifndef block that was determined to be located at the start of the file.
                                           *         When the file is popped from the #include-stack, this is non-NULL and 'f_noppguard' is ZERO,
                                           *         this keyword will be copied into the 'f_guard' field if not already set. */
@@ -408,13 +418,17 @@ TPPFile_NewKWMacro(char const *name, size_t name_size,
 
 //////////////////////////////////////////////////////////////////////////
 // Advances the given file to its next chunk.
-// NOTE: When 'extend' is non-ZERO(0), instead of dropping already-read data
-//       from the existing chunk, new data will be appended to that chunk,
-//       meaning that the resulting stream contains both old and new data,
+// NOTE: When 'flags' contains 'TPPFILE_NEXTCHUNK_FLAG_EXTEND', instead of dropping
+//       already-read data from the existing chunk, new data will be appended to that
+//       chunk, meaning that the resulting stream contains both old and new data,
 //       allowing for higher-level data lookahead while still remaining
 //       as unbuffered as possible.
 // Returns 0 if the file's EOF was already reached. 1 otherwise.
-TPPFUN int TPPFile_NextChunk(struct TPPFile *__restrict self, int extend);
+TPPFUN int TPPFile_NextChunk(struct TPPFile *__restrict self, int flags);
+#define TPPFILE_NEXTCHUNK_FLAG_NONE   0
+#define TPPFILE_NEXTCHUNK_FLAG_EXTEND 1 /*< Extend the current file chunk. */
+#define TPPFILE_NEXTCHUNK_FLAG_BINARY 2 /*< Read data in binary mode (don't convert to UTF-8 without BOM).
+                                         *  NOTE: This flag is implied if the lexer has the 'TPPLEXER_FLAG_NO_ENCODING' flag set. */
 
 
 
@@ -758,6 +772,7 @@ TPP_LOCAL int TPPLexer_COLUMN(void) { struct TPPFile *f = TPPLexer_Textfile(); r
                                                         *        >> Disable this option when either is important to your compiler. */
 #define TPPLEXER_FLAG_MSVC_MESSAGEFORMAT    0x01000000 /*< Use msvc's file+line format '%s(%d,%d) : ' instead of GCC's '%s:%d:%d: '. */
 #define TPPLEXER_FLAG_NO_WARNINGS           0x02000000 /*< Don't emit warnings. */
+#define TPPLEXER_FLAG_NO_ENCODING           0x04000000 /*< Don't try to detect file encodings (Everything is UTF-8 without BOM; aka. raw text). */
 #define TPPLEXER_FLAG_RANDOM_INITIALIZED    0x40000000 /*< Set when rand() has been initialized. */
 #define TPPLEXER_FLAG_ERROR                 0x80000000 /*< When set, the lexer is in an error-state in which calls to yield() will return TOK_ERR. */
 #define TPPLEXER_FLAG_MERGEMASK             0xf0000000 /*< A mask of flags that are merged (or'd together) during popf(). */

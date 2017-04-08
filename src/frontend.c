@@ -280,7 +280,7 @@ merge_argv(int argc, char **argv) {
  result->f_textfile.f_cacheinc    = 0;
  result->f_textfile.f_rdata       = argv_string->s_size;
  result->f_textfile.f_prefixdel   = '\0';
- result->f_textfile.f_noguard     = 1;
+ result->f_textfile.f_flags       = TPP_TEXTFILE_FLAG_NOGUARD;
  result->f_textfile.f_newguard    = NULL;
  return result;
 err_r:           free(result);
