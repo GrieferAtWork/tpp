@@ -3568,9 +3568,18 @@ def_skip_until_lf:
     messagefile->f_pos = end;
    } break;
 
+#define ALLOW_LEGACY_GUARD(curfile) \
+    (!(current.l_flags&TPPLEXER_FLAG_NO_LEGACY_GUARDS) && /*< Detection of legacy guard is allowed. */\
+      ((curfile)->f_kind == TPPFILE_KIND_TEXT) &&         /*< The current file is a text-file. */\
+      (!(curfile)->f_textfile.f_cacheentry) &&            /*< The current file isn't a cache-reference. */\
+      (!current.l_ifdef.is_slotc ||                       /*< This is an outer-most block for this file. */\
+        current.l_ifdef.is_slotv[current.l_ifdef.is_slotc-1].iss_file != (curfile)) &&\
+      (!(curfile)->f_textfile.f_guard) &&                 /*< The current file doesn't already have a guard. */\
+      (!(curfile)->f_textfile.f_noguard))
    {
     int line,block_mode;
     struct TPPKeyword *ifndef_keyword;
+    struct TPPFile *curfile;
    case KWD_ifdef:
    case KWD_ifndef:
     block_mode = TOK == KWD_ifndef;
@@ -3585,24 +3594,23 @@ def_skip_until_lf:
      ifndef_keyword = NULL;
     }
     if (block_mode) {
-     struct TPPFile *curfile = token.t_file;
+     curfile = token.t_file;
      /* #ifndef: Check if we're at the start of the file to setup a #include guard.
       * WARNING: This detection code will fail to recognize guards when the
       *          #ifndef isn't located within the first chunk of the file.
       *          But since this detection is only used for optimization, that's OK. */
-     if (!(current.l_flags&TPPLEXER_FLAG_NO_LEGACY_GUARDS) && /*< Detection of legacy guard is allowed. */
-          (curfile->f_kind == TPPFILE_KIND_TEXT) &&           /*< The current file is a text-file. */
-          (!curfile->f_textfile.f_cacheentry) &&              /*< The current file isn't a cache-reference. */
-          (!current.l_ifdef.is_slotc ||                       /*< This is an outer-most block for this file. */
-            current.l_ifdef.is_slotv[current.l_ifdef.is_slotc-1].iss_file != curfile) &&
-          (!curfile->f_textfile.f_guard) &&                   /*< The current file doesn't already have a guard. */
-          (!curfile->f_textfile.f_noguard)) {                 /*< The current file is allowed to contain a guard. */
+
+     if (ALLOW_LEGACY_GUARD(curfile)) {
+define_ifndef_guard:
       if (curfile->f_textfile.f_newguard) {
        /* Special case: We already found a potential guard in this file.
         *               The fact that we're here again means that this file
         *               has multiple preprocessor-blocks at its top-level,
         *               meaning that the file is no longer a candidate for
         *               a legacy #include-guard. */
+       LOG(LOG_LEGACYGUARD,("Second top-level guard '%s' nullifies '%s'\n",
+                            ifndef_keyword->k_name,
+                            curfile->f_textfile.f_newguard->k_name));
        curfile->f_textfile.f_noguard  = 1;
        curfile->f_textfile.f_newguard = NULL;
       } else if (/* We are inside the first chunk, meaning we can correctly
@@ -3614,10 +3622,14 @@ def_skip_until_lf:
                  skip_whitespace_and_comments(curfile->f_text->s_text,hash_begin) == hash_begin)
                  ) {
        /* Potential guard-block! Store the #ifndef-keyword as the potential future guard. */
+       LOG(LOG_LEGACYGUARD,("Determined potential legacy-guard '%s'\n",
+                            ifndef_keyword->k_name));
        curfile->f_textfile.f_newguard = ifndef_keyword;
       } else {
        /* There are other (important) tokens before the first #ifndef block
         * >> Don't allow this file to have a guard! */
+       LOG(LOG_LEGACYGUARD,("Legacy-guard '%s' preceded by important tokens\n",
+                            ifndef_keyword->k_name));
        curfile->f_textfile.f_noguard  = 1;
       }
      }
@@ -3647,7 +3659,34 @@ create_block:
     struct TPPConst ifval;
    case KWD_if:
     yield_fetch();
-    /* TODO: Automatically detect '#if !defined FOO'/'#if !defined(FOO)'-style guards. */
+    /* Automatically detect '#if !defined FOO'/'#if !defined(FOO)'-style guards.
+     * NOTE: During this special evaluation, there can't be any macros!
+     *       This is required to ensure that the behavior of this code
+     *       doesn't depend on the expansion of a macro that might change! */
+    if (TOK == '!' && current.l_eob_file == token.t_file &&
+       (curfile = token.t_file,ALLOW_LEGACY_GUARD(curfile))) {
+     int has_paren;
+     char *expr_begin = token.t_begin;
+     TPPLexer_YieldRaw();
+     if (TOK != KWD_defined) goto not_a_guard;
+     TPPLexer_YieldRaw();
+     has_paren = TOK == '(';
+     if (has_paren) TPPLexer_YieldRaw();
+     if (!TPP_ISKEYWORD(TOK)) goto not_a_guard;
+     ifndef_keyword = token.t_kwd;
+     TPPLexer_YieldRaw();
+     assert(ifndef_keyword);
+     if (has_paren) { if (TOK != ')') goto not_a_guard; TPPLexer_YieldRaw(); }
+     if (TOK != '\n') goto not_a_guard;
+     /* Yes! This expression behaves exactly like #ifndef, and can therefor replace it! */
+     goto define_ifndef_guard;
+not_a_guard:
+     while (token.t_file != current.l_eob_file) popfile();
+     assert(expr_begin >= token.t_file->f_begin);
+     assert(expr_begin <= token.t_file->f_end);
+     token.t_file->f_pos = expr_begin;
+     yield_fetch();
+    }
     if unlikely(!TPPLexer_Eval(&ifval)) goto err;
     TPPConst_ToBool(&ifval);
     block_mode = (int)ifval.c_data.c_int;
@@ -6127,6 +6166,9 @@ TPPLexer_ParsePragma(tok_t endat) {
     textfile->f_textfile.f_guard = keyword;
    }
 #endif
+   /* Prevent other code from attempting to detect a legacy guard. */
+   textfile->f_textfile.f_noguard  = 1;
+   textfile->f_textfile.f_newguard = NULL;
    return 1;
   } break;
 

@@ -210,7 +210,7 @@ struct TPPTextFile {
                                           *  >> // File: "myfile.h"
                                           *  >> #ifndef foo
                                           *  >> #endif
-                                          *  >> #ifndef bar // This #ifndef will set 'f_noppguard' to non-ZERO
+                                          *  >> #ifndef bar // This #ifndef will set 'f_noguard' to non-ZERO
                                           *  >> #endif
                                           */
  char                     f_padding[2];  /*< Padding data... */
