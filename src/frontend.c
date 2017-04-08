@@ -262,7 +262,11 @@ merge_argv(int argc, char **argv) {
  result->f_name                   = strdup("<commandline>");
  if (!result->f_name) goto err_r;
  result->f_namesize               = 13;
- result->f_namehash               = 3330511802;
+#if defined(_WIN64) || (defined(__SIZEOF_POINTER__) && __SIZEOF_POINTER__ == 8)
+ result->f_namehash = 12182544704004658106ull;
+#else
+ result->f_namehash = 3330511802ul;
+#endif
  result->f_text                   = argv_string; /* Inherit reference. */
  result->f_begin                  = argv_string->s_text;
  result->f_end                    = argv_string->s_text+argv_string->s_size;
@@ -375,7 +379,8 @@ int main(int argc, char *argv[]) {
  }
 
  if (argc && strcmp(argv[0],"-") != 0) {
-  infile = TPPLexer_OpenFile(TPPLEXER_OPENFILE_MODE_NORMAL,
+  infile = TPPLexer_OpenFile(TPPLEXER_OPENFILE_MODE_NORMAL|
+                             TPPLEXER_OPENFILE_FLAG_NOCASEWARN,
                              argv[0],strlen(argv[0]),NULL);
   if (infile) TPPFile_Incref(infile);
   if (infile && firstname) {

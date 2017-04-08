@@ -26,7 +26,7 @@
 #endif
 #ifndef WARNING
 #define TPP_DEFS_DEFINES_WARNING
-#define WARNING(name,group,default)
+#define WARNING(name,groups,default)
 #endif
 #ifndef MACRO
 #define TPP_DEFS_DEFINES_MACRO
@@ -173,67 +173,102 @@ WGROUP(WG_USER,    "user")
 WGROUP(WG_ENVIRON, "environ")
 WGROUP(WG_LIMIT,   "limit")
 
-WARNING(W_STARSLASH_OUTSIDE_OF_COMMENT,    WG_COMMENTS,WSTATE_WARN)    /*< [char *]. */
-WARNING(W_LINE_COMMENT_CONTINUED,          WG_COMMENTS,WSTATE_WARN)    /*< . */
-WARNING(W_REDEFINING_MACRO,                WG_MACROS,  WSTATE_WARN)    /*< [struct TPPKeyword *]. */
-WARNING(W_REDEFINING_BUILTIN_KEYWORD,      WG_MACROS,  WSTATE_WARN)    /*< [struct TPPKeyword *]. */
-WARNING(W_SPECIAL_ARGUMENT_NAME,           WG_MACROS,  WSTATE_WARN)    /*< [struct TPPKeyword *]. */
-WARNING(W_VA_KEYWORD_IN_REGULAR_MACRO,     WG_MACROS,  WSTATE_WARN)    /*< [struct TPPKeyword *]. */
-WARNING(W_KEYWORD_MACRO_ALREADY_ONSTACK,   WG_MACROS,  WSTATE_DISABLE) /*< [struct TPPFile *]. */
-WARNING(W_EOF_IN_MACRO_ARGUMENT_LIST,      WG_SYNTAX,  WSTATE_WARN)    /*< . */
-WARNING(W_TOO_MANY_MACRO_ARGUMENTS,        WG_MACROS,  WSTATE_WARN)    /*< [struct TPPFile *]. */
-WARNING(W_NOT_ENGOUH_MACRO_ARGUMENTS,      WG_MACROS,  WSTATE_WARN)    /*< [struct TPPFile *]. */
-WARNING(W_CHARACTER_TOO_LONG,              WG_VALUE,   WSTATE_WARN)    /*< . */
-WARNING(W_MULTICHAR_NOT_ALLOWED,           WG_VALUE,   WSTATE_WARN)    /*< [char const *,size_t]. */
-WARNING(W_DIVIDE_BY_ZERO,                  WG_VALUE,   WSTATE_WARN)    /*< . */
-WARNING(W_INTEX_OUT_OF_BOUNDS,             WG_VALUE,   WSTATE_DISABLE) /*< [struct TPPString *,ptrdiff_t]. */
-WARNING(W_EXPECTED_MACRO_ARGUMENT_NAME,    WG_SYNTAX,  WSTATE_WARN)    /*< [tok_t]. */
-WARNING(W_ARGUMENT_NAMED_ALREADY_TAKEN,    WG_MACROS,  WSTATE_WARN)    /*< [tok_t]. */
-WARNING(W_EXPECTED_COMMA_OR_ARGEND,        WG_SYNTAX,  WSTATE_WARN)    /*< [tok_t]. */
-WARNING(W_EXPECTED_ARGEND_AFTER_VARARGS,   WG_SYNTAX,  WSTATE_WARN)    /*< [tok_t]. */
-WARNING(W_EXPECTED_KEYWORD_AFTER_DEFINE,   WG_SYNTAX,  WSTATE_WARN)    /*< . */
-WARNING(W_EXPECTED_KEYWORD_AFTER_UNDEF,    WG_SYNTAX,  WSTATE_WARN)    /*< . */
-WARNING(W_MACRO_NOT_DEFINED,               WG_SYNTAX,  WSTATE_DISABLE) /*< [struct TPPKeyword *]. */
-WARNING(W_CANT_UNDEF_BUILTIN_MACRO,        WG_SYNTAX,  WSTATE_WARN)    /*< [struct TPPKeyword *]. */
-WARNING(W_UNKNOWN_PREPROCESSOR_DIRECTIVE,  WG_SYNTAX,  WSTATE_WARN)    /*< . */
-WARNING(W_INVALID_INTEGER_SUFFIX,          WG_SYNTAX,  WSTATE_WARN)    /*< [char const *,size_t]. */
-WARNING(W_EXPECTED_COLLON_AFTER_QUESTION,  WG_SYNTAX,  WSTATE_WARN)    /*< . */
-WARNING(W_STRING_TERMINATED_BY_LINEFEED,   WG_SYNTAX,  WSTATE_WARN)    /*< . */
-WARNING(W_STRING_TERMINATED_BY_EOF,        WG_SYNTAX,  WSTATE_WARN)    /*< . */
-WARNING(W_COMMENT_TERMINATED_BY_EOF,       WG_SYNTAX,  WSTATE_WARN)    /*< . */
-WARNING(W_UNKNOWN_TOKEN_IN_EXPR_IS_ZERO,   WG_SYNTAX,  WSTATE_WARN)    /*< . */
-WARNING(W_EXPECTED_RPAREN_IN_EXPRESSION,   WG_SYNTAX,  WSTATE_WARN)    /*< . */
-WARNING(W_EXPECTED_RBRACKET_IN_EXPRESSION, WG_SYNTAX,  WSTATE_WARN)    /*< . */
-WARNING(W_EXPECTED_KEYWORD_AFTER_IFDEF,    WG_SYNTAX,  WSTATE_WARN)    /*< . */
-WARNING(W_EXPECTED_KEYWORD_AFTER_DEFINED,  WG_SYNTAX,  WSTATE_WARN)    /*< . */
-WARNING(W_EXPECTED_RPAREN_AFTER_DEFINED,   WG_SYNTAX,  WSTATE_WARN)    /*< . */
-WARNING(W_EXPECTED_LPAREN,                 WG_SYNTAX,  WSTATE_WARN)    /*< . */
-WARNING(W_EXPECTED_RPAREN,                 WG_SYNTAX,  WSTATE_WARN)    /*< . */
-WARNING(W_EXPECTED_COMMA,                  WG_SYNTAX,  WSTATE_WARN)    /*< . */
-WARNING(W_EXPECTED_STRING_AFTER_PRAGMA,    WG_SYNTAX,  WSTATE_WARN)    /*< [struct TPPConst *]. */
-WARNING(W_EXPECTED_STRING_IN_EXPRESSION,   WG_SYNTAX,  WSTATE_WARN)    /*< [struct TPPConst *]. */
-WARNING(W_EXPECTED_STRING_AFTER_LINE,      WG_SYNTAX,  WSTATE_WARN)    /*< [struct TPPConst *]. */
-WARNING(W_EXPECTED_INCLUDE_STRING,         WG_SYNTAX,  WSTATE_WARN)    /*< . */
-WARNING(W_EXPECTED_STRING_AFTER_PUSHMACRO, WG_SYNTAX,  WSTATE_WARN)    /*< [struct TPPConst *]. */
-WARNING(W_EXPECTED_STRING_AFTER_MESSAGE,   WG_SYNTAX,  WSTATE_WARN)    /*< [struct TPPConst *]. */
-WARNING(W_EXPECTED_STRING_AFTER_DEPRECATED,WG_SYNTAX,  WSTATE_WARN)    /*< [struct TPPConst *]. */
-WARNING(W_EXPECTED_STRING_AFTER_TPP_EXEC,  WG_SYNTAX,  WSTATE_WARN)    /*< [struct TPPConst *]. */
-WARNING(W_EXPECTED_STRING_AFTER_TPP_SETF,  WG_SYNTAX,  WSTATE_WARN)    /*< [struct TPPConst *]. */
-WARNING(W_EXPECTED_STRING_AFTER_TPP_STRD,  WG_SYNTAX,  WSTATE_WARN)    /*< [struct TPPConst *]. */
-WARNING(W_EXPECTED_STRING_AFTER_TPP_STRAT, WG_SYNTAX,  WSTATE_WARN)    /*< [struct TPPConst *]. */
-WARNING(W_FILE_NOT_FOUND,                  WG_ENVIRON, WSTATE_WARN)    /*< [char const *]. */
-WARNING(W_NONPARTABLE_FILENAME_CASING,     WG_ENVIRON, WSTATE_WARN)    /*< [char const *,char const *,size_t,char const *]. (path,wrong_begin,wrong_size,corrent_begin) */
-WARNING(W_ERROR,                           WG_USER,    WSTATE_ERROR)   /*< [char const *,size_t]. */
-WARNING(W_WARNING,                         WG_USER,    WSTATE_WARN)    /*< [char const *,size_t]. */
-WARNING(W_MACRO_RECURSION_LIMIT_EXCEEDED,  WG_LIMIT,   WSTATE_WARN)    /*< [struct TPPFile *]. */
-WARNING(W_INCLUDE_RECURSION_LIMIT_EXCEEDED,WG_LIMIT,   WSTATE_WARN)    /*< [struct TPPFile *]. */
-WARNING(W_IF_WITHOUT_ENDIF,                WG_SYNTAX,  WSTATE_WARN)    /*< [struct TPPIfdefStackSlot *]. */
-WARNING(W_ELSE_WITHOUT_IF,                 WG_SYNTAX,  WSTATE_WARN)    /*< . */
-WARNING(W_ELIF_WITHOUT_IF,                 WG_SYNTAX,  WSTATE_WARN)    /*< . */
-WARNING(W_ELSE_AFTER_ELSE,                 WG_SYNTAX,  WSTATE_WARN)    /*< [struct TPPIfdefStackSlot *]. */
-WARNING(W_ELIF_AFTER_ELSE,                 WG_SYNTAX,  WSTATE_WARN)    /*< [struct TPPIfdefStackSlot *]. */
-WARNING(W_ENDIF_WITHOUT_IF,                WG_SYNTAX,  WSTATE_WARN)    /*< . */
-WARNING(W_DEPRECATED_IDENTIFIER,           WG_USER,    WSTATE_WARN)    /*< [struct TPPKeyword *]. */
+/* NOTE: These warnings are arranged to mirror those from the old TPP. */
+/* 0*/WARNING(W_EXPECTED_KEYWORD_AFTER_DEFINE,   (WG_SYNTAX),  WSTATE_WARN)    /*< OLD(TPPWarn_ExpectedKeywordAfterDefine). */
+/* 1*/WARNING(W_REDEFINING_BUILTIN_KEYWORD,      (WG_MACROS),  WSTATE_WARN)    /*< [struct TPPKeyword *] OLD(TPPWarn_RedefiningBuiltinKeyword). */
+/* 2*/WARNING(W_UNKNOWN_PREPROCESSOR_DIRECTIVE,  (WG_SYNTAX),  WSTATE_WARN)    /*< OLD(TPPWarn_UnknownPreprocessorDirective). */
+/* 3*/WARNING(W_STARSLASH_OUTSIDE_OF_COMMENT,    (WG_COMMENTS),WSTATE_WARN)    /*< [char *] OLD(TPPWarn_StarSlashOutsideOfComment). */
+/* 4*/WARNING(W_ERROR,                           (WG_USER),    WSTATE_ERROR)   /*< [char const *,size_t] OLD(TPPWarn_DirectiveError). */
+/* 5*/WARNING(W_WARNING,                         (WG_USER),    WSTATE_WARN)    /*< [char const *,size_t] OLD(TPPWarn_DirectiveWarning). */
+/* 6*/WARNING(W_EXPECTED_KWDLPAR_AFTER_DEFINED,  (WG_SYNTAX),  WSTATE_WARN)    /*< OLD(TPPWarn_ExpectedKeywordOrLParenAfterDefined). */
+/* 7*/WARNING(W_EXPECTED_KEYWORD_AFTER_DEFINED,  (WG_SYNTAX),  WSTATE_WARN)    /*< OLD(TPPWarn_ExpectedKeywordAfterDefined). */
+/* 8*/WARNING(W_EXPECTED_RPAREN_AFTER_DEFINED,   (WG_SYNTAX),  WSTATE_WARN)    /*< OLD(TPPWarn_ExpectedRParenAfterDefined). */
+/* 9*/WARNING(W_EXPECTED_MACRO_ARGUMENT_NAME,    (WG_SYNTAX),  WSTATE_WARN)    /*< [tok_t] OLD(TPPWarn_ExpectedKeywordForMacroArgument). */
+/*10*/WARNING(W_EXPECTED_ARGEND_AFTER_VARARGS,   (WG_SYNTAX),  WSTATE_WARN)    /*< [tok_t] OLD(TPPWarn_ExpectedRParenAfterVaArgs). */
+/*11*/WARNING(W_EXPECTED_COMMA_OR_ARGEND,        (WG_SYNTAX),  WSTATE_WARN)    /*< [tok_t] OLD(TPPWarn_ExpectedCommaOrRParenForMacroFuncDecl). */
+/*12*/WARNING(W_TOO_MANY_MACRO_ARGUMENTS,        (WG_MACROS),  WSTATE_WARN)    /*< [struct TPPFile *] OLD( TPPWarn_InvalidMacroArgCount). */
+/*13*/WARNING(W_EOF_IN_MACRO_ARGUMENT_LIST,      (WG_SYNTAX),  WSTATE_WARN)    /*< OLD(TPPWarn_UnexpectedEOFInMacroArgList). */
+/*14*/WARNING(W_EXPECTED_INCLUDE_STRING,         (WG_SYNTAX),  WSTATE_WARN)    /*< OLD(TPPWarn_ExpectedIncludeString). */
+/*15*/WARNING(W_FILE_NOT_FOUND,                  (WG_ENVIRON), WSTATE_WARN)    /*< [char const *] OLD(TPPWarn_IncludeFileNotFound). */
+/*16*/WARNING(W_UNUSED_00,                       (WG_VALUE),   WSTATE_DISABLE) /*< OLD(TPPWarn_SysIncludeFileNotFound). */
+/*17*/WARNING(W_UNUSED_01,                       (WG_VALUE),   WSTATE_DISABLE) /*< OLD(TPPWarn_ExpectedLParenAfterTPPCounter). */
+/*18*/WARNING(W_UNUSED_02,                       (WG_VALUE),   WSTATE_DISABLE) /*< OLD(TPPWarn_ExpectedKeywordAfterTPPCounter). */
+/*19*/WARNING(W_UNUSED_03,                       (WG_VALUE),   WSTATE_DISABLE) /*< OLD(TPPWarn_ExpectedRParenAfterTPPCounter). */
+/*20*/WARNING(W_UNUSED_04,                       (WG_VALUE),   WSTATE_DISABLE) /*< OLD(TPPWarn_ExpectedLParenAfterTPPRandom). */
+/*21*/WARNING(W_UNUSED_05,                       (WG_VALUE),   WSTATE_DISABLE) /*< OLD(TPPWarn_ExpectedIntegerAfterTPPRandom1). */
+/*22*/WARNING(W_UNUSED_06,                       (WG_VALUE),   WSTATE_DISABLE) /*< OLD(TPPWarn_ExpectedCommaAfterTPPRandom). */
+/*23*/WARNING(W_UNUSED_07,                       (WG_VALUE),   WSTATE_DISABLE) /*< OLD(TPPWarn_ExpectedIntegerAfterTPPRandom2). */
+/*24*/WARNING(W_UNUSED_08,                       (WG_VALUE),   WSTATE_DISABLE) /*< OLD(TPPWarn_ExpectedRParenAfterTPPRandom). */
+/*25*/WARNING(W_REDEFINING_MACRO,                (WG_MACROS),  WSTATE_WARN)    /*< [struct TPPKeyword *] OLD(TPPWarn_MacroAlreadyDefined). */
+/*26*/WARNING(W_EXPECTED_KEYWORD_AFTER_UNDEF,    (WG_SYNTAX),  WSTATE_WARN)    /*< OLD(TPPWarn_ExpectedKeywordAfterUndef). */
+/*27*/WARNING(W_EXPECTED_KEYWORD_AFTER_IFDEF,    (WG_SYNTAX),  WSTATE_WARN)    /*< OLD(TPPWarn_ExpectedKeywordAfterIfdef). */
+/*28*/WARNING(W_ELSE_WITHOUT_IF,                 (WG_SYNTAX),  WSTATE_WARN)    /*< OLD(TPPWarn_ElseWithoutIfdef). */
+/*29*/WARNING(W_ELSE_AFTER_ELSE,                 (WG_SYNTAX),  WSTATE_WARN)    /*< [struct TPPIfdefStackSlot *] OLD(TPPWarn_ElseAfterElse). */
+/*30*/WARNING(W_ELIF_WITHOUT_IF,                 (WG_SYNTAX),  WSTATE_WARN)    /*< OLD(TPPWarn_ElifWithoutIfdef). */
+/*31*/WARNING(W_ELIF_AFTER_ELSE,                 (WG_SYNTAX),  WSTATE_WARN)    /*< [struct TPPIfdefStackSlot *] OLD(TPPWarn_ElifAfterElse). */
+/*32*/WARNING(W_IF_WITHOUT_ENDIF,                (WG_SYNTAX),  WSTATE_WARN)    /*< [struct TPPIfdefStackSlot *] OLD(TPPWarn_IfdefWithoutEndif). */
+/*33*/WARNING(W_ENDIF_WITHOUT_IF,                (WG_SYNTAX),  WSTATE_WARN)    /*< OLD(TPPWarn_EndifWithoutIfdef). */
+/*34*/WARNING(W_UNUSED_09,                       (WG_VALUE),   WSTATE_DISABLE) /*< OLD(TPPWarn_ExpectedIntAfterLine). */
+/*35*/WARNING(W_EXPECTED_STRING_AFTER_LINE,      (WG_SYNTAX),  WSTATE_WARN)    /*< [struct TPPConst *] OLD(TPPWarn_ExpectedStringAfterLine). */
+/*36*/WARNING(W_MACRO_NOT_DEFINED,               (WG_SYNTAX),  WSTATE_DISABLE) /*< [struct TPPKeyword *] OLD(TPPWarn_MacroDoesntExist). */
+/*37*/WARNING(W_CANT_UNDEF_BUILTIN_MACRO,        (WG_SYNTAX),  WSTATE_WARN)    /*< [struct TPPKeyword *] OLD(TPPWarn_CantUndefBuiltinMacro). */
+/*38*/WARNING(W_UNUSED_0A,                       (WG_VALUE),   WSTATE_DISABLE) /*< OLD(TPPWarn_ExpectedLParenAfterHasInclude). */
+/*39*/WARNING(W_UNUSED_0B,                       (WG_VALUE),   WSTATE_DISABLE) /*< OLD(TPPWarn_ExpectedRParenAfterHasInclude). */
+/*40*/WARNING(W_EXPECTED_COLLON_AFTER_QUESTION,  (WG_SYNTAX),  WSTATE_WARN)    /*< OLD(TPPWarn_ExpectedCollonAfterQuestion). */
+/*41*/WARNING(W_INVALID_INTEGER_SUFFIX,          (WG_SYNTAX),  WSTATE_WARN)    /*< [char const *,size_t] OLD(TPPWarn_ExpectedInteger). */
+/*42*/WARNING(W_EXPECTED_RPAREN_IN_EXPRESSION,   (WG_SYNTAX),  WSTATE_WARN)    /*< OLD(TPPWarn_ExpectedRparenAfterLParen). */
+/*43*/WARNING(W_UNKNOWN_TOKEN_IN_EXPR_IS_ZERO,   (WG_SYNTAX),  WSTATE_WARN)    /*< OLD(TPPWarn_UnexpectedTokenInConstExpr). */
+/*44*/WARNING(W_UNUSED_0C,                       (WG_VALUE),   WSTATE_DISABLE) /*< OLD(TPPWarn_ExpectedLParenAfterTPPEval). */
+/*45*/WARNING(W_UNUSED_0D,                       (WG_VALUE),   WSTATE_DISABLE) /*< OLD(TPPWarn_ExpectedRParenAfterTPPEval). */
+/*46*/WARNING(W_UNUSED_0E,                       (WG_VALUE),   WSTATE_DISABLE) /*< OLD(TPPWarn_ExpectedLParenAfterPragma). */
+/*47*/WARNING(W_EXPECTED_STRING_AFTER_PRAGMA,    (WG_SYNTAX),  WSTATE_WARN)    /*< [struct TPPConst *] OLD(TPPWarn_ExpectedStringAfterPragma). */
+/*48*/WARNING(W_UNUSED_0F,                       (WG_VALUE),   WSTATE_DISABLE) /*< OLD(TPPWarn_ExpectedRParenAfterPragma). */
+/*49*/WARNING(W_UNUSED_10,                       (WG_VALUE),   WSTATE_DISABLE) /*< OLD(TPPWarn_UnexpectedToken). */
+/*50*/WARNING(W_INVALID_WARNING,                 (WG_VALUE),   WSTATE_WARN)    /* TODO! */ /*< OLD(TPPWarn_InvalidWarning). */
+/*51*/WARNING(W_CANT_POP_WARNINGS,               (WG_VALUE),   WSTATE_WARN)    /* TODO! */ /*< OLD(TPPWarn_CantPopWarnings). */
+/*52*/WARNING(W_UNUSED_11,                       (WG_VALUE),   WSTATE_DISABLE) /*< OLD(TPPWarn_TPPLoadFileNotFound). */
+/*53*/WARNING(W_EXPECTED_STRING_AFTER_PUSHMACRO, (WG_SYNTAX),  WSTATE_WARN)    /*< [struct TPPConst *] OLD(TPPWarn_ExpectedStringAfterPushMacro). */
+/*54*/WARNING(W_UNUSED_12,                       (WG_VALUE),   WSTATE_DISABLE) /*< OLD(TPPWarn_CantPopMacro). */
+/*55*/WARNING(W_UNUSED_13,                       (WG_VALUE),   WSTATE_DISABLE) /*< OLD(TPPWarn_ExpectedLParenAfterTPPStrDecompile). */
+/*56*/WARNING(W_EXPECTED_STRING_AFTER_TPP_STRD,  (WG_SYNTAX),  WSTATE_WARN)    /*< [struct TPPConst *] OLD(TPPWarn_ExpectedStringAfterTPPStrDecompile). */
+/*57*/WARNING(W_UNUSED_14,                       (WG_VALUE),   WSTATE_DISABLE) /*< OLD(TPPWarn_ExpectedRParenAfterTPPStrDecompile). */
+/*58*/WARNING(W_EXPECTED_LPAREN,                 (WG_SYNTAX),  WSTATE_WARN)    /*< OLD(TPPWarn_ExpectedLParen). */
+/*59*/WARNING(W_EXPECTED_RPAREN,                 (WG_SYNTAX),  WSTATE_WARN)    /*< OLD(TPPWarn_ExpectedRParen). */
+/*60*/WARNING(W_DEPRECATED_IDENTIFIER,           (WG_USER),    WSTATE_WARN)    /*< [struct TPPKeyword *] OLD(TPPWarn_DeprecatedKeyword). */
+/*61*/WARNING(W_NONPARTABLE_FILENAME_CASING,     (WG_ENVIRON), WSTATE_WARN)    /*< [char const *,char const *,size_t,char const *]. (path,wrong_begin,wrong_size,corrent_begin) OLD(TPPWarn_InvalidPathCasing). */
+/*62*/WARNING(W_DIVIDE_BY_ZERO,                  (WG_VALUE),   WSTATE_WARN)    /*< OLD(TPPWarn_DivideByZero|TPPWarn_ModuloByZero). */
+/*63*/WARNING(W_ARGUMENT_NAMED_ALREADY_TAKEN,    (WG_MACROS),  WSTATE_WARN)    /*< [tok_t] OLD(TPPWarn_ReusedMacroParameter). */
+/*64*/WARNING(W_SPECIAL_ARGUMENT_NAME,           (WG_MACROS),  WSTATE_WARN)    /*< [struct TPPKeyword *] OLD(TPPWarn_VaArgsUsedAsMacroParameter). */
+/*65*/WARNING(W_UNUSED_15,                       (WG_VALUE),   WSTATE_WARN)    /*< OLD(TPPWarn_VaCommaUsedAsMacroParameter). */
+/*66*/WARNING(W_UNUSED_16,                       (WG_VALUE),   WSTATE_WARN)    /*< OLD(TPPWarn_Unexpected). */
+/*67*/WARNING(W_UNUSED_17,                       (WG_VALUE),   WSTATE_WARN)    /*< OLD(TPPWarn_VaArgsMustBeLastParameter). */
+/*68*/WARNING(W_UNUSED_18,                       (WG_VALUE),   WSTATE_WARN)    /*< OLD(TPPWarn_ExpectedBoolExpression). */
+/*69*/WARNING(W_UNUSED_19,                       (WG_VALUE),   WSTATE_WARN)    /*< OLD(TPPWarn_ExpectedBoolExpressionNot). */
+/*70*/WARNING(W_UNUSED_1A,                       (WG_VALUE),   WSTATE_WARN)    /*< OLD(TPPWarn_ExpectedBoolExpressionLhsOP). */
+/*71*/WARNING(W_UNUSED_1B,                       (WG_VALUE),   WSTATE_WARN)    /*< OLD(TPPWarn_ExpectedBoolExpressionRhsOP). */
+/*72*/WARNING(W_UNUSED_1C,                       (WG_VALUE),   WSTATE_WARN)    /*< OLD(TPPWarn_ExpectedKeyword). */
+
+/* Warnings added by the new TPP. */
+WARNING(W_LINE_COMMENT_CONTINUED,          (WG_COMMENTS),WSTATE_WARN)    /*< . */
+WARNING(W_VA_KEYWORD_IN_REGULAR_MACRO,     (WG_MACROS),  WSTATE_WARN)    /*< [struct TPPKeyword *]. */
+WARNING(W_KEYWORD_MACRO_ALREADY_ONSTACK,   (WG_MACROS),  WSTATE_DISABLE) /*< [struct TPPFile *]. */
+WARNING(W_NOT_ENGOUH_MACRO_ARGUMENTS,      (WG_MACROS),  WSTATE_WARN)    /*< [struct TPPFile *]. */
+WARNING(W_CHARACTER_TOO_LONG,              (WG_VALUE),   WSTATE_WARN)    /*< . */
+WARNING(W_MULTICHAR_NOT_ALLOWED,           (WG_VALUE),   WSTATE_WARN)    /*< [char const *,size_t]. */
+WARNING(W_INTEX_OUT_OF_BOUNDS,             (WG_VALUE),   WSTATE_DISABLE) /*< [struct TPPString *,ptrdiff_t]. */
+WARNING(W_STRING_TERMINATED_BY_LINEFEED,   (WG_SYNTAX),  WSTATE_WARN)    /*< . */
+WARNING(W_STRING_TERMINATED_BY_EOF,        (WG_SYNTAX),  WSTATE_WARN)    /*< . */
+WARNING(W_COMMENT_TERMINATED_BY_EOF,       (WG_SYNTAX),  WSTATE_WARN)    /*< . */
+WARNING(W_EXPECTED_RBRACKET_IN_EXPRESSION, (WG_SYNTAX),  WSTATE_WARN)    /*< . */
+WARNING(W_EXPECTED_COMMA,                  (WG_SYNTAX),  WSTATE_WARN)    /*< . */
+WARNING(W_EXPECTED_STRING_IN_EXPRESSION,   (WG_SYNTAX),  WSTATE_WARN)    /*< [struct TPPConst *]. */
+WARNING(W_EXPECTED_STRING_AFTER_MESSAGE,   (WG_SYNTAX),  WSTATE_WARN)    /*< [struct TPPConst *]. */
+WARNING(W_EXPECTED_STRING_AFTER_DEPRECATED,(WG_SYNTAX),  WSTATE_WARN)    /*< [struct TPPConst *]. */
+WARNING(W_EXPECTED_STRING_AFTER_TPP_EXEC,  (WG_SYNTAX),  WSTATE_WARN)    /*< [struct TPPConst *]. */
+WARNING(W_EXPECTED_STRING_AFTER_TPP_SETF,  (WG_SYNTAX),  WSTATE_WARN)    /*< [struct TPPConst *]. */
+WARNING(W_EXPECTED_STRING_AFTER_TPP_STRAT, (WG_SYNTAX),  WSTATE_WARN)    /*< [struct TPPConst *]. */
+WARNING(W_MACRO_RECURSION_LIMIT_EXCEEDED,  (WG_LIMIT),   WSTATE_WARN)    /*< [struct TPPFile *]. */
+WARNING(W_INCLUDE_RECURSION_LIMIT_EXCEEDED,(WG_LIMIT),   WSTATE_WARN)    /*< [struct TPPFile *]. */
 
 #ifdef TPP_DEFS_DEFINES_BUILTIN_MACRO
 #undef TPP_DEFS_DEFINES_BUILTIN_MACRO

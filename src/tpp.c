@@ -2128,6 +2128,216 @@ err:
 #endif
 }
 
+/* Figure out the default state of warnings. */
+PRIVATE struct {
+#define WGROUP(name,str)             unsigned int s_##name : TPP_WARNING_BITS;
+#include "tpp-defs.inl"
+#undef WGROUP
+#define WARNING(name,groups,default) unsigned int s_##name : TPP_WARNING_BITS;
+#include "tpp-defs.inl"
+#undef WARNING
+} const default_warnings_state = {
+#ifndef __INTELLISENSE__
+#define WGROUP(name,str)             WSTATE_ERROR,
+#include "tpp-defs.inl"
+#undef WGROUP
+#define WARNING(name,groups,default) default,
+#include "tpp-defs.inl"
+#undef WARNING
+#endif
+};
+
+PRIVATE char const *const wgroup_names[WG_COUNT+1] = {
+#ifndef __INTELLISENSE__
+#define WGROUP(name,str) str,
+#include "tpp-defs.inl"
+#undef WGROUP
+#endif
+ NULL
+};
+
+#ifndef __INTELLISENSE__
+#define EXPAND_GROUPS(...)  {__VA_ARGS__,-1}
+#define WARNING(name,groups,default) PRIVATE int const wgroups_##name[] = EXPAND_GROUPS groups;
+#include "tpp-defs.inl"
+#undef WARNING
+#undef EXPAND_GROUPS
+#endif
+
+PRIVATE int const *const w_associated_groups[W_COUNT] = {
+#ifndef __INTELLISENSE__
+#define WARNING(name,groups,default) wgroups_##name,
+#include "tpp-defs.inl"
+#undef WARNING
+#endif
+};
+
+
+PUBLIC int TPPLexer_PushWarnings(void) {
+ struct TPPWarningState *newstate,*curstate;
+ assert(TPPLexer_Current);
+ curstate = current.l_warnings.w_curstate;
+ assert(curstate);
+ assert((curstate == &current.l_warnings.w_basestate) ==
+        (curstate->ws_prev == NULL));
+ newstate = (struct TPPWarningState *)malloc(sizeof(struct TPPWarningState));
+ if unlikely(!newstate) return 0;
+ if ((newstate->ws_extendeda = curstate->ws_extendeda) != 0) {
+  /* todo: maybe only copy slots that are actually in use? */
+  size_t extended_size = newstate->ws_extendeda*sizeof(struct TPPWarningStateEx);
+  newstate->ws_extendedv = (struct TPPWarningStateEx *)malloc(extended_size);
+  if unlikely(!newstate->ws_extendedv) { free(newstate); return 0; }
+  memcpy(newstate->ws_extendedv,
+         curstate->ws_extendedv,
+         extended_size);
+ } else {
+  newstate->ws_extendedv = NULL;
+ }
+ memcpy(newstate->ws_state,curstate->ws_state,TPP_WARNING_BITSETSIZE);
+ newstate->ws_prev = curstate;
+ current.l_warnings.w_curstate = newstate;
+ return 1;
+}
+PUBLIC int TPPLexer_PopWarnings(void) {
+ struct TPPWarningState *curstate;
+ assert(TPPLexer_Current);
+ curstate = current.l_warnings.w_curstate;
+ assert(curstate);
+ assert((curstate == &current.l_warnings.w_basestate) ==
+        (curstate->ws_prev == NULL));
+ /* Check if this state has a predecessor. */
+ if unlikely(!curstate->ws_prev) return 0;
+ current.l_warnings.w_curstate = curstate->ws_prev;
+ free(curstate->ws_extendedv);
+ free(curstate);
+ return 1;
+}
+
+PRIVATE int set_wstate(int wid, wstate_t state) {
+ struct TPPWarningState *curstate; size_t newalloc;
+ struct TPPWarningStateEx *iter,*end,*newslot;
+ uint8_t *bitset_byte,byte_shift;
+ assert(TPPLexer_Current);
+ curstate = current.l_warnings.w_curstate;
+ assert(curstate);
+ assert((curstate == &current.l_warnings.w_basestate) ==
+        (curstate->ws_prev == NULL));
+ assert(wid < TPP_WARNING_TOTAL);
+ end = (iter = curstate->ws_extendedv)+curstate->ws_extendeda;
+ while (iter != end && iter->wse_wid < wid) ++iter;
+ assert(iter == end || iter->wse_wid >= wid);
+ bitset_byte = &curstate->ws_state[wid/(8/TPP_WARNING_BITS)];
+ byte_shift  = (wid%(8/TPP_WARNING_BITS))*TPP_WARNING_BITS;
+ assert(byte_shift == 0 || byte_shift == 2 ||
+        byte_shift == 4 || byte_shift == 6);
+ if (state == WSTATE_SUPPRESS) {
+  if (iter == end || iter->wse_wid != wid) {
+   /* Must insert/allocate a new slot. */
+   newslot = curstate->ws_extendedv;
+   while (newslot != end && newslot->wse_suppress) ++newslot;
+   if (newslot == end) {
+    /* No free slots. */
+    newalloc = curstate->ws_extendeda ? curstate->ws_extendeda*2 : 2;
+    newslot = (struct TPPWarningStateEx *)realloc(curstate->ws_extendedv,newalloc*
+                                                  sizeof(struct TPPWarningStateEx));
+    if unlikely(!newslot) return 0;
+    /* ZERO-initialize the new memory. */
+    memset(newslot+curstate->ws_extendeda,0,
+          (newalloc-curstate->ws_extendeda)*
+           sizeof(struct TPPWarningStateEx));
+    iter = newslot+(iter-curstate->ws_extendedv);
+    curstate->ws_extendedv = newslot;
+    newslot += curstate->ws_extendeda;
+    curstate->ws_extendeda = newalloc;
+   }
+   assert(iter <= newslot);
+   assert(iter == newslot || iter->wse_wid > wid);
+   assert(iter == curstate->ws_extendedv || iter[-1].wse_wid < wid);
+   /* Move data between iter and newslot. */
+   memmove(iter+1,iter,(size_t)(newslot-iter)*
+           sizeof(struct TPPWarningStateEx));
+   iter->wse_wid      = wid;
+   iter->wse_suppress = 0;
+   iter->wse_oldstate = (wstate_t)((*bitset_byte >> byte_shift) & 3);
+   assert(iter->wse_oldstate != WSTATE_SUPPRESS);
+  }
+  /* Suppress the warning a little bit more. */
+  ++iter->wse_suppress;
+ }
+ if (state != WSTATE_SUPPRESS &&
+    *bitset_byte & (WSTATE_SUPPRESS << byte_shift)) {
+  /* The old state was suppress, but the new one isn't. */
+  assert((iter != end && iter->wse_wid == wid) &&
+         "Warning is set to suppress, but is lacking an extended entry");
+  assert(iter->wse_suppress);
+  --iter->wse_suppress;
+ }
+ /* Set the new warning state in the bitset. */
+ *bitset_byte &= (uint8_t)~(3 << byte_shift);
+ *bitset_byte |= (uint8_t)(state << byte_shift);
+ return 1;
+}
+
+PUBLIC int TPPLexer_SetWarning(int wnum, wstate_t state) {
+ return unlikely(wnum >= W_COUNT) ? 2 : set_wstate(wnum+WG_COUNT,state);
+}
+PUBLIC int TPPLexer_SetWarnings(char const *__restrict group, wstate_t state) {
+ char const *const *iter;
+ for (iter = wgroup_names; *iter; ++iter) {
+  if (!strcmp(*iter,group)) {
+   return set_wstate((int)(iter-wgroup_names),state);
+  }
+ }
+ return 2;
+}
+PRIVATE wstate_t do_invoke_wid(int wid) {
+ struct TPPWarningState *curstate;
+ struct TPPWarningStateEx *iter;
+ uint8_t *bitset_byte,byte_shift;
+ wstate_t state;
+ assert(TPPLexer_Current);
+ curstate = current.l_warnings.w_curstate;
+ assert(curstate);
+ assert((curstate == &current.l_warnings.w_basestate) ==
+        (curstate->ws_prev == NULL));
+ assert(wid < TPP_WARNING_TOTAL);
+ bitset_byte = &curstate->ws_state[wid/(8/TPP_WARNING_BITS)];
+ byte_shift  = (wid%(8/TPP_WARNING_BITS))*TPP_WARNING_BITS;
+ assert(byte_shift == 0 || byte_shift == 2 ||
+        byte_shift == 4 || byte_shift == 6);
+ state = (wstate_t)((*bitset_byte >> byte_shift) & 3);
+ if (state == WSTATE_SUPPRESS) {
+  iter = curstate->ws_extendedv;
+  while ((assert(iter < curstate->ws_extendedv+curstate->ws_extendeda),
+          iter->wse_wid != wid)) ++iter;
+  if (!--iter->wse_suppress) {
+   /* Last time this warning should be suppressed.
+    * >> Must revert the bitset state to that before supression started. */
+   *bitset_byte &= (uint8_t)~(3 << byte_shift);
+   *bitset_byte |= ((uint8_t)iter->wse_oldstate << byte_shift);
+  }
+ }
+ return state;
+}
+
+PUBLIC int TPPLexer_InvokeWarning(int wnum) {
+ wstate_t state; int found_warn = 0;
+ int const *group_iter;
+ if unlikely(wnum >= W_COUNT) return TPP_WARNINGMODE_WARN;
+ state = do_invoke_wid(wnum+WG_COUNT);
+ group_iter = w_associated_groups[wnum];
+ for (;;) {
+  if (state == WSTATE_SUPPRESS ||
+      state == WSTATE_DISABLE) return TPP_WARNINGMODE_IGNORE;
+  found_warn |= state == WSTATE_WARN;
+  if (*group_iter < 0) break;
+  state = do_invoke_wid(*group_iter++);
+ }
+ return found_warn ? TPP_WARNINGMODE_WARN : TPP_WARNINGMODE_ERROR;
+}
+
+
+
 
 PUBLIC int TPPLexer_Init(struct TPPLexer *__restrict self) {
  assert(self);
@@ -2151,8 +2361,21 @@ PUBLIC int TPPLexer_Init(struct TPPLexer *__restrict self) {
  self->l_ifdef.is_slotc    = 0;
  self->l_ifdef.is_slota    = 0;
  self->l_ifdef.is_slotv    = NULL;
+ self->l_warnings.w_curstate = &self->l_warnings.w_basestate;
+ self->l_warnings.w_basestate.ws_extendeda = 0;
+ self->l_warnings.w_basestate.ws_extendedv = NULL;
+ self->l_warnings.w_basestate.ws_prev      = NULL;
+ assert(sizeof(default_warnings_state) >= TPP_WARNING_BITSETSIZE &&
+        sizeof(default_warnings_state) <= TPP_OFFSETAFTER(struct TPPWarningState,ws_padding));
+ memcpy(self->l_warnings.w_basestate.ws_state,
+        &default_warnings_state,TPP_WARNING_BITSETSIZE);
+
  assert(hashof("",0) == EMPTY_STRING_HASH);
- assert(hashof("<commandline>",13) == 3330511802);
+#if __SIZEOF_SIZE_T__ == 4
+ assert(hashof("<commandline>",13) == 3330511802ul);
+#elif __SIZEOF_SIZE_T__ == 8
+ assert(hashof("<commandline>",13) == 12182544704004658106ull);
+#endif
  assert(TPPFile_Empty.f_namehash ==
         hashof(TPPFile_Empty.f_name,
                TPPFile_Empty.f_namesize));
@@ -2161,6 +2384,35 @@ PUBLIC int TPPLexer_Init(struct TPPLexer *__restrict self) {
 PUBLIC void TPPLexer_Quit(struct TPPLexer *__restrict self) {
  struct TPPFile *fileiter,*filenext;
  assert(self);
+ /* Emit warnings about all unclosed #ifdef-blocks. */
+ if (!(self->l_flags&TPPLEXER_FLAG_ERROR)) {
+#if !TPP_CONFIG_ONELEXER
+  struct TPPLexer *oldcurrent = TPPLexer_Current;
+  TPPLexer_Current = self;
+#endif /* !TPP_CONFIG_ONELEXER */
+  while (self->l_ifdef.is_slotc--) {
+   if (!TPPLexer_Warn(W_IF_WITHOUT_ENDIF,&self->l_ifdef.is_slotv[
+                                          self->l_ifdef.is_slotc])) break;
+  }
+#if !TPP_CONFIG_ONELEXER
+  TPPLexer_Current = oldcurrent;
+#endif /* !TPP_CONFIG_ONELEXER */
+ }
+ free(self->l_ifdef.is_slotv);
+ { /* Free all non-popped and extended warnings information. */
+  struct TPPWarningState *wstate,*wnext;
+  wstate = self->l_warnings.w_curstate;
+  assert(!self->l_warnings.w_basestate.ws_prev);
+  for (;;) {
+   assert(wstate);
+   free(wstate->ws_extendedv);
+   if (wstate == &self->l_warnings.w_basestate) break;
+   wnext = wstate->ws_prev;
+   free(wstate);
+   wstate = wnext;
+  }
+ }
+
  /* Free keywords and remaining macros. */
  destroy_keyword_map(&self->l_keywords);
  /* Clear the remainder of the #include-stack. */
@@ -2177,21 +2429,6 @@ PUBLIC void TPPLexer_Quit(struct TPPLexer *__restrict self) {
   for (; iter != end; ++iter) free(iter->ip_path);
   free(self->l_syspaths.il_pathv);
  }
- /* Emit warnings about all unclosed #ifdef-blocks. */
- if (!(self->l_flags&TPPLEXER_FLAG_ERROR)) {
-#if !TPP_CONFIG_ONELEXER
-  struct TPPLexer *oldcurrent = TPPLexer_Current;
-  TPPLexer_Current = self;
-#endif /* !TPP_CONFIG_ONELEXER */
-  while (self->l_ifdef.is_slotc--) {
-   if (!TPPLexer_Warn(W_IF_WITHOUT_ENDIF,&self->l_ifdef.is_slotv[
-                                          self->l_ifdef.is_slotc])) break;
-  }
-#if !TPP_CONFIG_ONELEXER
-  TPPLexer_Current = oldcurrent;
-#endif /* !TPP_CONFIG_ONELEXER */
- }
- free(self->l_ifdef.is_slotv);
 }
 
 PRIVATE void
@@ -2589,6 +2826,12 @@ TPPLexer_OpenFile(int mode, char *filename, size_t filename_size,
    result = open_normal_file(used_filename,newbuffersize,pkeyword_entry);
    if (result) { /* Goti! */
 #ifdef _WIN32
+    /* TODO: No need to check inherited path portion:
+     * >> // file "src/file.c"
+     * >> #include "foo/bar.c"
+     *    src/foo/bar.c
+     *        [-------] Only need to check this portion.
+     */
     if (!(mode&TPPLEXER_OPENFILE_FLAG_NOCASEWARN) &&
         !check_path_spelling(filename,filename_size)
         ) {err_buffer_r: free(buffer); goto err_r; }
@@ -2635,6 +2878,12 @@ next_syspath:
     if (!(mode&TPPLEXER_OPENFILE_FLAG_NEXT) ||
         !(result->f_prev)) {
 #ifdef _WIN32
+     /* TODO: No need to check the syspath portion:
+      *  -I/usr/include
+      *  #include <stdlib.h>
+      *  /usr/includes/stdlib.h
+      *                [------] Only need to check this
+      */
      if (!(mode&TPPLEXER_OPENFILE_FLAG_NOCASEWARN) &&
          !check_path_spelling(filename,filename_size)
          ) goto err_buffer_r;
@@ -3160,10 +3409,10 @@ again:
  if (result == '#' &&
      token.t_file->f_kind != TPPFILE_KIND_MACRO) {
   char *hash_begin = token.t_begin;
-  if (!at_start_of_line()) return result; /* Not a preprocessor directive! */
   if ((current.l_flags&(TPPLEXER_FLAG_NO_DIRECTIVES|TPPLEXER_FLAG_ASM_COMMENTS)) ==
                         TPPLEXER_FLAG_NO_DIRECTIVES
       ) return result; /* Directives are not being parsed. */
+  if (!at_start_of_line()) return result; /* Not actually a preprocessor directive! */
   pushf();
   current.l_flags |= (TPPLEXER_FLAG_WANTLF|TPPLEXER_FLAG_TERMINATE_STRING_LF);
   current.l_flags &= ~(TPPLEXER_FLAG_WANTSPACE|TPPLEXER_FLAG_WANTCOMMENTS);
@@ -3884,6 +4133,7 @@ create_int_file:
     popf();
     if (TOK != '(') TPPLexer_Warn(W_EXPECTED_LPAREN);
     keyword_begin = token.t_end;
+    /* TODO: Don't accept ')' characters in comments! */
     keyword_end   = (char *)memchr(keyword_begin,')',
                                   (size_t)(token.t_file->f_end-
                                            keyword_begin));
@@ -5428,7 +5678,9 @@ PRIVATE void EVAL_CALL eval_unary(struct TPPConst *result) {
                                         TPP_ISBUILTINMACRO(token.t_id));
     TPPLexer_YieldPP();
    } else if (result) {
-    TPPLexer_Warn(W_EXPECTED_KEYWORD_AFTER_DEFINED);
+    TPPLexer_Warn(with_paren
+                  ? W_EXPECTED_KEYWORD_AFTER_DEFINED
+                  : W_EXPECTED_KWDLPAR_AFTER_DEFINED);
     if (with_paren) while (TOK > 0 && TOK != ')') TPPLexer_YieldPP();
     result->c_kind       = TPP_CONST_INTEGRAL;
     result->c_data.c_int = 0;
@@ -5987,7 +6239,8 @@ TPPLexer_ParsePragma(tok_t endat) {
     old_token_begin = token.t_begin;
     pushfile_inherited(exec_file);
     pushf();
-    /* Disable some unnecessary tokens & make sure macros & preprocessor blocks are enabled. */
+    /* Disable some unnecessary tokens and make sure
+     * that macros & preprocessor directives are enabled. */
     current.l_flags &= ~(TPPLEXER_FLAG_WANTCOMMENTS|
                          TPPLEXER_FLAG_WANTSPACE|
                          TPPLEXER_FLAG_WANTLF|
@@ -6066,13 +6319,17 @@ seterr:
 #define WARNF(...) fprintf(stderr,__VA_ARGS__)
 PUBLIC int TPPLexer_Warn(int wnum, ...) {
  va_list args; char const *used_filename,*true_filename;
- char const *macro_name = NULL; int macro_name_size;
+ char const *macro_name = NULL;
+ int macro_name_size,behavior; int const *wgroups;
  struct TPPKeyword *kwd; char *temp;
  struct TPPIfdefStackSlot *ifdef_slot;
  struct TPPString *temp_string = NULL;
  if (current.l_flags&TPPLEXER_FLAG_ERROR) return 0; /* Already in an error-state. */
  if (current.l_flags&TPPLEXER_FLAG_NO_WARNINGS) return 1; /* Warnings are disabled. */
- /* TODO: Check for per-warning behavior, as configured by the current lexer. */
+ /* Check for per-warning behavior, as configured by the current lexer. */
+ behavior = TPPLexer_InvokeWarning(wnum);
+ if (behavior == TPP_WARNINGMODE_IGNORE) return 1; /* Warning is being ignored. */
+
  va_start(args,wnum);
 #define TOK_S         "'%.*s'"
 #define TOK_A        (int)(token.t_end-token.t_begin),token.t_begin
@@ -6081,16 +6338,6 @@ PUBLIC int TPPLexer_Warn(int wnum, ...) {
 #define KWDNAME()    (ARG(struct TPPKeyword *)->k_name)
 #define TOK_NAME()   (kwd = TPPLexer_LookupKeywordID(ARG(tok_t)),kwd ? kwd->k_name : "??" "?")
 #define CONST_STR()  (temp_string = TPPConst_ToString(ARG(struct TPPConst *)),temp_string ? temp_string->s_text : NULL)
- switch (wnum) {
-  case W_IF_WITHOUT_ENDIF:
-   ifdef_slot = ARG(struct TPPIfdefStackSlot *);
-   WARNF(current.l_flags&TPPLEXER_FLAG_MSVC_MESSAGEFORMAT
-         ? "%s(%d) : " : "%s:%d: ",
-         ifdef_slot->iss_file->f_name,ifdef_slot->iss_line+1);
-   WARNF("#if without #endif\n");
-   goto end;
-  default: break; 
- }
  used_filename = TPPLexer_FILE(NULL);
  if (token.t_file->f_kind == TPPFILE_KIND_MACRO) {
   macro_name = token.t_file->f_name;
@@ -6099,10 +6346,29 @@ PUBLIC int TPPLexer_Warn(int wnum, ...) {
  } else {
   true_filename = used_filename;
  }
- WARNF(current.l_flags&TPPLEXER_FLAG_MSVC_MESSAGEFORMAT
-       ? "%s(%d,%d) : " : "%s:%d:%d: "
-       ,true_filename,TPPLexer_TRUE_LINE()+1,TPPLexer_TRUE_COLUMN()+1);
+ switch (wnum) {
+  case W_IF_WITHOUT_ENDIF:
+   ifdef_slot = ARG(struct TPPIfdefStackSlot *);
+   WARNF(current.l_flags&TPPLEXER_FLAG_MSVC_MESSAGEFORMAT
+         ? "%s(%d) : " : "%s:%d: ",
+         ifdef_slot->iss_file->f_name,ifdef_slot->iss_line+1);
+   macro_name = NULL;
+   break;
+  default:
+   WARNF(current.l_flags&TPPLEXER_FLAG_MSVC_MESSAGEFORMAT
+         ? "%s(%d,%d) : " : "%s:%d:%d: "
+         ,true_filename,TPPLexer_TRUE_LINE()+1,TPPLexer_TRUE_COLUMN()+1);
+   break; 
+ }
  if (macro_name) WARNF("In macro '%.*s': ",macro_name_size,macro_name);
+ WARNF("%c%04d(",(behavior == TPP_WARNINGMODE_ERROR) ? 'E' : 'W',wnum);
+ /* print a list of all groups associated with the warning. */
+ wgroups = w_associated_groups[wnum];
+ while (*wgroups >= 0) {
+  char const *name = wgroup_names[*wgroups++];
+  WARNF("\"-W%s\"%s",name,(*wgroups >= 0) ? "," : "");
+ }
+ WARNF("): ");
  switch (wnum) {
   case W_STARSLASH_OUTSIDE_OF_COMMENT    : WARNF("'*" "/' outside of comment"); break;
   case W_LINE_COMMENT_CONTINUED          : WARNF("Line-comment continued"); break;
@@ -6174,9 +6440,10 @@ PUBLIC int TPPLexer_Warn(int wnum, ...) {
                                                  ifdef_slot->iss_file->f_name,ifdef_slot->iss_line+1);
                                            WARNF("See reference to #else");
                                            break;
+  case W_IF_WITHOUT_ENDIF                : WARNF("#if without #endif"); break;
   case W_ENDIF_WITHOUT_IF                : WARNF("#endif without #if"); break;
   case W_DEPRECATED_IDENTIFIER           : WARNF("DEPRECATED : '%s'",KWDNAME()); break;
-  default: WARNF("WARNING (%d)",wnum); break;
+  default: WARNF("? %d",wnum); break;
  }
  if (temp_string) TPPString_Decref(temp_string);
 #undef FILENAME
@@ -6193,10 +6460,13 @@ PUBLIC int TPPLexer_Warn(int wnum, ...) {
          used_filename,TPPLexer_LINE()+1,TPPLexer_COLUMN()+1);
   }
  }
-end:
  fflush(stderr);
+ if (behavior == TPP_WARNINGMODE_ERROR) {
+  /* NOTE: On error, the current token _must_ be set to TOK_ERR */
+  TPPLexer_SetErr();
+  return 0;
+ }
  return 1;
- /* NOTE: On error, the current token _must_ be set to TOK_ERR */
 }
 
 #ifdef _MSC_VER

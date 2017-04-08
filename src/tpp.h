@@ -524,23 +524,92 @@ enum{
 };
 
 typedef enum { /* Warning states. */
- TPP(WSTATE_DISABLE)  = -2,
- TPP(WSTATE_ERROR)    = -1,
- TPP(WSTATE_WARN)     = 0,
- TPP(WSTATE_SUPPRESS) = 1, /* To suppress more than once, use > 1 */
+ TPP(WSTATE_DISABLE)  = 0,
+ TPP(WSTATE_ERROR)    = 1,
+ TPP(WSTATE_WARN)     = 2,
+ TPP(WSTATE_SUPPRESS) = 3, /*< Can be set multiple times for recursion. */
 } TPP(wstate_t);
 
 enum{
 #define WGROUP(name,str) TPP(name),
 #include "tpp-defs.inl"
 #undef WGROUP
+ TPP(WG_COUNT)
 };
 
 enum{
-#define WARNING(name,group,default) TPP(name),
+#define WARNING(name,groups,default) TPP(name),
 #include "tpp-defs.inl"
 #undef WARNING
+ TPP(W_COUNT)
 };
+
+
+struct TPPWarningStateEx { /* Extended state for a 11-warning. */
+ int          wse_wid;      /*< Warning/group ID. */
+ unsigned int wse_suppress; /*< Amount of remaining times this warning should be suppressed for.
+                             *  NOTE: When ZERO(0), this slot is unused. */
+ wstate_t     wse_oldstate; /*< Old warning state to return to after suppression ends.
+                             *  NOTE: Never 'WSTATE_SUPPRESS' */
+};
+#define TPP_WARNING_BITS          2 /*< One of WSTATE_*. */
+#define TPP_WARNING_TOTAL        (TPP(WG_COUNT)+TPP(W_COUNT))
+#define TPP_WARNING_BITSETSIZE  ((TPP_WARNING_TOTAL*TPP_WARNING_BITS)/8)
+struct TPPWarningState {
+ /* Bitset describing the current warning state.
+  * NOTE: Warning groups come before warning numbers. */
+ uint8_t                   ws_state[TPP_WARNING_BITSETSIZE];
+ uint8_t                   ws_padding[sizeof(void *)-(TPP_WARNING_BITSETSIZE % sizeof(void *))]; /* Force pointer-alignment. */
+ size_t                    ws_extendeda; /*< Allocated members for the 'ws_extendedv' vector. */
+ struct TPPWarningStateEx *ws_extendedv; /*< [0..ws_extendedc|alloc(ws_extendeda)][owned] Extended warning state data (Sorted by 'wse_num'). */
+ struct TPPWarningState   *ws_prev;      /*< [0..1][owned_if(!= &:w_basestate)] Previous warning state.
+                                          *   NOTE: Always NULL if 'self == &:w_basestate' */
+};
+struct TPPWarnings {
+ struct TPPWarningState *w_curstate;  /*< [1..1][owned_if(!= &w_basestate)] Current warning state. */
+ struct TPPWarningState  w_basestate; /*< Base (aka. first) warning state. */
+};
+
+//////////////////////////////////////////////////////////////////////////
+// Push/Pop the current warning state.
+// @return: 0: [TPPLexer_PushWarnings] Not enough available memory.
+// @return: 0: [TPPLexer_PopWarnings] No older warning state was available to restore.
+// @return: 1: Successfully pushed/popped the warnings.
+TPPFUN int TPPLexer_PushWarnings(void);
+TPPFUN int TPPLexer_PopWarnings(void);
+
+//////////////////////////////////////////////////////////////////////////
+// Set the state of a given warning number.
+// NOTE: If the given state is 'TPP(WSTATE_SUPPRESS)', ONE(1)
+//       will be added to the suppress recursion counter.
+// @return: 0: Not enough available memory.
+// @return: 1: Successfully set the given warning number.
+// @return: 2: The given warning number is unknown.
+TPPFUN int TPPLexer_SetWarning(int wnum, TPP(wstate_t) state);
+
+//////////////////////////////////////////////////////////////////////////
+// Similar to 'TPPLexer_SetWarning', but set the state of all warnings from a given group.
+// NOTES:
+//   - Groups work independent of warning ids, meaning you can even
+//     specify 'TPP(WSTATE_SUPPRESS)' as state, with the next warning
+//     part of that state occurring simply consuming that suppression.
+//   - If you disable an entire warning group, no warning part of it will be emit.
+//   - If a warning is invoked, that is both part of an error and a warning/disabled
+//     group it will always tend to do as little damage as possible:
+//     >> suppress >= disabled >= warning >= error
+// @return: 0: Not enough available memory.
+// @return: 1: Successfully set the given warning number.
+// @return: 2: The given group name is unknown.
+TPPFUN int TPPLexer_SetWarnings(char const *__restrict group, TPP(wstate_t) state);
+
+//////////////////////////////////////////////////////////////////////////
+// Invoke a given warning number, returning one of 'TPP_WARNINGMODE_*'
+// NOTE: Unknown warnings will always result in 'TPP_WARNINGMODE_WARN'
+TPPFUN int TPPLexer_InvokeWarning(int wnum);
+#define TPP_WARNINGMODE_ERROR  0 /*< Emit an error and call TPPLexer_SetErr(). */
+#define TPP_WARNINGMODE_WARN   1 /*< Emit a warning, but continue normally. */
+#define TPP_WARNINGMODE_IGNORE 2 /*< Do nothing and continue normally (NOTE: If the warning was just suppressed, its ). */
+
 
 struct TPPIfdefStackSlot {
 #define TPP_IFDEFMODE_FALSE 0
@@ -751,6 +820,7 @@ struct TPPLexer {
  tok_t                 l_noerror;    /*< Old token ID before 'TPPLEXER_FLAG_ERROR' was set. */
  int_t                 l_counter;    /*< Value returned the next time '__COUNTER__' is expanded (Initialized to ZERO(0)). */
  struct TPPIfdefStack  l_ifdef;      /*< #ifdef stack. */
+ struct TPPWarnings    l_warnings;   /*< Current user-configured warnings state. */
 };
 #define TPPLEXER_DEFAULT_LIMIT_MREC 512 /* Even when generated text differs from previous version, don't allow more self-recursion per macro than this. */
 #define TPPLEXER_DEFAULT_LIMIT_INCL 64  /* User attempts to #include a file more often that file will fail with an error message. */
