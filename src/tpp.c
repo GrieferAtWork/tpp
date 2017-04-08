@@ -3954,6 +3954,7 @@ create_block:
      if (has_paren) { if (TOK != ')') goto not_a_guard; TPPLexer_YieldRaw(); }
      if (TOK != '\n') goto not_a_guard;
      /* Yes! This expression behaves exactly like #ifndef, and can therefor replace it! */
+     block_mode = 1;
      goto define_ifndef_guard;
 not_a_guard:
      while (token.t_file != current.l_eob_file) popfile();
