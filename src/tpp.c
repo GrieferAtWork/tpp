@@ -4103,7 +4103,7 @@ create_int_file:
    } break;
 
    { /* Check various attributes of keyword. */
-    char *keyword_begin,*keyword_end;
+    char *keyword_begin,*keyword_end,*file_end,*file_pos;
     size_t keyword_rawsize,keyword_realsize;
     struct TPPKeyword *keyword; tok_t mode;
     int create_missing_keyword;
@@ -4136,16 +4136,21 @@ create_int_file:
     TPPLexer_YieldPP();
     popf();
     if (TOK != '(') TPPLexer_Warn(W_EXPECTED_LPAREN);
-    keyword_begin = token.t_end;
-    /* TODO: Don't accept ')' characters in comments! */
-    keyword_end   = (char *)memchr(keyword_begin,')',
-                                  (size_t)(token.t_file->f_end-
-                                           keyword_begin));
-    if (!keyword_end) {
+    keyword_begin = token.t_end,file_end = token.t_file->f_end;
+    keyword_begin = skip_whitespace_and_comments(keyword_begin,file_end);
+    keyword_end = keyword_begin;
+    while (keyword_end != file_end) {
+     while (SKIP_WRAPLF(keyword_end,file_end));
+     if (!isalnum(*keyword_end)) break;
+     ++keyword_end;
+    }
+    file_pos = skip_whitespace_and_comments(keyword_end,file_end);
+    token.t_file->f_pos = file_pos;
+    if (*file_pos != ')') {
      TPPLexer_Warn(W_EXPECTED_RPAREN);
      keyword_end = keyword_begin;
     } else {
-     token.t_file->f_pos = keyword_end+1;
+     ++token.t_file->f_pos; /* Skip the ')' character. */
     }
     /* Strip whitespace and comments from both ends. */
     keyword_begin = skip_whitespace_and_comments(keyword_begin,keyword_end);
@@ -6372,19 +6377,17 @@ set_warning_newstate:
       }
      } break;
 
-     {
-
+     { /* Parse constant:
+        * >> #pragma warning("-Wno-comments") // Same as '#pragma warning(disable: "comments")'
+        * >> #pragma warning("-Wcomments")    // Same as '#pragma warning(default: "comments")'
+        * The old TPP also allowed an integral ID for a new warning mode:
+        * >> #pragma warning(-1: 42) // Same as '#pragma warning(error: 42)'
+        * >> #pragma warning(0: 42) // Same as '#pragma warning(enable: 42)'
+        * >> #pragma warning(1: 42) // Same as '#pragma warning(disable: 42)'
+        * >> #pragma warning(2: 42) // Same as '#pragma warning(suppress: 42)'
+        * Both of these idea are be merged here!
+        */
      default:
-      /* Parse constant:
-       * >> #pragma warning("-Wno-comments") // Same as '#pragma warning(disable: "comments")'
-       * >> #pragma warning("-Wcomments")    // Same as '#pragma warning(default: "comments")'
-       * The old TPP also allowed an integral ID for a new warning mode:
-       * >> #pragma warning(-1: 42) // Same as '#pragma warning(error: 42)'
-       * >> #pragma warning(0: 42) // Same as '#pragma warning(enable: 42)'
-       * >> #pragma warning(1: 42) // Same as '#pragma warning(disable: 42)'
-       * >> #pragma warning(2: 42) // Same as '#pragma warning(suppress: 42)'
-       * Both of these idea are be merged here!
-       */
       if unlikely(!TPPLexer_Eval(&val)) return 0;
       if (val.c_kind == TPP_CONST_INTEGRAL) {
        /* NOTE: Technically, the old TPP allowed numbers 'x' greater than 2 to
