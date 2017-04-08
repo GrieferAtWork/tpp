@@ -6530,6 +6530,8 @@ PUBLIC int TPPLexer_Warn(int wnum, ...) {
   case W_NONPARTABLE_FILENAME_CASING     : { char *temp2; size_t temp3; temp = ARG(char *),temp2 = ARG(char *),temp3 = ARG(size_t); WARNF("Non-portable casing in '%s': '%.*s' should be '%s' instead",temp,(int)temp3,temp2,ARG(char *)); } break;
   case W_ERROR                           : temp = ARG(char *),WARNF("ERROR : %.*s",(int)ARG(size_t),temp); break;
   case W_WARNING                         : temp = ARG(char *),WARNF("WARNING : %.*s",(int)ARG(size_t),temp); break;
+  case W_INVALID_WARNING                 : WARNF("Invalid warning '%s'",CONST_STR()); break;
+  case W_CANT_POP_WARNINGS               : WARNF("Can't pop warnings"); break;
   case W_MACRO_RECURSION_LIMIT_EXCEEDED  : WARNF("Macro recursion limit exceeded when expanding '%s'",FILENAME()); break;
   case W_INCLUDE_RECURSION_LIMIT_EXCEEDED: WARNF("Include recursion limit exceeded when including '%s'",FILENAME()); break;
   case W_ELSE_WITHOUT_IF                 : WARNF("#else without #if"); break;
