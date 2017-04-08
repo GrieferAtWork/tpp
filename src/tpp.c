@@ -2146,6 +2146,10 @@ PRIVATE struct {
 #undef WARNING
 #endif
 };
+#define DEFAULT_WARNING_STATE(wnum) \
+ (wstate_t)((((uint8_t *)&default_warnings_state)[(wnum)/(8/TPP_WARNING_BITS)] \
+          >> ((wnum)%(8/TPP_WARNING_BITS))*TPP_WARNING_BITS) & 3)
+
 
 PRIVATE char const *const wgroup_names[WG_COUNT+1] = {
 #ifndef __INTELLISENSE__
@@ -2265,7 +2269,7 @@ PRIVATE int set_wstate(int wid, wstate_t state) {
   ++iter->wse_suppress;
  }
  if (state != WSTATE_SUPPRESS &&
-    *bitset_byte & (WSTATE_SUPPRESS << byte_shift)) {
+    (*bitset_byte & (3 << byte_shift)) == WSTATE_SUPPRESS) {
   /* The old state was suppress, but the new one isn't. */
   assert((iter != end && iter->wse_wid == wid) &&
          "Warning is set to suppress, but is lacking an extended entry");
@@ -6296,14 +6300,118 @@ TPPLexer_ParsePragma(tok_t endat) {
    }
   } break;
 
+  { /* Configure warning behavior by group/id.
+     * NOTE: Warning IDs have been chosen for backwards-compatibility with the old TPP. */
+  case KWD_warning:
+   yield_fetch();
+   if unlikely(TOK != '(') TPPLexer_Warn(W_EXPECTED_LPAREN);
+   else yield_fetch();
+   for (;;) {
+    wstate_t newstate,used_newstate; int wset_error;
+    struct TPPConst val; int wnum;
+    switch (TOK) {
+     case KWD_push: /* Push warnings. */
+      if unlikely(!TPPLexer_PushWarnings()) goto seterr;
+      yield_fetch();
+      break;
+     case KWD_pop: /* Pop warnings. */
+      if (!TPPLexer_PopWarnings() &&
+          !TPPLexer_Warn(W_CANT_POP_WARNINGS)) return 0;
+      yield_fetch();
+      break;
+
+     { /* Set the state of a given set of warnings. */
+#define WSTATE_DEFAULT  ((wstate_t)4)
+      if (FALSE) { case KWD_disable:  newstate = WSTATE_DISABLE; }
+      if (FALSE) { /*case KWD_warning:*/
+                   case KWD_enable:   newstate = WSTATE_WARN; }
+      if (FALSE) { case KWD_suppress: newstate = WSTATE_SUPPRESS; }
+      if (FALSE) { case KWD_error:    newstate = WSTATE_ERROR; }
+      if (FALSE) { case KWD_default:  newstate = WSTATE_DEFAULT; }
+      yield_fetch();
+set_warning_newstate:
+      if (TOK != ':') {
+       /* TODO: Warning? (The old TPP didn't have one here, but... why shouldn't the new one add one?) */
+      } else {
+       yield_fetch();
+       /* Parse warning numbers/names. */
+       while (TOK > 0 && TOK != ',' && TOK != ')') {
+        if unlikely(!TPPLexer_Eval(&val)) return 0;
+        if (val.c_kind == TPP_CONST_INTEGRAL) {
+         wnum          = (int)val.c_data.c_int;
+         used_newstate = (newstate == WSTATE_DEFAULT)
+          ? (wnum < W_COUNT ? DEFAULT_WARNING_STATE(wnum) : WSTATE_DISABLE)
+          : newstate;
+         wset_error = TPPLexer_SetWarning(wnum,used_newstate);
+        } else {
+         used_newstate = newstate == WSTATE_DEFAULT ? WSTATE_ERROR : newstate;
+         wset_error = TPPLexer_SetWarnings(val.c_data.c_string->s_text,used_newstate);
+        }
+        if (wset_error == 2) wset_error = TPPLexer_Warn(W_INVALID_WARNING,&val);
+        TPPConst_Quit(&val);
+        if (!wset_error) goto seterr;
+       }
+      }
+     } break;
+
+     {
+
+     default:
+      /* Parse constant:
+       * >> #pragma warning("-Wno-comments") // Same as '#pragma warning(disable: "comments")'
+       * >> #pragma warning("-Wcomments")    // Same as '#pragma warning(default: "comments")'
+       * The old TPP also allowed an integral ID for a new warning mode:
+       * >> #pragma warning(-1: 42) // Same as '#pragma warning(error: 42)'
+       * >> #pragma warning(0: 42) // Same as '#pragma warning(enable: 42)'
+       * >> #pragma warning(1: 42) // Same as '#pragma warning(disable: 42)'
+       * >> #pragma warning(2: 42) // Same as '#pragma warning(suppress: 42)'
+       * Both of these idea are be merged here!
+       */
+      if unlikely(!TPPLexer_Eval(&val)) return 0;
+      if (val.c_kind == TPP_CONST_INTEGRAL) {
+       /* NOTE: Technically, the old TPP allowed numbers 'x' greater than 2 to
+        *       be specified here, which would in return suppress the warning
+        *       an additional 'x-1' times.
+        *       This behavior is not supported by the new TPP!
+        */
+            if (val.c_data.c_int < 0) newstate = WSTATE_ERROR;
+       else if (val.c_data.c_int == 0) newstate = WSTATE_WARN;
+       else if (val.c_data.c_int == 1) newstate = WSTATE_DISABLE;
+       else newstate = WSTATE_SUPPRESS;
+       goto set_warning_newstate;
+      } else {
+       char *warning_text;
+       /* Very nice-looking warning directives:
+        * >> #pragma warning(push,"-Wno-syntax")
+        * >> ... // Do something ~nasty~.
+        * >> #pragma warning(pop)
+        */
+       newstate = WSTATE_ERROR;
+       warning_text = val.c_data.c_string->s_text;
+       if (*warning_text == '-') ++warning_text;
+       if (*warning_text == 'W') ++warning_text;
+       if (!memcmp(warning_text,"no-",3)) warning_text += 3,newstate = WSTATE_DISABLE;
+       wset_error = TPPLexer_SetWarnings(warning_text,newstate);
+       if (wset_error == 2) wset_error = TPPLexer_Warn(W_INVALID_WARNING,&val);
+       TPPString_Decref(val.c_data.c_string);
+       if unlikely(!wset_error) goto seterr;
+      }
+     } break;
+    }
+    if (TOK != ',') break;
+    yield_fetch();
+   }
+   if unlikely(TOK != ')') TPPLexer_Warn(W_EXPECTED_RPAREN);
+   else yield_fetch();
+   return 1;
+  } break;
+
   default:
    if (TPP_ISKEYWORD(TOK)) {
     printf("PRAGMA: %s\n",token.t_kwd->k_name);
    }
    break;
  }
- /* TODO: #pragma warning (Backwards compatibility for this one's gonna be complicated...) */
-
  return 0;
 seterr:
  TPPLexer_SetErr();

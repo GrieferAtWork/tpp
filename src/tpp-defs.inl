@@ -122,6 +122,14 @@ DEF_K(deprecated)
 DEF_K(tpp_exec)
 DEF_K(tpp_set_keyword_flags)
 
+/* Argument keywords for #pragma warning */
+DEF_K(push)
+DEF_K(pop)
+DEF_K(disable)
+DEF_K(enable)
+DEF_K(suppress)
+DEF_K(default)
+
 
 /* TPP extension macros. */
 DEF_M_IF(__TPP_EVAL,         HAS_EXTENSION(TPPLEXER_EXTENSION_TPP_EVAL))
@@ -224,7 +232,7 @@ WGROUP(WG_LIMIT,   "limit")
 /*47*/WARNING(W_EXPECTED_STRING_AFTER_PRAGMA,    (WG_SYNTAX),  WSTATE_WARN)    /*< [struct TPPConst *] OLD(TPPWarn_ExpectedStringAfterPragma). */
 /*48*/WARNING(W_UNUSED_0F,                       (WG_VALUE),   WSTATE_DISABLE) /*< OLD(TPPWarn_ExpectedRParenAfterPragma). */
 /*49*/WARNING(W_UNUSED_10,                       (WG_VALUE),   WSTATE_DISABLE) /*< OLD(TPPWarn_UnexpectedToken). */
-/*50*/WARNING(W_INVALID_WARNING,                 (WG_VALUE),   WSTATE_WARN)    /* TODO! */ /*< OLD(TPPWarn_InvalidWarning). */
+/*50*/WARNING(W_INVALID_WARNING,                 (WG_VALUE),   WSTATE_WARN)    /* TODO! */ /*< [struct TPPConst *] OLD(TPPWarn_InvalidWarning). */
 /*51*/WARNING(W_CANT_POP_WARNINGS,               (WG_VALUE),   WSTATE_WARN)    /* TODO! */ /*< OLD(TPPWarn_CantPopWarnings). */
 /*52*/WARNING(W_UNUSED_11,                       (WG_VALUE),   WSTATE_DISABLE) /*< OLD(TPPWarn_TPPLoadFileNotFound). */
 /*53*/WARNING(W_EXPECTED_STRING_AFTER_PUSHMACRO, (WG_SYNTAX),  WSTATE_WARN)    /*< [struct TPPConst *] OLD(TPPWarn_ExpectedStringAfterPushMacro). */
