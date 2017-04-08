@@ -409,6 +409,7 @@ do{ tok_t              _old_tok_id    = token.t_id;\
 #define HAVE_EXTENSION_TPP_STR_SUBSTR   (current.l_extensions&TPPLEXER_EXTENSION_TPP_STR_SUBSTR)
 #define HAVE_EXTENSION_TPP_STR_SIZE     (current.l_extensions&TPPLEXER_EXTENSION_TPP_STR_SIZE)
 #define HAVE_EXTENSION_TPP_STR_PACK     (current.l_extensions&TPPLEXER_EXTENSION_TPP_STR_PACK)
+#define HAVE_EXTENSION_DOLLAR_IS_ALPHA  (current.l_extensions&TPPLEXER_EXTENSION_DOLLAR_IS_ALPHA)
 
 
 
@@ -2699,7 +2700,6 @@ PUBLIC void TPPLexer_Quit(struct TPPLexer *__restrict self) {
    wstate = wnext;
   }
  }
-
  /* Free keywords and remaining macros. */
  destroy_keyword_map(&self->l_keywords);
  /* Clear the remainder of the #include-stack. */
@@ -2717,6 +2717,44 @@ PUBLIC void TPPLexer_Quit(struct TPPLexer *__restrict self) {
   free(self->l_syspaths.il_pathv);
  }
 }
+
+struct tpp_extension {
+ char const *e_name;
+ size_t      e_size;
+ uint64_t    e_flag;
+};
+static struct tpp_extension const tpp_extensions[] = {
+#define EXTENSION(name,flag) {name,sizeof(name)/sizeof(char)-1,flag}
+ EXTENSION("trigraphs",TPPLEXER_EXTENSION_TRIGRAPHS),
+ EXTENSION("digraphs",TPPLEXER_EXTENSION_DIGRAPHS),
+ EXTENSION("dollars-in-identifiers",TPPLEXER_EXTENSION_DOLLAR_IS_ALPHA),
+#undef EXTENSION
+ {NULL,0,0},
+};
+
+
+PUBLIC int
+TPPLexer_SetExtension(char const *__restrict name,
+                      int enabled) {
+ struct tpp_extension const *iter;
+ size_t name_size;
+ assert(TPPLexer_Current);
+ assert(name);
+ name_size = strlen(name);
+ iter = tpp_extensions;
+ while (iter->e_name) {
+  if (iter->e_size == name_size &&
+     !memcmp(iter->e_name,name,name_size*sizeof(char))) {
+   /* Found it! */
+   if (enabled) current.l_extensions |=  (iter->e_flag);
+   else         current.l_extensions &= ~(iter->e_flag);
+   return 1;
+  }
+  ++iter;
+ }
+ return 0;
+}
+
 
 PRIVATE void
 rehash_keywords(size_t newsize) {
@@ -2750,9 +2788,7 @@ TPPLexer_LookupKeyword(char const *name, size_t namelen,
                        int create_missing) {
  hash_t namehash;
  struct TPPKeyword *kwd_entry,**bucket;
-#if !TPP_CONFIG_ONELEXER
  assert(TPPLexer_Current);
-#endif
  namehash = hashof(name,namelen);
  /* Try to rehash the keyword map. */
  if (TPPKeywordMap_SHOULDHASH(&keywords)) {
@@ -2788,9 +2824,7 @@ TPPLexer_LookupKeyword(char const *name, size_t namelen,
 PUBLIC struct TPPKeyword *
 TPPLexer_LookupKeywordID(TPP(tok_t) id) {
  struct TPPKeyword **bucket_iter,**bucket_end,*iter;
-#if !TPP_CONFIG_ONELEXER
  assert(TPPLexer_Current);
-#endif
  if (!TPP_ISKEYWORD(id)) return NULL;
 #if TPP_CONFIG_ONELEXER
  /* Special case: In one-lexer mode, we can lookup builtin keywords by ID. */
@@ -2908,9 +2942,7 @@ PUBLIC int
 TPPLexer_AddIncludePath(char *path, size_t pathsize) {
  struct TPPIncludePath *iter,*end;
  char *path_copy;
-#if !TPP_CONFIG_ONELEXER
  assert(TPPLexer_Current);
-#endif
  /* Normalize & fix the given path as best as possible. */
  fix_filename(path,&pathsize);
  /* Handle special case: empty path & remove trailing slashes. */
@@ -2983,6 +3015,18 @@ TPPLexer_Define(char const *__restrict name, size_t name_size,
  if (oldfile) TPPFile_Decref(oldfile);
  return oldfile ? 2 : 1;
 err_value_string: TPPString_Decref(value_string); return 0;
+}
+PUBLIC int
+TPPLexer_Undef(char const *__restrict name, size_t name_size) {
+ struct TPPKeyword *keyword;
+ assert(TPPLexer_Current);
+ assert(name);
+ /* Lookup the keyword associated with 'name'. */
+ keyword = TPPLexer_LookupKeyword(name,name_size,0);
+ if (!keyword || !keyword->k_macro) return 0;
+ TPPFile_Decref(keyword->k_macro);
+ keyword->k_macro = NULL;
+ return 1;
 }
 
 
@@ -3217,9 +3261,7 @@ lookup_escaped_keyword(char const *name, size_t namelen,
 PUBLIC tok_t TPPLexer_YieldRaw(void) {
  struct TPPFile *file,*prev_file;
  char *iter,*end,*forward; tok_t ch;
-#if !TPP_CONFIG_ONELEXER
  assert(TPPLexer_Current);
-#endif
  if (current.l_flags&TPPLEXER_FLAG_ERROR) return TOK_ERR;
  file = token.t_file;
 again:
@@ -3469,15 +3511,21 @@ set_comment:
        *forward == '>') { ch = ']'; goto settok_forward1; } /* [:>] --> []] */
    goto settok;
 
+  case '$':
+   if (!HAVE_EXTENSION_DOLLAR_IS_ALPHA) goto settok;
   default:
    if (isalpha(ch)) {
     struct TPPKeyword *kwd_entry;
     size_t name_size = 1;
     size_t name_escapesize;
     /* keyword: scan until a non-alnum character is found. */
-    for (;;) {
+    if (HAVE_EXTENSION_DOLLAR_IS_ALPHA) for (;;) {
      while (SKIP_WRAPLF(iter,end));
      if (!isalnum(*iter)) break;
+     ++iter,++name_size;
+    } else for (;;) {
+     while (SKIP_WRAPLF(iter,end));
+     if (!isalnum(*iter) || *iter == '$') break;
      ++iter,++name_size;
     }
     /* Lookup/generate the token id of this keyword. */
@@ -3573,14 +3621,14 @@ PRIVATE int at_start_of_line(void) {
  line_begin = token.t_begin;
  /* NOTE: Due to how chunks are read from files, we can rely
   *       on the fact that nothing until to start of the current
-  *       line is part of a previous chunk, meaning we are safe
-  *       to rely on our search here to determine the
+  *       line is part of a previous chunk, meaning that we are
+  *       safe to rely on our search here to determine the
   *       at-start-of-line-ity of this token.
   */
  /* STDC allows comments here (So we must ignore slash-star comments)! */
  line_begin = skip_whitespacenolf_and_comments_rev(line_begin,file_begin);
  if (line_begin != file_begin &&
-    !islf(line_begin[-1]) && line_begin[-1] != '\0'
+    !islforzero(line_begin[-1])
      ) return 0; /* Not at the start of a line. */
  return 1;
 }
@@ -5800,9 +5848,7 @@ TPPLexer_ParseString(void) {
  struct TPPString *result,*newbuffer;
  size_t reqsize,allocsize;
  char *string_begin,*string_end;
-#if !TPP_CONFIG_ONELEXER
  assert(TPPLexer_Current);
-#endif
  assert(token.t_id == TOK_STRING);
  string_begin = token.t_begin;
  string_end = token.t_end;
@@ -6829,6 +6875,7 @@ PUBLIC int TPPLexer_Warn(int wnum, ...) {
  WARNF("): ");
  switch (wnum) {
   case W_STARSLASH_OUTSIDE_OF_COMMENT    : WARNF("'*" "/' outside of comment"); break;
+  case W_SLASHSTAR_INSIDE_OF_COMMENT     : WARNF("'/" "*' repeated inside of comment"); break;
   case W_LINE_COMMENT_CONTINUED          : WARNF("Line-comment continued"); break;
   case W_REDEFINING_MACRO                : WARNF("Redefining macro '%s'",KWDNAME()); break;
   case W_REDEFINING_BUILTIN_KEYWORD      : WARNF("Redefining builtin macro '%s'",KWDNAME()); break;

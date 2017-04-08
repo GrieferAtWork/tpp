@@ -780,8 +780,8 @@ TPP_LOCAL int TPPLexer_COLUMN(void) { struct TPPFile *f = TPPLexer_Textfile(); r
 
 /* Extension flags. */
 #define TPPLEXER_EXTENSION_NONE             0x0000000000000000ull
-#define TPPLEXER_EXTENSION_TRIGRAPHS        0x0000000000000001ull /*< [FEATURE] Recognize trigraph character sequences. */
-#define TPPLEXER_EXTENSION_DIGRAPHS         0x0000000000000002ull /*< [FEATURE] Recognize digraph character sequences. */
+#define TPPLEXER_EXTENSION_TRIGRAPHS        0x0000000000000001ull /*< [name("trigraphs")][FEATURE] Recognize trigraph character sequences. */
+#define TPPLEXER_EXTENSION_DIGRAPHS         0x0000000000000002ull /*< [name("digraphs")][FEATURE] Recognize digraph character sequences. */
 #define TPPLEXER_EXTENSION_GCC_VA_ARGS      0x0000000000000004ull /*< Recognize gcc's '#define foo(args...)' varargs syntax. */
 #define TPPLEXER_EXTENSION_GCC_VA_COMMA     0x0000000000000008ull /*< Recognize gcc's ', ## __VA_ARGS__' syntax as '__VA_COMMA__' alternative. */
 #define TPPLEXER_EXTENSION_GCC_IFELSE       0x0000000000000010ull /*< Recognize 'foo ? : 42' as alias for 'foo ? foo : 42'. */
@@ -818,7 +818,8 @@ TPP_LOCAL int TPPLexer_COLUMN(void) { struct TPPFile *f = TPPLexer_Textfile(); r
 #define TPPLEXER_EXTENSION_TPP_STR_SUBSTR   0x0000000800000000ull /*< Enable the '__TPP_STR_AT(...)' and '__TPP_STR_SUBSTR(...)' builtin macros. */
 #define TPPLEXER_EXTENSION_TPP_STR_PACK     0x0000001000000000ull /*< Enable the '__TPP_STR_PACK(...)' builtin macro. */
 #define TPPLEXER_EXTENSION_TPP_STR_SIZE     0x0000002000000000ull /*< Enable the '__TPP_STR_SIZE(...)' builtin macro. */
-#define TPPLEXER_EXTENSION_DEFAULT          0xffffffffffffffffull /*< Enable all extensions. */
+#define TPPLEXER_EXTENSION_DOLLAR_IS_ALPHA  0x0000004000000000ull /*< [name("dollars-in-identifiers")] Interpret '$' as an alphabetical character. */
+#define TPPLEXER_EXTENSION_DEFAULT          0xfffffffffffffffeull /*< Enable (almost) all extensions. */
 
 struct TPPLexer {
  struct TPPToken       l_token;      /*< The current token. */
@@ -857,6 +858,14 @@ TPPFUN struct TPPLexer *TPPLexer_Current;
 // @return: 0: Not enough available memory to setup builtin keywords.
 TPPFUN int  TPPLexer_Init(struct TPPLexer *__restrict self);
 TPPFUN void TPPLexer_Quit(struct TPPLexer *__restrict self);
+
+//////////////////////////////////////////////////////////////////////////
+// Set the state of a given extension 'name'.
+// Extension names attempt to follow gcc names of the same extension.
+// The name of an extension can be found above.
+// @return: 0: Unknown extension.
+// @return: 1: Successfully configured the given extension.
+TPPFUN int TPPLexer_SetExtension(char const *__restrict name, int enabled);
 
 //////////////////////////////////////////////////////////////////////////
 // Searches the cache and opens a new file if not found.
@@ -914,6 +923,12 @@ TPPFUN int TPPLexer_AddIncludePath(char *path, size_t pathsize);
 // @return: 2: A macro named 'name' was already defined, and was overwritten.
 TPPFUN int TPPLexer_Define(char const *__restrict name, size_t name_size,
                            char const *__restrict value, size_t value_size);
+
+//////////////////////////////////////////////////////////////////////////
+// Undefine the macro associated with a given name.
+// @return: 0: No macro was associated with the given name.
+// @return: 1: Successfully undefined a macro.
+TPPFUN int TPPLexer_Undef(char const *__restrict name, size_t name_size);
 
 //////////////////////////////////////////////////////////////////////////
 // Similar to 'TPPLexer_Yield' and used to implement it, but

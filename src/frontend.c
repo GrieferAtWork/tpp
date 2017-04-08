@@ -199,12 +199,13 @@ void usage(char *appname) {
                 "\t" "--pp                        Enable preprocess-mode, which emits all tokens separated by '\\0'-bytes.\n"
                 "\t" "-f[no-]spc                  Configure emission of SPACE tokens (Default: on).\n"
                 "\t" "-f[no-]lf                   Configure emission of LF tokens (Default: on).\n"
-                "\t" "-f[no-]line                 Configure emission of #line adjustment directives (Default: on).\n"
                 "\t" "-f[no-]comments             Configure emission of COMMENT tokens (Default: off).\n"
                 "\t" "-f[no-]magiclf              Enable/Disable magic linefeeds sometimes used in place of #line (Default: off).\n"
                 "\t" "-f[no-]longstring           Enable/Disable string continuation between lines (Default: off).\n"
                 "\t" "                            Enabling this option also disabled SPACE and LF tokens, though\n"
                 "\t" "                            they can be re-enabled using the -spc and -lf switches.\n"
+                "\t" "-P                          Disable emission of #line adjustment directives (Default: on).\n"
+                "\t" "-trigraphs                  Enable recognition of trigraph character sequences.\n"
                 "\t" "-i <text>                   Preprocess the remained of the commandline\n"
                 "\t" "-Idir                       Adds 'dir' to the list of #include <...> paths\n"
                 "\t" "-Dsym[=val=1]               Defines 'sym' as 'val'\n"
@@ -316,14 +317,14 @@ int main(int argc, char *argv[]) {
   else if (!strcmp(arg,"fno-spc")) TPPLexer_Current->l_flags &= ~(TPPLEXER_FLAG_WANTSPACE);
   else if (!strcmp(arg,"flf")) TPPLexer_Current->l_flags |= TPPLEXER_FLAG_WANTLF;
   else if (!strcmp(arg,"fno-lf")) TPPLexer_Current->l_flags &= ~(TPPLEXER_FLAG_WANTLF);
-  else if (!strcmp(arg,"fline")) no_line_directives = 0;
-  else if (!strcmp(arg,"fno-line")) no_line_directives = 1;
   else if (!strcmp(arg,"fcomments")) TPPLexer_Current->l_flags |= TPPLEXER_FLAG_WANTCOMMENTS;
   else if (!strcmp(arg,"fno-comments")) TPPLexer_Current->l_flags &= ~(TPPLEXER_FLAG_WANTCOMMENTS);
   else if (!strcmp(arg,"fmagiclf")) no_magic_tokens = 0;
   else if (!strcmp(arg,"fno-magiclf")) no_magic_tokens = 1;
   else if (!strcmp(arg,"flongstring")) TPPLexer_Current->l_flags &= ~(TPPLEXER_FLAG_TERMINATE_STRING_LF);
   else if (!strcmp(arg,"fno-longstring")) TPPLexer_Current->l_flags |= TPPLEXER_FLAG_TERMINATE_STRING_LF;
+  else if (!strcmp(arg,"trigraphs")) TPPLexer_Current->l_flags |= TPPLEXER_EXTENSION_TRIGRAPHS;
+  else if (!strcmp(arg,"P")) no_line_directives = 0;
   else if (!strcmp(arg,"o")) argc > 1 ? (output_filename = argv[1],++argv,--argc) : 0;
   else if (!strcmp(arg,"-name")) argc > 1 ? (firstname = argv[1],++argv,--argc) : 0;
   else if (!strcmp(arg,"-message-format=gcc")) TPPLexer_Current->l_flags &= ~(TPPLEXER_FLAG_MSVC_MESSAGEFORMAT);
@@ -341,18 +342,27 @@ int main(int argc, char *argv[]) {
    TPPLexer_Current->l_flags &= ~(TPPLEXER_FLAG_WANTSPACE|
                                   TPPLEXER_FLAG_WANTLF),
    outline_tokens = OUTLINE_MODE_ZERO;
-  else if (*arg == 'I') { if (!*arg++ && argc > 1) arg = argv[1],++argv,--argc;
+  else if (*arg == 'I') { if (!*++arg && argc > 1) arg = argv[1],++argv,--argc;
                           if (!TPPLexer_AddIncludePath(arg,strlen(arg))) _exit(1); }
   else if (*arg == 'D') { char *val;
-                          if (!*arg++ && argc > 1) arg = argv[1],++argv,--argc;
+                          if (!*++arg && argc > 1) arg = argv[1],++argv,--argc;
                           val = strchr(arg,'=');
                           if (val) *val++ = '\0'; else val = "1";
                           if (!TPPLexer_Define(arg,strlen(arg),val,strlen(val))) _exit(1); }
+  else if (*arg == 'U') { if (!*++arg && argc > 1) arg = argv[1],++argv,--argc;
+                          TPPLexer_Undef(arg,strlen(arg)); }
+  else if (*arg == 'f') { int enable = 1; ++arg; /* Set an extension. */
+                          if (!memcmp(arg,"no-",3)) arg += 3,enable = 0;
+                          if (!TPPLexer_SetExtension(arg,enable)) goto noopt; }
+  else if (*arg == 'W') { wstate_t state = WSTATE_ERROR; ++arg; /* Set an extension. */
+                          if (!memcmp(arg,"no-",3)) arg += 3,state = WSTATE_DISABLE;
+                          if (!TPPLexer_SetWarnings(arg,state)) goto noopt; }
 #if 1 /* Backwards-compatibility with old TPP */
   else if (!strcmp(arg,"no-line")) no_line_directives = 1;
   else if (!strcmp(arg,"tok")) outline_tokens = OUTLINE_MODE_TOK;
 #endif
   else {
+noopt:
    fprintf(stderr,
            "Unknown option: \"%s\"\n"
            "See '%s --help' for more help\n",
