@@ -4152,9 +4152,8 @@ create_int_file:
     } else {
      ++token.t_file->f_pos; /* Skip the ')' character. */
     }
-    /* Strip whitespace and comments from both ends. */
-    keyword_begin = skip_whitespace_and_comments(keyword_begin,keyword_end);
-    keyword_end = skip_whitespace_and_comments_rev(keyword_end,keyword_begin);
+    /* Whitespace and comments have been stripped from both ends, and
+     * we can be sure that the keyword only contains alnum characters. */
     assert(keyword_begin <= keyword_end);
     keyword_rawsize = (size_t)(keyword_end-keyword_begin);
     keyword_realsize = wraplf_memlen(keyword_begin,keyword_rawsize);
@@ -4168,7 +4167,7 @@ create_int_file:
     }
     /* Handle case: Unknown/unused keyword. */
     if (!keyword) {
-     if (create_missing_keyword) goto seterr;
+     if unlikely(create_missing_keyword) goto seterr;
      intval = 0;
     } else switch (mode) {
    //case KWD___is_identifier:
