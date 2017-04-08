@@ -102,6 +102,9 @@
 #include <Windows.h>
 #define stream_close(fd) CloseHandle(fd)
 #else
+#if defined(__CYGWIN__) || defined(__MINGW32__)
+#include <Windows.h>
+#endif
 #include <endian.h>
 #include <fcntl.h>
 #include <unistd.h>
@@ -195,6 +198,11 @@ extern void __debugbreak(void);
 
 #define ceildiv(x,y) (((x)+((y)-1))/(y))
 
+#undef isalpha
+#undef isdigit
+#undef isalnum
+#undef isspace
+#undef isprint
 #define isalpha(ch)         (chrattr[ch]&CH_ISALPHA)
 #define isdigit(ch)         (chrattr[ch]&CH_ISDIGIT)
 #define isalnum(ch)         (chrattr[ch]&(CH_ISALPHA|CH_ISDIGIT))
