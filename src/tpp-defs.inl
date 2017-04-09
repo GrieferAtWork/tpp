@@ -66,6 +66,8 @@ DEF_K(error)
 DEF_K(warning)
 DEF_K(ident)
 DEF_K(sccs)
+DEF_K(assert)
+DEF_K(unassert)
 
 /* Various names for #pragma-directives (TPP supports everything) */
 DEF_K(pragma)
@@ -226,8 +228,8 @@ WGROUP(WG_DIRECTIVE,           "directive",           WSTATE_ERROR)
 /*33*/WARNING(W_ENDIF_WITHOUT_IF,                (WG_SYNTAX),  WSTATE_WARN)    /*< OLD(TPPWarn_EndifWithoutIfdef). */
 /*34*/WARNING(W_UNUSED_09,                       (WG_VALUE),   WSTATE_DISABLE) /*< OLD(TPPWarn_ExpectedIntAfterLine). */
 /*35*/WARNING(W_EXPECTED_STRING_AFTER_LINE,      (WG_VALUE),   WSTATE_WARN)    /*< [struct TPPConst *] OLD(TPPWarn_ExpectedStringAfterLine). */
-/*36*/WARNING(W_MACRO_NOT_DEFINED,               (WG_SYNTAX),  WSTATE_DISABLE) /*< [struct TPPKeyword *] OLD(TPPWarn_MacroDoesntExist). */
-/*37*/WARNING(W_CANT_UNDEF_BUILTIN_MACRO,        (WG_SYNTAX),  WSTATE_WARN)    /*< [struct TPPKeyword *] OLD(TPPWarn_CantUndefBuiltinMacro). */
+/*36*/WARNING(W_MACRO_NOT_DEFINED,               (WG_VALUE),   WSTATE_DISABLE) /*< [struct TPPKeyword *] OLD(TPPWarn_MacroDoesntExist). */
+/*37*/WARNING(W_CANT_UNDEF_BUILTIN_MACRO,        (WG_VALUE),   WSTATE_WARN)    /*< [struct TPPKeyword *] OLD(TPPWarn_CantUndefBuiltinMacro). */
 /*38*/WARNING(W_UNUSED_0A,                       (WG_VALUE),   WSTATE_DISABLE) /*< OLD(TPPWarn_ExpectedLParenAfterHasInclude). */
 /*39*/WARNING(W_UNUSED_0B,                       (WG_VALUE),   WSTATE_DISABLE) /*< OLD(TPPWarn_ExpectedRParenAfterHasInclude). */
 /*40*/WARNING(W_EXPECTED_COLLON_AFTER_QUESTION,  (WG_SYNTAX),  WSTATE_WARN)    /*< OLD(TPPWarn_ExpectedCollonAfterQuestion). */
@@ -293,6 +295,11 @@ WARNING(W_INCLUDE_RECURSION_LIMIT_EXCEEDED,(WG_LIMIT),   WSTATE_WARN)    /*< [st
 WARNING(W_UNKNOWN_EXTENSION,               (WG_VALUE),   WSTATE_WARN)    /*< [struct TPPConst *]. */
 WARNING(W_DEFINED_IN_MACRO_BODY,           (WG_EXPANSION_TO_DEFINED),WSTATE_WARN)
 WARNING(W_IDENT_SCCS_IGNORED,              (WG_DIRECTIVE),WSTATE_WARN)   /*< [struct TPPConst *]. */
+WARNING(W_EXPECTED_KEYWORD_AFTER_ASSERT,   (WG_DIRECTIVE),WSTATE_WARN)   /*< . */
+WARNING(W_EXPECTED_KEYWORD_AFTER_PREDICATE,(WG_DIRECTIVE),WSTATE_WARN)   /*< [struct TPPKeyword *]. */
+WARNING(W_EXPECTED_KEYWORD_AFTER_EXPR_HASH,(WG_DIRECTIVE),WSTATE_WARN)   /*< . */
+WARNING(W_EXPECTED_KEYWORD_AFTER_EXPR_PRED,(WG_DIRECTIVE),WSTATE_WARN)   /*< . */
+WARNING(W_UNKNOWN_ASSERTION,               (WG_VALUE),   WSTATE_DISABLE) /*< [struct TPPKeyword *,struct TPPKeyword *]. */
 
 #ifdef TPP_DEFS_DEFINES_BUILTIN_MACRO
 #undef TPP_DEFS_DEFINES_BUILTIN_MACRO

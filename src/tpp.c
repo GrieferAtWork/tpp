@@ -371,45 +371,47 @@ do{ tok_t              _old_tok_id    = token.t_id;\
 
 
 /* Active feature configurations. */
-#define HAVE_FEATURE_TRIGRAPHS          (current.l_extensions&TPPLEXER_EXTENSION_TRIGRAPHS)
-#define HAVE_FEATURE_DIGRAPHS           (current.l_extensions&TPPLEXER_EXTENSION_DIGRAPHS)
-#define HAVE_EXTENSION_GCC_VA_ARG       (current.l_extensions&TPPLEXER_EXTENSION_GCC_VA_ARGS)
-#define HAVE_EXTENSION_GCC_VA_COMMA     (current.l_extensions&TPPLEXER_EXTENSION_GCC_VA_COMMA)
-#define HAVE_EXTENSION_GCC_IFELSE       (current.l_extensions&TPPLEXER_EXTENSION_GCC_IFELSE)
-#define HAVE_EXTENSION_VA_COMMA         (current.l_extensions&TPPLEXER_EXTENSION_VA_COMMA)
-#define HAVE_EXTENSION_VA_NARGS         (current.l_extensions&TPPLEXER_EXTENSION_VA_NARGS)
-#define HAVE_EXTENSION_STR_E            (current.l_extensions&TPPLEXER_EXTENSION_STR_E)
-#define HAVE_EXTENSION_ALTMAC           (current.l_extensions&TPPLEXER_EXTENSION_ALTMAC)
-#define HAVE_EXTENSION_RECMAC           (current.l_extensions&TPPLEXER_EXTENSION_RECMAC)
-#define HAVE_EXTENSION_BININTEGRAL      (current.l_extensions&TPPLEXER_EXTENSION_BININTEGRAL)
-#define HAVE_EXTENSION_MSVC_PRAGMA      (current.l_extensions&TPPLEXER_EXTENSION_MSVC_PRAGMA)
-#define HAVE_EXTENSION_STRINGOPS        (current.l_extensions&TPPLEXER_EXTENSION_STRINGOPS)
-#define HAVE_EXTENSION_BASEFILE         (current.l_extensions&TPPLEXER_EXTENSION_BASEFILE)
-#define HAVE_EXTENSION_HASH_AT          (current.l_extensions&TPPLEXER_EXTENSION_HASH_AT)
-#define HAVE_EXTENSION_HASH_XCLAIM      (current.l_extensions&TPPLEXER_EXTENSION_HASH_XCLAIM)
-#define HAVE_EXTENSION_WARNING          (current.l_extensions&TPPLEXER_EXTENSION_WARNING)
-#define HAVE_EXTENSION_SHEBANG          (current.l_extensions&TPPLEXER_EXTENSION_SHEBANG)
-#define HAVE_EXTENSION_INCLUDE_NEXT     (current.l_extensions&TPPLEXER_EXTENSION_INCLUDE_NEXT)
-#define HAVE_EXTENSION_IMPORT           (current.l_extensions&TPPLEXER_EXTENSION_IMPORT)
-#define HAVE_EXTENSION_INCLUDE_LEVEL    (current.l_extensions&TPPLEXER_EXTENSION_INCLUDE_LEVEL)
-#define HAVE_EXTENSION_COUNTER          (current.l_extensions&TPPLEXER_EXTENSION_COUNTER)
-#define HAVE_EXTENSION_CLANG_FEATURES   (current.l_extensions&TPPLEXER_EXTENSION_CLANG_FEATURES)
-#define HAVE_EXTENSION_HAS_INCLUDE      (current.l_extensions&TPPLEXER_EXTENSION_HAS_INCLUDE)
-#define HAVE_EXTENSION_LXOR             (current.l_extensions&TPPLEXER_EXTENSION_LXOR)
-#define HAVE_EXTENSION_MULTICHAR_CONST  (current.l_extensions&TPPLEXER_EXTENSION_MULTICHAR_CONST)
-#define HAVE_EXTENSION_DATEUTILS        (current.l_extensions&TPPLEXER_EXTENSION_DATEUTILS)
-#define HAVE_EXTENSION_TIMEUTILS        (current.l_extensions&TPPLEXER_EXTENSION_TIMEUTILS)
-#define HAVE_EXTENSION_TIMESTAMP        (current.l_extensions&TPPLEXER_EXTENSION_TIMESTAMP)
-#define HAVE_EXTENSION_TPP_EVAL         (current.l_extensions&TPPLEXER_EXTENSION_TPP_EVAL)
-#define HAVE_EXTENSION_TPP_UNIQUE       (current.l_extensions&TPPLEXER_EXTENSION_TPP_UNIQUE)
-#define HAVE_EXTENSION_TPP_LOAD_FILE    (current.l_extensions&TPPLEXER_EXTENSION_TPP_LOAD_FILE)
-#define HAVE_EXTENSION_TPP_COUNTER      (current.l_extensions&TPPLEXER_EXTENSION_TPP_COUNTER)
-#define HAVE_EXTENSION_TPP_RANDOM       (current.l_extensions&TPPLEXER_EXTENSION_TPP_RANDOM)
+#define HAVE_FEATURE_TRIGRAPHS           (current.l_extensions&TPPLEXER_EXTENSION_TRIGRAPHS)
+#define HAVE_FEATURE_DIGRAPHS            (current.l_extensions&TPPLEXER_EXTENSION_DIGRAPHS)
+#define HAVE_EXTENSION_GCC_VA_ARG        (current.l_extensions&TPPLEXER_EXTENSION_GCC_VA_ARGS)
+#define HAVE_EXTENSION_GCC_VA_COMMA      (current.l_extensions&TPPLEXER_EXTENSION_GCC_VA_COMMA)
+#define HAVE_EXTENSION_GCC_IFELSE        (current.l_extensions&TPPLEXER_EXTENSION_GCC_IFELSE)
+#define HAVE_EXTENSION_VA_COMMA          (current.l_extensions&TPPLEXER_EXTENSION_VA_COMMA)
+#define HAVE_EXTENSION_VA_NARGS          (current.l_extensions&TPPLEXER_EXTENSION_VA_NARGS)
+#define HAVE_EXTENSION_STR_E             (current.l_extensions&TPPLEXER_EXTENSION_STR_E)
+#define HAVE_EXTENSION_ALTMAC            (current.l_extensions&TPPLEXER_EXTENSION_ALTMAC)
+#define HAVE_EXTENSION_RECMAC            (current.l_extensions&TPPLEXER_EXTENSION_RECMAC)
+#define HAVE_EXTENSION_BININTEGRAL       (current.l_extensions&TPPLEXER_EXTENSION_BININTEGRAL)
+#define HAVE_EXTENSION_MSVC_PRAGMA       (current.l_extensions&TPPLEXER_EXTENSION_MSVC_PRAGMA)
+#define HAVE_EXTENSION_STRINGOPS         (current.l_extensions&TPPLEXER_EXTENSION_STRINGOPS)
+#define HAVE_EXTENSION_BASEFILE          (current.l_extensions&TPPLEXER_EXTENSION_BASEFILE)
+#define HAVE_EXTENSION_HASH_AT           (current.l_extensions&TPPLEXER_EXTENSION_HASH_AT)
+#define HAVE_EXTENSION_HASH_XCLAIM       (current.l_extensions&TPPLEXER_EXTENSION_HASH_XCLAIM)
+#define HAVE_EXTENSION_WARNING           (current.l_extensions&TPPLEXER_EXTENSION_WARNING)
+#define HAVE_EXTENSION_SHEBANG           (current.l_extensions&TPPLEXER_EXTENSION_SHEBANG)
+#define HAVE_EXTENSION_INCLUDE_NEXT      (current.l_extensions&TPPLEXER_EXTENSION_INCLUDE_NEXT)
+#define HAVE_EXTENSION_IMPORT            (current.l_extensions&TPPLEXER_EXTENSION_IMPORT)
+#define HAVE_EXTENSION_INCLUDE_LEVEL     (current.l_extensions&TPPLEXER_EXTENSION_INCLUDE_LEVEL)
+#define HAVE_EXTENSION_COUNTER           (current.l_extensions&TPPLEXER_EXTENSION_COUNTER)
+#define HAVE_EXTENSION_CLANG_FEATURES    (current.l_extensions&TPPLEXER_EXTENSION_CLANG_FEATURES)
+#define HAVE_EXTENSION_HAS_INCLUDE       (current.l_extensions&TPPLEXER_EXTENSION_HAS_INCLUDE)
+#define HAVE_EXTENSION_LXOR              (current.l_extensions&TPPLEXER_EXTENSION_LXOR)
+#define HAVE_EXTENSION_MULTICHAR_CONST   (current.l_extensions&TPPLEXER_EXTENSION_MULTICHAR_CONST)
+#define HAVE_EXTENSION_DATEUTILS         (current.l_extensions&TPPLEXER_EXTENSION_DATEUTILS)
+#define HAVE_EXTENSION_TIMEUTILS         (current.l_extensions&TPPLEXER_EXTENSION_TIMEUTILS)
+#define HAVE_EXTENSION_TIMESTAMP         (current.l_extensions&TPPLEXER_EXTENSION_TIMESTAMP)
+#define HAVE_EXTENSION_TPP_EVAL          (current.l_extensions&TPPLEXER_EXTENSION_TPP_EVAL)
+#define HAVE_EXTENSION_TPP_UNIQUE        (current.l_extensions&TPPLEXER_EXTENSION_TPP_UNIQUE)
+#define HAVE_EXTENSION_TPP_LOAD_FILE     (current.l_extensions&TPPLEXER_EXTENSION_TPP_LOAD_FILE)
+#define HAVE_EXTENSION_TPP_COUNTER       (current.l_extensions&TPPLEXER_EXTENSION_TPP_COUNTER)
+#define HAVE_EXTENSION_TPP_RANDOM        (current.l_extensions&TPPLEXER_EXTENSION_TPP_RANDOM)
 #define HAVE_EXTENSION_TPP_STR_DECOMPILE (current.l_extensions&TPPLEXER_EXTENSION_TPP_STR_DECOMPILE)
-#define HAVE_EXTENSION_TPP_STR_SUBSTR   (current.l_extensions&TPPLEXER_EXTENSION_TPP_STR_SUBSTR)
-#define HAVE_EXTENSION_TPP_STR_SIZE     (current.l_extensions&TPPLEXER_EXTENSION_TPP_STR_SIZE)
-#define HAVE_EXTENSION_TPP_STR_PACK     (current.l_extensions&TPPLEXER_EXTENSION_TPP_STR_PACK)
-#define HAVE_EXTENSION_DOLLAR_IS_ALPHA  (current.l_extensions&TPPLEXER_EXTENSION_DOLLAR_IS_ALPHA)
+#define HAVE_EXTENSION_TPP_STR_SUBSTR    (current.l_extensions&TPPLEXER_EXTENSION_TPP_STR_SUBSTR)
+#define HAVE_EXTENSION_TPP_STR_SIZE      (current.l_extensions&TPPLEXER_EXTENSION_TPP_STR_SIZE)
+#define HAVE_EXTENSION_TPP_STR_PACK      (current.l_extensions&TPPLEXER_EXTENSION_TPP_STR_PACK)
+#define HAVE_EXTENSION_DOLLAR_IS_ALPHA   (current.l_extensions&TPPLEXER_EXTENSION_DOLLAR_IS_ALPHA)
+#define HAVE_EXTENSION_IDENT_SCCS        (current.l_extensions&TPPLEXER_EXTENSION_IDENT_SCCS)
+#define HAVE_EXTENSION_ASSERTIONS        (current.l_extensions&TPPLEXER_EXTENSION_ASSERTIONS)
 
 
 
@@ -1411,6 +1413,11 @@ search_suitable_end_again:
          if (ch == '\\' && iter != end) ++iter;
     else if (ch == '\'' && !(mode&~(MODE_INCHAR))) mode ^= MODE_INCHAR;
     else if (ch == '\"' && !(mode&~(MODE_INSTRING))) mode ^= MODE_INSTRING;
+    /* TODO: Linefeeds should also terminate strings when the line started with a '#':
+     *    >> #define m  This macro's fine!
+     *    >> #error This error contains an unmatched ", but that's file (< and so was that)
+     * NOTE: Though remember that escaped linefeeds are always more powerful!
+     */
     else if (termstring_onlf && islf(ch)) mode &= ~(MODE_INCHAR|MODE_INSTRING);
     else if (iter != end) {
      if (mode&MODE_INCOMMENT) {
@@ -2255,7 +2262,122 @@ set_macro:
  assert(!macro || !macro->f_macro.m_pushcount);
 }
 
+PRIVATE void
+rare_rehash_asserts(struct TPPRareKeyword *self, size_t newsize) {
+ struct TPPAssertion **newvec,*iter,*next,**bucket;
+ struct TPPAssertion **bucket_iter,**bucket_end;
+ assert(newsize);
+ assert(newsize > self->kr_asserts.as_assa);
+ assert((self->kr_asserts.as_assa != 0) ==
+        (self->kr_asserts.as_assv != NULL));
+ newvec = (struct TPPAssertion **)calloc(newsize,sizeof(struct TPPAssertion *));
+ if unlikely(!newvec) return; /* Ignore errors here. */
+ bucket_end = (bucket_iter = self->kr_asserts.as_assv)+
+                             self->kr_asserts.as_assa;
+ for (; bucket_iter != bucket_end; ++bucket_iter) {
+  iter = *bucket_iter;
+  while (iter) {
+   /* Transfer all assertion entries into the new bucket vector. */
+   assert(iter->as_kwd);
+   next = iter->as_next;
+   bucket = &newvec[iter->as_kwd->k_hash % newsize];
+   iter->as_next = *bucket;
+   *bucket = iter;
+   iter = next;
+  }
+ }
+ free(self->kr_asserts.as_assv);
+ self->kr_asserts.as_assa = newsize;
+ self->kr_asserts.as_assv = newvec;
+}
 
+PRIVATE int
+keyword_addassert(struct TPPKeyword *__restrict self,
+                  struct TPPKeyword *__restrict assertion) {
+ struct TPPRareKeyword *rare;
+ struct TPPAssertion **bucket,*slot;
+ assert(self),assert(assertion);
+ if unlikely(!TPPKeyword_MAKERARE(self)) return 0;
+ rare = self->k_rare,assert(rare);
+ if (rare->kr_asserts.as_assa) {
+  slot = rare->kr_asserts.as_assv[assertion->k_hash % rare->kr_asserts.as_assa];
+  while (slot) { if (slot->as_kwd == assertion) return 2; slot = slot->as_next; }
+ }
+ if (rare->kr_asserts.as_assc >= rare->kr_asserts.as_assa*2) {
+  size_t newsize = rare->kr_asserts.as_assa;
+  if ((newsize *= 2) == 0) newsize = 2;
+  rare_rehash_asserts(rare,newsize);
+  assert((rare->kr_asserts.as_assa != 0) ==
+         (rare->kr_asserts.as_assv != NULL));
+  /* Make sure that we didn't fail the first rehash. */
+  if unlikely(!rare->kr_asserts.as_assa) return 0;
+ }
+ /* Must allocate a new slot. */
+ slot = (struct TPPAssertion *)malloc(sizeof(struct TPPAssertion));
+ if unlikely(!slot) return 0;
+ bucket        = &rare->kr_asserts.as_assv[assertion->k_hash % rare->kr_asserts.as_assa];
+ slot->as_next = *bucket;
+ slot->as_kwd  = assertion;
+ *bucket       = slot;
+ ++rare->kr_asserts.as_assc;
+ return 1;
+}
+PRIVATE int
+keyword_delassert(struct TPPKeyword *__restrict self,
+                  struct TPPKeyword *__restrict assertion) {
+ struct TPPRareKeyword *rare;
+ struct TPPAssertion **pelem,*elem;
+ assert(self),assert(assertion);
+ if unlikely((rare = self->k_rare) == NULL ||
+             !rare->kr_asserts.as_assa ||
+             !rare->kr_asserts.as_assc) return 0;
+ pelem = &rare->kr_asserts.as_assv[assertion->k_hash % rare->kr_asserts.as_assa];
+ while ((elem = *pelem) != NULL) {
+  if (elem->as_kwd == assertion) {
+   --rare->kr_asserts.as_assc;
+   *pelem = elem->as_next;
+   free(elem);
+   return 1;
+  }
+  pelem = &elem->as_next;
+ }
+ return 0;
+}
+PRIVATE int
+keyword_hasassert(struct TPPKeyword *__restrict self,
+                  struct TPPKeyword *__restrict assertion) {
+ struct TPPRareKeyword *rare;
+ struct TPPAssertion *elem;
+ assert(self),assert(assertion);
+ if unlikely((rare = self->k_rare) == NULL ||
+             !rare->kr_asserts.as_assa ||
+             !rare->kr_asserts.as_assc) return 0;
+ elem = rare->kr_asserts.as_assv[assertion->k_hash % rare->kr_asserts.as_assa];
+ while (elem) { if (elem->as_kwd == assertion) return 1; elem = elem->as_next; }
+ return 0;
+}
+PRIVATE void
+keyword_clrassert(struct TPPKeyword *__restrict self) {
+ struct TPPRareKeyword *rare;
+ struct TPPAssertion **bucket_iter,**bucket_end,*iter,*next;
+ assert(self);
+ if unlikely((rare = self->k_rare) == NULL) return;
+ bucket_end = (bucket_iter = rare->kr_asserts.as_assv)+
+                             rare->kr_asserts.as_assa;
+ for (; bucket_iter != bucket_end; ++bucket_iter) {
+  iter = *bucket_iter;
+  while (iter) {
+   next = iter->as_next;
+   assert(iter->as_kwd);
+   free(iter);
+   iter = next;
+  }
+ }
+ free(rare->kr_asserts.as_assv);
+ rare->kr_asserts.as_assc = 0;
+ rare->kr_asserts.as_assa = 0;
+ rare->kr_asserts.as_assv = NULL;
+}
 
 
 
@@ -2326,19 +2448,20 @@ destroy_keyword_map(struct TPPKeywordMap *__restrict self) {
      TPPFile_Decref(fileiter);
      fileiter = filenext;
     }
-    assert((rare->kr_asserts.as_assertions != NULL) ==
-           (rare->kr_asserts.as_alloc != 0));
-    ass_end = (ass_iter = rare->kr_asserts.as_assertions)+
-                          rare->kr_asserts.as_alloc;
+    assert((rare->kr_asserts.as_assv != NULL) ==
+           (rare->kr_asserts.as_assa != 0));
+    ass_end = (ass_iter = rare->kr_asserts.as_assv)+
+                          rare->kr_asserts.as_assa;
     for (; ass_iter != ass_end; ++ass_iter) {
      aiter = *ass_iter;
      while (aiter) {
       anext = aiter->as_next;
+      assert(aiter->as_kwd);
       free(aiter);
       aiter = anext;
      }
     }
-    free(rare->kr_asserts.as_assertions);
+    free(rare->kr_asserts.as_assv);
     free(rare);
    }
 #if TPP_CONFIG_ONELEXER
@@ -3500,7 +3623,18 @@ set_comment:
    if (*forward == '=') { ch = TOK_MOD_EQUAL; goto settok_forward1; }
    if (HAVE_FEATURE_DIGRAPHS) {
     if (*forward == '>') { ch = '}'; goto settok_forward1; } /* [%>] --> [}] */
-    if (*forward == ':') { ch = '#'; goto settok_forward1; } /* [%:] --> [#] */
+    if (*forward == ':') {
+     iter = ++forward;
+     while (SKIP_WRAPLF(forward,end));
+     if (*forward == '#') { glue_tok: /* %:# --> ## */ ch = TOK_GLUE; goto settok; }
+     if (*forward == '%') {
+      ++forward; /* %:%: --> ## */
+      while (SKIP_WRAPLF(forward,end));
+      if (*forward == ':') goto glue_tok;
+     }
+     ch = '#'; /* [%:] --> [#] */
+     goto settok;
+    }
    }
    goto settok;
 
@@ -3714,14 +3848,28 @@ PRIVATE struct TPPIfdefStackSlot *alloc_ifdef(int mode) {
 
 PRIVATE int do_skip_pp_block(void) {
  unsigned int recursion = 1;
+ uint32_t oldflags = current.l_flags;
  for (;;) {
   if (TOK != '#' || !at_start_of_line()) {
    if (TPPLexer_YieldRaw() <= 0) return 0;
   } else {
+   /* NOTE: Must enable string-terminate-on-lf until the end of this line.
+    *    >> Otherwise, we might get incorrect syntax because this line may
+    *       contain an incomplete string ("#error a'b" is complete)
+    */
+   current.l_flags = oldflags|(TPPLEXER_FLAG_TERMINATE_STRING_LF|
+                               TPPLEXER_FLAG_WANTLF);
    TPPLexer_YieldRaw();
-   if (TOK == KWD_ifdef || TOK == KWD_ifndef || TOK == KWD_if) ++recursion;
-   else if (TOK == KWD_endif) { if (!--recursion) return 1; }
-   else if ((TOK == KWD_elif || TOK == KWD_else) && recursion == 1) return 1;
+   switch (TOK) {
+    case KWD_ifdef: case KWD_ifndef: case KWD_if: ++recursion; break;
+    case KWD_endif: if (!--recursion) return 1; break;
+    case KWD_elif: case KWD_else: if (recursion == 1) return 1; break;
+    default: break;
+   }
+   /* Scan until the end of the line. */
+   while (TOK > 0 && TOK != '\n') TPPLexer_YieldRaw();
+   current.l_flags = oldflags;
+   TPPLexer_YieldRaw();
   }
  }
 }
@@ -4128,7 +4276,7 @@ skip_block_and_parse:
    } break;
 
 #define TPPLEXER_OPENFILE_MODE_IMPORT   8
-   {
+   { /* Include a file. */
     int mode; struct TPPKeyword *kwd_entry;
     struct TPPFile *curfile,*include_file,*final_file;
     char *include_begin,*include_end,*end_of_line;
@@ -4187,11 +4335,55 @@ skip_block_and_parse:
     pushfile_inherited(final_file);
    } break;
 
+   { /* Define/delete an assertion. */
+    struct TPPKeyword *assertion_kwd;
+    tok_t mode;
+   case KWD_assert:
+   case KWD_unassert:
+    if (!HAVE_EXTENSION_ASSERTIONS) goto default_directive;
+    mode = TOK;
+    TPPLexer_YieldRaw();
+    if likely(TPP_ISKEYWORD(TOK)) {
+     assertion_kwd = token.t_kwd;
+     TPPLexer_YieldRaw();
+    } else {
+     TPPLexer_Warn(W_EXPECTED_KEYWORD_AFTER_ASSERT);
+     assertion_kwd = NULL;
+    }
+    if (TOK != '(') {
+     if (mode == KWD_unassert) {
+      /* '#unassert foobar' is allowed to clear assertions for 'foobar' */
+      keyword_clrassert(assertion_kwd);
+      goto def_skip_until_lf;
+     }
+     TPPLexer_Warn(W_EXPECTED_LPAREN);
+    } else TPPLexer_YieldRaw();
+    if likely(TPP_ISKEYWORD(TOK)) {
+     if (assertion_kwd) {
+      if (mode == KWD_assert) {
+       if unlikely(!keyword_addassert(assertion_kwd,token.t_kwd)) goto seterr;
+      } else {
+       assert(mode == KWD_unassert);
+       if unlikely(!keyword_delassert(assertion_kwd,token.t_kwd) &&
+                   !TPPLexer_Warn(W_UNKNOWN_ASSERTION,assertion_kwd,token.t_kwd)) goto err;
+      }
+     }
+     TPPLexer_YieldRaw();
+    } else if (assertion_kwd) {
+     TPPLexer_Warn(W_EXPECTED_KEYWORD_AFTER_PREDICATE,assertion_kwd);
+    }
+    if (TOK != ')') TPPLexer_Warn(W_EXPECTED_LPAREN);
+    else TPPLexer_YieldRaw();
+    goto def_skip_until_lf;
+   } break;
+
+
    { /* I still don't fully understand _why_.
       * >> https://gcc.gnu.org/onlinedocs/cpp/Other-Directives.html */
     struct TPPConst ident_string; int werror;
    case KWD_ident:
    case KWD_sccs:
+    if (!HAVE_EXTENSION_IDENT_SCCS) goto default_directive;
     TPPLexer_Yield();
     if unlikely(!TPPLexer_Eval(&ident_string)) goto err;
     werror = TPPLexer_Warn(W_IDENT_SCCS_IGNORED,&ident_string);
@@ -6066,8 +6258,28 @@ PRIVATE void EVAL_CALL eval_unary(struct TPPConst *result) {
 
   case '#':
    /* Determine the length of a string. */
-   if (!HAVE_EXTENSION_STRINGOPS) goto defch;
+   if (!HAVE_EXTENSION_STRINGOPS &&
+       !HAVE_EXTENSION_ASSERTIONS) goto defch;
    yield_fetch();
+   if (TPP_ISKEYWORD(TOK) && HAVE_EXTENSION_ASSERTIONS) {
+    struct TPPKeyword *ass_keyword;
+    /* Evaluate assertion expression. */
+    ass_keyword = token.t_kwd;
+    TPPLexer_YieldRaw();
+    if unlikely(TOK != '(') TPPLexer_Warn(W_EXPECTED_LPAREN);
+    else TPPLexer_YieldRaw();
+    result->c_kind = TPP_CONST_INTEGRAL;
+    if unlikely(!TPP_ISKEYWORD(TOK)) { TPPLexer_Warn(W_EXPECTED_KEYWORD_AFTER_EXPR_PRED,ass_keyword); goto res_zero; }
+    /* Lookup an assertion */
+    result->c_data.c_int = (int_t)keyword_hasassert(ass_keyword,token.t_kwd);
+    TPPLexer_YieldRaw();
+    if unlikely(TOK != ')') TPPLexer_Warn(W_EXPECTED_RPAREN);
+    else TPPLexer_YieldRaw();
+    break;
+   } else if (!HAVE_EXTENSION_STRINGOPS) {
+    if (result) { TPPLexer_Warn(W_EXPECTED_KEYWORD_AFTER_EXPR_HASH); res_zero: TPPConst_ZERO(result); }
+    break;
+   }
    eval_unary(result);
    if (result) {
     if (result->c_kind != TPP_CONST_STRING) {
@@ -7032,6 +7244,11 @@ PUBLIC int TPPLexer_Warn(int wnum, ...) {
   case W_ENDIF_WITHOUT_IF                : WARNF("#endif without #if"); break;
   case W_DEPRECATED_IDENTIFIER           : WARNF("DEPRECATED : '%s'",KWDNAME()); break;
   case W_IDENT_SCCS_IGNORED              : WARNF("#ident/sccs with '%s' is ignored",CONST_STR()); break;
+  case W_EXPECTED_KEYWORD_AFTER_ASSERT   : WARNF("Expected keyword after #assert, but got " TOK_S,TOK_A); break;
+  case W_EXPECTED_KEYWORD_AFTER_PREDICATE: WARNF("Expected keyword after predicate '%s' in #assert, but got " TOK_S,KWDNAME(),TOK_A); break;
+  case W_EXPECTED_KEYWORD_AFTER_EXPR_HASH: WARNF("Expected keyword after # in expression, but got " TOK_S,TOK_A); break;
+  case W_EXPECTED_KEYWORD_AFTER_EXPR_PRED: WARNF("Expected keyword after predicate '%s' in expression, but got " TOK_S,KWDNAME(),TOK_A); break;
+  case W_UNKNOWN_ASSERTION               : WARNF("Assertion '%s' does not contain a predicate '%s'",KWDNAME(),KWDNAME()); break;
   default: WARNF("? %d",wnum); break;
  }
  if (temp_string) TPPString_Decref(temp_string);

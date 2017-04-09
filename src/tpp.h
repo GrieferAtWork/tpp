@@ -660,15 +660,13 @@ struct TPPIncludeList {
 
 struct TPPAssertion {
  struct TPPAssertion *as_next; /*< [0..1][owned] Next assertion. */
- size_t               as_size; /*< Size of this assertion's text in characters. */
- TPP(hash_t)          as_hash; /*< Hash of the assertion's text. */
- char                 as_text[TPP_SYMARRAY_SIZE]; /*< [as_size] Assertion text. */
+ struct TPPKeyword   *as_kwd;  /*< [1..1][const] Keyword associated with this assertion. */
 };
 struct TPPAssertions {
  /* s.a.: 'https://gcc.gnu.org/onlinedocs/cpp/Obsolete-Features.html' */
- size_t                as_size;       /*< Amount of defined assertions. */
- size_t                as_alloc;      /*< Allocated amount of assertions. */
- struct TPPAssertion **as_assertions; /*< [0..1][owned][0..as_alloc][owned] Hash-map of existing assertions. */
+ size_t                as_assc; /*< Amount of defined assertions. */
+ size_t                as_assa; /*< Allocated amount of assertions. */
+ struct TPPAssertion **as_assv; /*< [0..1][owned][0..as_alloc][owned] Hash-map of existing assertions. */
 };
 
 struct TPPRareKeyword {
@@ -833,6 +831,8 @@ TPP_LOCAL int TPPLexer_COLUMN(void) { struct TPPFile *f = TPPLexer_Textfile(); r
 #define TPPLEXER_EXTENSION_TPP_STR_PACK     0x0000001000000000ull /*< Enable the '__TPP_STR_PACK(...)' builtin macro. */
 #define TPPLEXER_EXTENSION_TPP_STR_SIZE     0x0000002000000000ull /*< Enable the '__TPP_STR_SIZE(...)' builtin macro. */
 #define TPPLEXER_EXTENSION_DOLLAR_IS_ALPHA  0x0000004000000000ull /*< [name("dollars-in-identifiers")] Interpret '$' as an alphabetical character. */
+#define TPPLEXER_EXTENSION_IDENT_SCCS       0x0000008000000000ull /*< Recognize (and ignore) #ident/#sccs directives. */
+#define TPPLEXER_EXTENSION_ASSERTIONS       0x0000010000000000ull /*< Recognize #assert/#unassert directives, as well as #predicate(answer) expressions. */
 #define TPPLEXER_EXTENSION_DEFAULT          0xfffffffffffffffeull /*< Enable (almost) all extensions. */
 
 struct TPPLexer {
