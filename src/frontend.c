@@ -195,6 +195,15 @@ void usage(char *appname) {
  fprintf(stderr,"Usage: %s [options...] [-o outfile] [infile]\n"
                 "       %s [options...] [-o outfile] -i string...\n"
                 "options:\n"
+                "\t" "-o <name>                   Redirect output to a given file (defauls to STDOUT).\n"
+                "\t" "-i <text>                   Preprocess the remained of the commandline\n"
+                "\t" "-Idir                       Adds 'dir' to the list of #include <...> paths\n"
+                "\t" "-Dsym[=val=1]               Defines 'sym' as 'val'\n"
+                "\t" "-Usym                       Undefine a previously defined symbol 'sym'\n"
+                "\t" "-Apred=answer               Define an assertion 'pred' as 'answer'\n"
+                "\t" "-A-pred[=answer]            Delete 'answer' or all assertions previously made about 'pred'\n"
+                "\t" "-P                          Disable emission of #line adjustment directives (Default: on).\n"
+                "\t" "-trigraphs                  Enable recognition of trigraph character sequences.\n"
                 "\t" "--tok                       Outline all tokens using the [...] notation (Default: off).\n"
                 "\t" "--pp                        Enable preprocess-mode, which emits all tokens separated by '\\0'-bytes.\n"
                 "\t" "-f[no-]spc                  Configure emission of SPACE tokens (Default: on).\n"
@@ -202,15 +211,11 @@ void usage(char *appname) {
                 "\t" "-f[no-]comments             Configure emission of COMMENT tokens (Default: off).\n"
                 "\t" "-f[no-]magiclf              Enable/Disable magic linefeeds sometimes used in place of #line (Default: off).\n"
                 "\t" "-f[no-]longstring           Enable/Disable string continuation between lines (Default: off).\n"
+                "\t" "-f[no-]<extension>          Enable/Disable a given 'extension'.\n"
+                "\t" "-W[no-]<warning>            Enable/Disable a given 'warning' group.\n"
                 "\t" "                            Enabling this option also disabled SPACE and LF tokens, though\n"
                 "\t" "                            they can be re-enabled using the -spc and -lf switches.\n"
-                "\t" "-P                          Disable emission of #line adjustment directives (Default: on).\n"
-                "\t" "-trigraphs                  Enable recognition of trigraph character sequences.\n"
-                "\t" "-i <text>                   Preprocess the remained of the commandline\n"
-                "\t" "-Idir                       Adds 'dir' to the list of #include <...> paths\n"
-                "\t" "-Dsym[=val=1]               Defines 'sym' as 'val'\n"
-                "\t" "-o <name>                   Redirect output to a given file (defauls to STDOUT).\n"
-                "\t" "--name <name>               Set the name used for __FILE__ in INFILE (Useful when INFILE is stdin).\n"
+                "\t" "--name <name>               Set the name used for __FILE__ by INFILE (Useful when INFILE is stdin).\n"
                 "\t" "--help                      Display this help and exit.\n"
                 "\t" "--version                   Display version information and exit.\n"
 #ifdef _WIN32
@@ -221,7 +226,7 @@ void usage(char *appname) {
                 "infile:\n"
                 "\t" "-                When not specified or set to '-', use STDIN as input\n"
                 "\t" "<filename>       The name of a file to preprocess, as well as the default value for '--name'\n"
-         ,appname);
+         ,appname,appname);
 }
 
 static /*ref*/struct TPPString *
@@ -308,8 +313,7 @@ int main(int argc, char *argv[]) {
                                TPPLEXER_EXTENSION_RECMAC);
  while (argc && argv[0][0] == '-') {
   char *arg = argv[0]+1;
-  /* TODO: -I */
-  /* TODO: -D */
+  /* TODO: All those source dependency switches (-M, -MM, -MF, -MG, -MP, -MT, -MQ, -MD, -MMD) */
   /* TODO: Look at the arguments 'cpp' can take and try to implement them all (or most).
    *       >> This new version of TPP is meant as a drop-in replacement for cpp! */
        if (!strcmp(arg,"-tok")) outline_tokens = OUTLINE_MODE_TOK;
@@ -351,6 +355,13 @@ int main(int argc, char *argv[]) {
                           if (!TPPLexer_Define(arg,strlen(arg),val,strlen(val))) _exit(1); }
   else if (*arg == 'U') { if (!*++arg && argc > 1) arg = argv[1],++argv,--argc;
                           TPPLexer_Undef(arg,strlen(arg)); }
+  else if (*arg == 'A') { int add = 1; char *val;
+                          if (!*++arg && argc > 1) arg = argv[1],++argv,--argc;
+                          if (*arg == '-') ++arg,add = 0;
+                          val = strchr(arg,'=');
+                          if (val) *val++ = '\0'; else if (add) goto noopt;
+                          add ? TPPLexer_AddAssert(arg,strlen(arg),val,strlen(val))
+                              : TPPLexer_DelAssert(arg,strlen(arg),val,val ? strlen(val) : 0); }
   else if (*arg == 'f') { int enable = 1; ++arg; /* Set an extension. */
                           if (!memcmp(arg,"no-",3)) arg += 3,enable = 0;
                           if (!TPPLexer_SetExtension(arg,enable)) goto noopt; }

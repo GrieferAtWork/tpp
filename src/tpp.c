@@ -445,6 +445,7 @@ do{ tok_t              _old_tok_id    = token.t_id;\
 #define HAVE_EXTENSION_DOLLAR_IS_ALPHA   (current.l_extensions&TPPLEXER_EXTENSION_DOLLAR_IS_ALPHA)
 #define HAVE_EXTENSION_IDENT_SCCS        (current.l_extensions&TPPLEXER_EXTENSION_IDENT_SCCS)
 #define HAVE_EXTENSION_ASSERTIONS        (current.l_extensions&TPPLEXER_EXTENSION_ASSERTIONS)
+#define HAVE_EXTENSION_CANONICAL_HEADERS (current.l_extensions&TPPLEXER_EXTENSION_CANONICAL_HEADERS)
 
 
 
@@ -2389,12 +2390,15 @@ keyword_hasassert(struct TPPKeyword *__restrict self,
  while (elem) { if (elem->as_kwd == assertion) return 1; elem = elem->as_next; }
  return 0;
 }
-PRIVATE void
+PRIVATE int
 keyword_clrassert(struct TPPKeyword *__restrict self) {
  struct TPPRareKeyword *rare;
  struct TPPAssertion **bucket_iter,**bucket_end,*iter,*next;
  assert(self);
- if unlikely((rare = self->k_rare) == NULL) return;
+ if unlikely((rare = self->k_rare) == NULL) return 0;
+ assert((rare->kr_asserts.as_assa != 0) ==
+        (rare->kr_asserts.as_assv != NULL));
+ if unlikely(!rare->kr_asserts.as_assa) return 0;
  bucket_end = (bucket_iter = rare->kr_asserts.as_assv)+
                              rare->kr_asserts.as_assa;
  for (; bucket_iter != bucket_end; ++bucket_iter) {
@@ -2410,6 +2414,7 @@ keyword_clrassert(struct TPPKeyword *__restrict self) {
  rare->kr_asserts.as_assc = 0;
  rare->kr_asserts.as_assa = 0;
  rare->kr_asserts.as_assv = NULL;
+ return 1;
 }
 
 
@@ -2909,6 +2914,7 @@ static struct tpp_extension const tpp_extensions[] = {
  EXTENSION("trigraphs",TPPLEXER_EXTENSION_TRIGRAPHS),
  EXTENSION("digraphs",TPPLEXER_EXTENSION_DIGRAPHS),
  EXTENSION("dollars-in-identifiers",TPPLEXER_EXTENSION_DOLLAR_IS_ALPHA),
+ EXTENSION("canonical-system-headers",TPPLEXER_EXTENSION_CANONICAL_HEADERS),
 #undef EXTENSION
  {NULL,0,0},
 };
@@ -3125,7 +3131,7 @@ TPPLexer_AddIncludePath(char *path, size_t pathsize) {
  char *path_copy;
  assert(TPPLexer_Current);
  /* Normalize & fix the given path as best as possible. */
- fix_filename(path,&pathsize);
+ if (HAVE_EXTENSION_CANONICAL_HEADERS) fix_filename(path,&pathsize);
  /* Handle special case: empty path & remove trailing slashes. */
  while (pathsize && path[-1] == SEP) --pathsize;
  if unlikely(!pathsize) path = ".",pathsize = 1;
@@ -3210,6 +3216,27 @@ TPPLexer_Undef(char const *__restrict name, size_t name_size) {
  return 1;
 }
 
+PUBLIC int
+TPPLexer_AddAssert(char const *__restrict predicate, size_t predicate_size,
+                   char const *__restrict answer, size_t answer_size) {
+ struct TPPKeyword *predicate_kwd,*answer_kwd;
+ predicate_kwd = TPPLexer_LookupKeyword(predicate,predicate_size,1);
+ answer_kwd = TPPLexer_LookupKeyword(answer,answer_size,1);
+ if unlikely(!predicate_kwd || !answer_kwd) return 0;
+ return keyword_addassert(predicate_kwd,answer_kwd);
+}
+PUBLIC int
+TPPLexer_DelAssert(char const *__restrict predicate, size_t predicate_size,
+                   char const *answer, size_t answer_size) {
+ struct TPPKeyword *predicate_kwd,*answer_kwd;
+ predicate_kwd = TPPLexer_LookupKeyword(predicate,predicate_size,0);
+ if unlikely(!predicate_kwd) return 0;
+ if unlikely(!answer) return keyword_clrassert(predicate_kwd);
+ answer_kwd = TPPLexer_LookupKeyword(answer,answer_size,0);
+ if unlikely(!answer_kwd) return 0;
+ return keyword_delassert(predicate_kwd,answer_kwd);
+}
+
 
 #ifdef HAVE_INSENSITIVE_PATHS
 PRIVATE int
@@ -3289,7 +3316,8 @@ TPPLexer_OpenFile(int mode, char *filename, size_t filename_size,
  int checked_empty_path = 0;
  size_t buffersize,newbuffersize;
  assert(mode != (TPPLEXER_OPENFILE_MODE_NORMAL|TPPLEXER_OPENFILE_FLAG_NEXT));
- fix_filename(filename,&filename_size);
+ /* Fix broken/distorted filenames to prevent ambiguity. */
+ if (HAVE_EXTENSION_CANONICAL_HEADERS) fix_filename(filename,&filename_size);
  if ((mode&3) == TPPLEXER_OPENFILE_MODE_NORMAL) {
 #ifdef HAVE_INSENSITIVE_PATHS
   result = open_normal_file(filename,filename_size,pkeyword_entry);

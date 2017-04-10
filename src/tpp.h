@@ -834,6 +834,7 @@ TPP_LOCAL int TPPLexer_COLUMN(void) { struct TPPFile *f = TPPLexer_Textfile(); r
 #define TPPLEXER_EXTENSION_DOLLAR_IS_ALPHA   0x0000008000000000ull /*< [name("dollars-in-identifiers")] Interpret '$' as an alphabetical character. */
 #define TPPLEXER_EXTENSION_IDENT_SCCS        0x0000010000000000ull /*< Recognize (and ignore) #ident/#sccs directives. */
 #define TPPLEXER_EXTENSION_ASSERTIONS        0x0000020000000000ull /*< Recognize #assert/#unassert directives, as well as #predicate(answer) expressions. */
+#define TPPLEXER_EXTENSION_CANONICAL_HEADERS 0x0000040000000000ull /*< [name("canonical-system-headers")] Fix paths to normalize '/' vs. '\\', in order to prevent problems with #pragma once. */
 #define TPPLEXER_EXTENSION_DEFAULT           0xfffffffffffffffeull /*< Enable (almost) all extensions. */
 
 struct TPPLexer {
@@ -944,6 +945,17 @@ TPPFUN int TPPLexer_Define(char const *__restrict name, size_t name_size,
 // @return: 0: No macro was associated with the given name.
 // @return: 1: Successfully undefined a macro.
 TPPFUN int TPPLexer_Undef(char const *__restrict name, size_t name_size);
+
+//////////////////////////////////////////////////////////////////////////
+// Add/Delete a given assertion for a given predicate.
+// @param: answer: [TPPLexer_DelAssert] When NULL, clear all assertions.
+// @return: 0: [TPPLexer_AddAssert] Not enough available memory.
+// @return: 0: [TPPLexer_DelAssert] Unknown/no answer(s)
+// @return: 1: Successfully added/deleted any assertion(s)
+TPPFUN int TPPLexer_AddAssert(char const *__restrict predicate, size_t predicate_size,
+                              char const *__restrict answer, size_t answer_size);
+TPPFUN int TPPLexer_DelAssert(char const *__restrict predicate, size_t predicate_size,
+                              char const *answer, size_t answer_size);
 
 //////////////////////////////////////////////////////////////////////////
 // Similar to 'TPPLexer_Yield' and used to implement it, but
