@@ -38,6 +38,10 @@
 #include <unistd.h>
 #endif
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #define STR2(x) #x
 #define STR(x) STR2(x)
 #if defined(_MSC_FULL_VER) && defined(__cplusplus)
@@ -191,7 +195,35 @@ TPP_COMPILER
 #endif
 "]\n\n";
 
-void usage(char *appname) {
+struct tpp_extension {
+ char const *e_name;
+ size_t      e_size;
+ uint64_t    e_flag;
+};
+extern struct tpp_extension const tpp_extensions[];
+extern char const *const wgroup_names[WG_COUNT+1];
+
+void usage(char *appname, char *subject) {
+ if (subject) {
+  if (!strcmp(subject,"extensions")) {
+   struct tpp_extension const *iter;
+   for (iter = tpp_extensions; iter->e_name; ++iter) {
+    fprintf(stderr,"-f%s%s\n",(TPPLexer_Current->l_extensions&iter->e_flag) ? "" : "no-",iter->e_name);
+   }
+  } else if (!strcmp(subject,"warnings")) {
+   char const *const *iter;
+#define getstate(wid) \
+ (wstate_t)((TPPLexer_Current->l_warnings.w_curstate->ws_state[(wid)/(8/TPP_WARNING_BITS)] \
+        >> (((wid)%(8/TPP_WARNING_BITS))*TPP_WARNING_BITS)) & 3)
+   for (iter = wgroup_names; *iter; ++iter) {
+    fprintf(stderr,"-W%s%s\n",getstate(iter-wgroup_names) == WSTATE_DISABLE ? "no-" : "",*iter);
+   }
+#undef getstate
+  } else {
+   fprintf(stderr,"Unknown subject: %s\n",subject);
+  }
+  return;
+ }
  fprintf(stderr,"Usage: %s [options...] [-o outfile] [infile]\n"
                 "       %s [options...] [-o outfile] -i string...\n"
                 "options:\n"
@@ -211,12 +243,13 @@ void usage(char *appname) {
                 "\t" "-f[no-]comments             Configure emission of COMMENT tokens (Default: off).\n"
                 "\t" "-f[no-]magiclf              Enable/Disable magic linefeeds sometimes used in place of #line (Default: off).\n"
                 "\t" "-f[no-]longstring           Enable/Disable string continuation between lines (Default: off).\n"
-                "\t" "-f[no-]<extension>          Enable/Disable a given 'extension'.\n"
-                "\t" "-W[no-]<warning>            Enable/Disable a given 'warning' group.\n"
+                "\t" "-f[no-]<extension>          Enable/Disable a given 'extension' (s.a.: '--help extensions').\n"
+                "\t" "-W[no-]<warning>            Enable/Disable a given 'warning' group (s.a.: '--help warnings').\n"
                 "\t" "                            Enabling this option also disabled SPACE and LF tokens, though\n"
                 "\t" "                            they can be re-enabled using the -spc and -lf switches.\n"
                 "\t" "--name <name>               Set the name used for __FILE__ by INFILE (Useful when INFILE is stdin).\n"
-                "\t" "--help                      Display this help and exit.\n"
+                "\t" "--help [subject]            Display this help and exit.\n"
+                "\t" "                            When specified, subject may be one of {extensions|warnings}\n"
                 "\t" "--version                   Display version information and exit.\n"
 #ifdef _WIN32
                 "\t" "--message-format={msvc|gcc} Set the format for error message (Default: msvc).\n"
@@ -333,7 +366,7 @@ int main(int argc, char *argv[]) {
   else if (!strcmp(arg,"-name")) argc > 1 ? (firstname = argv[1],++argv,--argc) : 0;
   else if (!strcmp(arg,"-message-format=gcc")) TPPLexer_Current->l_flags &= ~(TPPLEXER_FLAG_MSVC_MESSAGEFORMAT);
   else if (!strcmp(arg,"-message-format=msvc")) TPPLexer_Current->l_flags |= TPPLEXER_FLAG_MSVC_MESSAGEFORMAT;
-  else if (!strcmp(arg,"-help")) usage(appname),_exit(2);
+  else if (!strcmp(arg,"-help")) usage(appname,argc > 1 && argv[1][0] != '-' ? argv[1] : NULL),_exit(2);
   else if (!strcmp(arg,"-version")) fwrite(version,sizeof(char),sizeof(version)/sizeof(char)-1,stderr),_exit(2);
   else if (!strcmp(arg,"i")) { !argc || --argc,++argv; infile = merge_argv(argc,argv); goto use_infile; }
   else if (!strcmp(arg,"-pp"))
@@ -467,3 +500,6 @@ end:
  return result;
 }
 
+#ifdef __cplusplus
+}
+#endif

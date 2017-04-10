@@ -128,13 +128,19 @@ DEF_K(tpp_exec)
 DEF_K(tpp_set_keyword_flags)
 DEF_K(extension)
 
-/* Argument keywords for #pragma warning */
+/* Argument keywords for #pragma warning. */
 DEF_K(push)
 DEF_K(pop)
 DEF_K(disable)
 DEF_K(enable)
 DEF_K(suppress)
 DEF_K(default)
+
+/* Additional keywords required to implement some GCC stuff. */
+DEF_K(GCC)
+DEF_K(diagnostic)
+DEF_K(ignored)
+DEF_K(system_header)
 
 
 /* TPP extension macros. */
@@ -293,7 +299,7 @@ WARNING(W_EXPECTED_STRING_AFTER_PRGERROR,  (WG_VALUE),   WSTATE_WARN)    /*< [st
 WARNING(W_EXPECTED_STRING_AFTER_EXTENSION, (WG_VALUE),   WSTATE_WARN)    /*< [struct TPPConst *]. */
 WARNING(W_MACRO_RECURSION_LIMIT_EXCEEDED,  (WG_LIMIT),   WSTATE_WARN)    /*< [struct TPPFile *]. */
 WARNING(W_INCLUDE_RECURSION_LIMIT_EXCEEDED,(WG_LIMIT),   WSTATE_WARN)    /*< [struct TPPFile *]. */
-WARNING(W_UNKNOWN_EXTENSION,               (WG_VALUE),   WSTATE_WARN)    /*< [struct TPPConst *]. */
+WARNING(W_UNKNOWN_EXTENSION,               (WG_VALUE),   WSTATE_WARN)    /*< [struct TPPConst *,struct tpp_extension const *]. */
 WARNING(W_DEFINED_IN_MACRO_BODY,           (WG_EXPANSION_TO_DEFINED),WSTATE_WARN)
 WARNING(W_IDENT_SCCS_IGNORED,              (WG_DIRECTIVE),WSTATE_WARN)   /*< [struct TPPConst *]. */
 WARNING(W_EXPECTED_STRING_AFTER_IDENT,     (WG_VALUE),    WSTATE_WARN)   /*< [struct TPPConst *]. */
@@ -302,6 +308,7 @@ WARNING(W_EXPECTED_KEYWORD_AFTER_PREDICATE,(WG_DIRECTIVE),WSTATE_WARN)   /*< [st
 WARNING(W_EXPECTED_KEYWORD_AFTER_EXPR_HASH,(WG_DIRECTIVE),WSTATE_WARN)   /*< . */
 WARNING(W_EXPECTED_KEYWORD_AFTER_EXPR_PRED,(WG_DIRECTIVE),WSTATE_WARN)   /*< . */
 WARNING(W_UNKNOWN_ASSERTION,               (WG_VALUE),   WSTATE_DISABLE) /*< [struct TPPKeyword *,struct TPPKeyword *]. */
+WARNING(W_EXPECTED_STRING_AFTER_GCC_DIAG,  (WG_VALUE),   WSTATE_WARN)    /*< [struct TPPConst *]. */
 
 #ifdef TPP_DEFS_DEFINES_BUILTIN_MACRO
 #undef TPP_DEFS_DEFINES_BUILTIN_MACRO

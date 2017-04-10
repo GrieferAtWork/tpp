@@ -81,7 +81,13 @@
 #endif
 #endif
 #ifndef PRIVATE
+#ifdef __ELF__
+#   define PRIVATE  __attribute__((__visibility__("private")))
+#elif 1
+#   define PRIVATE  extern
+#else
 #   define PRIVATE  static
+#endif
 #endif
 
 #ifdef PUBLIC
@@ -416,13 +422,14 @@ do{ tok_t              _old_tok_id    = token.t_id;\
 #define HAVE_EXTENSION_BININTEGRAL       (current.l_extensions&TPPLEXER_EXTENSION_BININTEGRAL)
 #define HAVE_EXTENSION_MSVC_PRAGMA       (current.l_extensions&TPPLEXER_EXTENSION_MSVC_PRAGMA)
 #define HAVE_EXTENSION_STRINGOPS         (current.l_extensions&TPPLEXER_EXTENSION_STRINGOPS)
-#define HAVE_EXTENSION_BASEFILE          (current.l_extensions&TPPLEXER_EXTENSION_BASEFILE)
 #define HAVE_EXTENSION_HASH_AT           (current.l_extensions&TPPLEXER_EXTENSION_HASH_AT)
 #define HAVE_EXTENSION_HASH_XCLAIM       (current.l_extensions&TPPLEXER_EXTENSION_HASH_XCLAIM)
 #define HAVE_EXTENSION_WARNING           (current.l_extensions&TPPLEXER_EXTENSION_WARNING)
 #define HAVE_EXTENSION_SHEBANG           (current.l_extensions&TPPLEXER_EXTENSION_SHEBANG)
 #define HAVE_EXTENSION_INCLUDE_NEXT      (current.l_extensions&TPPLEXER_EXTENSION_INCLUDE_NEXT)
 #define HAVE_EXTENSION_IMPORT            (current.l_extensions&TPPLEXER_EXTENSION_IMPORT)
+#define HAVE_EXTENSION_IDENT_SCCS        (current.l_extensions&TPPLEXER_EXTENSION_IDENT_SCCS)
+#define HAVE_EXTENSION_BASEFILE          (current.l_extensions&TPPLEXER_EXTENSION_BASEFILE)
 #define HAVE_EXTENSION_INCLUDE_LEVEL     (current.l_extensions&TPPLEXER_EXTENSION_INCLUDE_LEVEL)
 #define HAVE_EXTENSION_COUNTER           (current.l_extensions&TPPLEXER_EXTENSION_COUNTER)
 #define HAVE_EXTENSION_CLANG_FEATURES    (current.l_extensions&TPPLEXER_EXTENSION_CLANG_FEATURES)
@@ -443,7 +450,6 @@ do{ tok_t              _old_tok_id    = token.t_id;\
 #define HAVE_EXTENSION_TPP_STR_SIZE      (current.l_extensions&TPPLEXER_EXTENSION_TPP_STR_SIZE)
 #define HAVE_EXTENSION_TPP_STR_PACK      (current.l_extensions&TPPLEXER_EXTENSION_TPP_STR_PACK)
 #define HAVE_EXTENSION_DOLLAR_IS_ALPHA   (current.l_extensions&TPPLEXER_EXTENSION_DOLLAR_IS_ALPHA)
-#define HAVE_EXTENSION_IDENT_SCCS        (current.l_extensions&TPPLEXER_EXTENSION_IDENT_SCCS)
 #define HAVE_EXTENSION_ASSERTIONS        (current.l_extensions&TPPLEXER_EXTENSION_ASSERTIONS)
 #define HAVE_EXTENSION_CANONICAL_HEADERS (current.l_extensions&TPPLEXER_EXTENSION_CANONICAL_HEADERS)
 
@@ -2610,7 +2616,7 @@ PRIVATE struct {
 };
 #define DEFAULT_WARNING_STATE(wid) \
  (wstate_t)((((uint8_t *)&default_warnings_state)[(wid)/(8/TPP_WARNING_BITS)] \
-          >> ((wid)%(8/TPP_WARNING_BITS))*TPP_WARNING_BITS) & 3)
+         >> (((wid)%(8/TPP_WARNING_BITS))*TPP_WARNING_BITS)) & 3)
 
 
 PRIVATE char const *const wgroup_names[WG_COUNT+1] = {
@@ -2909,16 +2915,112 @@ struct tpp_extension {
  size_t      e_size;
  uint64_t    e_flag;
 };
-static struct tpp_extension const tpp_extensions[] = {
+PRIVATE struct tpp_extension const tpp_extensions[] = {
 #define EXTENSION(name,flag) {name,sizeof(name)/sizeof(char)-1,flag}
  EXTENSION("trigraphs",TPPLEXER_EXTENSION_TRIGRAPHS),
  EXTENSION("digraphs",TPPLEXER_EXTENSION_DIGRAPHS),
+ EXTENSION("named-varargs-in-macros",TPPLEXER_EXTENSION_GCC_VA_ARGS),
+ EXTENSION("glue-comma-in-macros",TPPLEXER_EXTENSION_GCC_VA_COMMA),
+ EXTENSION("if-else-optional-true",TPPLEXER_EXTENSION_GCC_IFELSE),
+ EXTENSION("va-comma-in-macros",TPPLEXER_EXTENSION_VA_COMMA),
+ EXTENSION("va-nargs-in-macros",TPPLEXER_EXTENSION_VA_NARGS),
+ EXTENSION("escape-e-in-strings",TPPLEXER_EXTENSION_STR_E),
+ EXTENSION("alternative-macro-parenthesis",TPPLEXER_EXTENSION_ALTMAC),
+ EXTENSION("macro-recursion",TPPLEXER_EXTENSION_RECMAC),
+ EXTENSION("binary-literals",TPPLEXER_EXTENSION_BININTEGRAL),
+ EXTENSION("msvc-pragma-support",TPPLEXER_EXTENSION_MSVC_PRAGMA),
+ EXTENSION("strings-in-expressions",TPPLEXER_EXTENSION_STRINGOPS),
+ EXTENSION("charize-macro-argument",TPPLEXER_EXTENSION_HASH_AT),
+ EXTENSION("dont-expand-macro-argument",TPPLEXER_EXTENSION_HASH_XCLAIM),
+ EXTENSION("warning-directives",TPPLEXER_EXTENSION_WARNING),
+ EXTENSION("shebang-directives",TPPLEXER_EXTENSION_SHEBANG),
+ EXTENSION("include-next-directives",TPPLEXER_EXTENSION_INCLUDE_NEXT),
+ EXTENSION("import-directives",TPPLEXER_EXTENSION_IMPORT),
+ EXTENSION("ident-directives",TPPLEXER_EXTENSION_IDENT_SCCS),
+ EXTENSION("basefile-macro",TPPLEXER_EXTENSION_BASEFILE),
+ EXTENSION("include-level-macro",TPPLEXER_EXTENSION_INCLUDE_LEVEL),
+ EXTENSION("counter-macro",TPPLEXER_EXTENSION_COUNTER),
+ EXTENSION("has-feature-macros",TPPLEXER_EXTENSION_CLANG_FEATURES),
+ EXTENSION("has-include-macros",TPPLEXER_EXTENSION_HAS_INCLUDE),
+ EXTENSION("logical-xor-in-expressions",TPPLEXER_EXTENSION_LXOR),
+ EXTENSION("multichar-constants",TPPLEXER_EXTENSION_MULTICHAR_CONST),
+ EXTENSION("numeric-date-macros",TPPLEXER_EXTENSION_DATEUTILS),
+ EXTENSION("numeric-time-macros",TPPLEXER_EXTENSION_TIMEUTILS),
+ EXTENSION("timestamp-macro",TPPLEXER_EXTENSION_TIMESTAMP),
+ EXTENSION("column-macro",TPPLEXER_EXTENSION_COLUMN),
+ EXTENSION("tpp-eval-macro",TPPLEXER_EXTENSION_TPP_EVAL),
+ EXTENSION("tpp-unique-macro",TPPLEXER_EXTENSION_TPP_UNIQUE),
+ EXTENSION("tpp-load-file-macro",TPPLEXER_EXTENSION_TPP_LOAD_FILE),
+ EXTENSION("tpp-counter-macro",TPPLEXER_EXTENSION_TPP_COUNTER),
+ EXTENSION("tpp-random-macro",TPPLEXER_EXTENSION_TPP_RANDOM),
+ EXTENSION("tpp-str-decompile-macro",TPPLEXER_EXTENSION_TPP_STR_DECOMPILE),
+ EXTENSION("tpp-str-substr-macro",TPPLEXER_EXTENSION_TPP_STR_SUBSTR),
+ EXTENSION("tpp-str-pack-macro",TPPLEXER_EXTENSION_TPP_STR_PACK),
+ EXTENSION("tpp-str-size-macro",TPPLEXER_EXTENSION_TPP_STR_SIZE),
  EXTENSION("dollars-in-identifiers",TPPLEXER_EXTENSION_DOLLAR_IS_ALPHA),
+ EXTENSION("assertions",TPPLEXER_EXTENSION_ASSERTIONS),
  EXTENSION("canonical-system-headers",TPPLEXER_EXTENSION_CANONICAL_HEADERS),
 #undef EXTENSION
  {NULL,0,0},
 };
 
+#define tolower(c) ((c) >= 'A' && (c) <= 'Z' ? ((c)+('a'-'A')) : (c))
+
+/* Fuzzy match two strings */
+PRIVATE size_t fuzzy_match(char const *__restrict a,
+                           char const *__restrict b) {
+ /* ~sigh~ such a pretty 'rithm lost to exponentiality... */
+ char cha,chb; size_t result,temp;
+ /* If either string ends, the resulting weight
+  * is the remaining length of the other.
+  * NOTE: Multiply the punishment by 2, because in theory
+  *       for every character taken hereafter, we'd also
+  *       need to add another to the other string. */
+ if ((cha = *a) == '\0') return strlen(b)*2;
+ if ((chb = *b) == '\0') return strlen(a)*2;
+ if (tolower(cha) != tolower(chb)) {
+  /* Choose the lower weight of comparison when taking
+   * away the first character from each string as punishment.
+   * A third chance of matching is be taking the character
+   * from both strings and adding the punishment for doing so. */
+  result = fuzzy_match(a+1,b)+1;
+  if (result == 1) return 1;
+  temp   = fuzzy_match(a,b+1)+1;
+  if (result == 1) return 1;
+  if (temp < result) result = temp;
+  temp   = fuzzy_match(a+1,b+1)+2;
+  if (temp < result) result = temp;
+ } else {
+  /* The characters matched. - Fuzzy-match the rest. */
+  result = fuzzy_match(a+1,b+1);
+ }
+ return result;
+}
+
+PRIVATE struct tpp_extension const *
+find_most_likely_extension(char const *__restrict name) {
+ /* In theory, this works. But in the real world,
+  * this function takes exponentially longer for long names.
+  * >> And I'm talking multiple minutes at 100% CPU
+  *    usage for a little more than 10 character. */
+#if 1
+ (void)name;
+ return NULL;
+#else
+ struct tpp_extension const *iter,*result = NULL;
+ size_t new_weight,result_weight = (size_t)-1;
+ for (iter = tpp_extensions; iter->e_name; ++iter) {
+  printf("FUZZY: %s,%s\n",iter->e_name,name);
+  new_weight = fuzzy_match(iter->e_name,name);
+  /* Select this new extension if it has a lower fuzzy matching value. */
+  if (new_weight < result_weight) {
+   result = iter;
+   result_weight = new_weight;
+  }
+ }
+ return result;
+#endif
+}
 
 PUBLIC int
 TPPLexer_SetExtension(char const *__restrict name,
@@ -7153,13 +7255,63 @@ set_warning_newstate:
     if (*name == 'f') ++name;
     if (!memcmp(name,"no-",3)) name += 3,mode = 0;
     ext_error = TPPLexer_SetExtension(name,mode);
-    if unlikely(!ext_error) ext_error = TPPLexer_Warn(W_UNKNOWN_EXTENSION,&extname);
+    if unlikely(!ext_error) {
+     ext_error = TPPLexer_Warn(W_UNKNOWN_EXTENSION,&extname,
+                               find_most_likely_extension(name));
+    }
     TPPString_Decref(extname.c_data.c_string);
     if unlikely(!ext_error) return 0;
    }
    if unlikely(TOK != ')') TPPLexer_Warn(W_EXPECTED_RPAREN);
    else yield_fetch();
    return 1;
+  } break;
+
+  { /* Emulate some GCC pragmas. */
+  case KWD_GCC:
+   yield_fetch();
+   if (TOK == KWD_diagnostic) {
+    yield_fetch();
+    switch (TOK) {
+     /* Push/Pop warnings */
+     case KWD_push: if unlikely(!TPPLexer_PushWarnings()) goto seterr; break;
+     case KWD_pop: if (!TPPLexer_PopWarnings() && !TPPLexer_Warn(W_CANT_POP_WARNINGS)) return 0; break;
+
+     { /* Configure the mode for a GCC diagnostic. */
+      wstate_t newmode; struct TPPConst group_name;
+      if (FALSE) { case KWD_warning: newmode = WSTATE_WARN; }
+      if (FALSE) { case KWD_error:   newmode = WSTATE_ERROR; }
+      if (FALSE) { case KWD_ignored: newmode = WSTATE_DISABLE; }
+      yield_fetch();
+      if unlikely(!TPPLexer_Eval(&group_name)) return 0;
+      if (group_name.c_kind != TPP_CONST_STRING) {
+       if unlikely(!TPPLexer_Warn(W_EXPECTED_STRING_AFTER_GCC_DIAG,&group_name)) return 0;
+      } else {
+       int wset_error;
+       char const *warning_name = group_name.c_data.c_string->s_text;
+       if (*warning_name == '-') ++warning_name;
+       if (*warning_name == 'W') ++warning_name;
+       wset_error = TPPLexer_SetWarnings(warning_name,newmode);
+       if (wset_error == 2) wset_error = TPPLexer_Warn(W_INVALID_WARNING,&group_name);
+       TPPString_Decref(group_name.c_data.c_string);
+       if unlikely(!wset_error) goto seterr;
+      }
+      return 1;
+     } break;
+
+     default: return 0;
+    }
+    yield_fetch();
+    return 1;
+   } else if (TOK == KWD_system_header) {
+    struct TPPFile *textfile;
+    yield_fetch();
+    textfile = TPPLexer_Textfile();
+    if (textfile->f_textfile.f_cacheentry) textfile = textfile->f_textfile.f_cacheentry;
+    /* Set the system-header flag in the current file (thus suppressing warnings) */
+    textfile->f_textfile.f_flags |= TPP_TEXTFILE_FLAG_SYSHEADER;
+    return 1;
+   }
   } break;
 
   default:
@@ -7185,6 +7337,7 @@ PUBLIC int TPPLexer_Warn(int wnum, ...) {
  va_list args; char const *used_filename,*true_filename;
  char const *macro_name = NULL;
  int macro_name_size,behavior; int const *wgroups;
+ struct TPPFile *textfile;
  struct TPPKeyword *kwd; char *temp;
  struct TPPIfdefStackSlot *ifdef_slot;
  struct TPPString *temp_string = NULL;
@@ -7193,7 +7346,17 @@ PUBLIC int TPPLexer_Warn(int wnum, ...) {
  /* Check for per-warning behavior, as configured by the current lexer. */
  behavior = TPPLexer_InvokeWarning(wnum);
  if (behavior == TPP_WARNINGMODE_IGNORE) return 1; /* Warning is being ignored. */
-
+ /* Turn warnings into errors. */
+ if (behavior == TPP_WARNINGMODE_WARN) {
+  /* Ignore warnings in system headers. */
+  if (!(current.l_flags&TPPLEXER_FLAG_WSYSTEMHEADERS)) {
+   textfile = TPPLexer_Textfile(); /* Walk the chain of a cached #include file. */
+   if (textfile->f_textfile.f_cacheentry) textfile = textfile->f_textfile.f_cacheentry;
+   if (textfile->f_textfile.f_flags&TPP_TEXTFILE_FLAG_SYSHEADER) return 1;
+  }
+  /* Turn warnings into errors. */
+  if (current.l_flags&TPPLEXER_FLAG_WERROR) behavior = TPP_WARNINGMODE_ERROR;
+ }
  va_start(args,wnum);
 #define TOK_S         "'%.*s'"
 #define TOK_A        (int)(token.t_end-token.t_begin),token.t_begin
@@ -7289,7 +7452,17 @@ PUBLIC int TPPLexer_Warn(int wnum, ...) {
   case W_EXPECTED_STRING_AFTER_TPP_SETF  : WARNF("Expected string after tpp_set_keyword_flags, but got '%s'",CONST_STR()); break;
   case W_EXPECTED_STRING_AFTER_TPP_STRD  : WARNF("Expected string after __TPP_STR_DECOMPILE, but got '%s'",CONST_STR()); break;
   case W_EXPECTED_STRING_AFTER_TPP_STRAT : WARNF("Expected string after __TPP_STR_AT|__TPP_STR_SUBSTR, but got '%s'",CONST_STR()); break;
+  case W_EXPECTED_STRING_AFTER_PRGERROR  : WARNF("Expected string after #pragma error, but got '%s'",CONST_STR()); break;
+  case W_EXPECTED_STRING_AFTER_EXTENSION : WARNF("Expected string after #pragma extension, but got '%s'",CONST_STR()); break;
+  case W_EXPECTED_STRING_AFTER_GCC_DIAG  : WARNF("Expected string after #pragma GCC diagnostic <mode>, but got '%s'",CONST_STR()); break;
   case W_FILE_NOT_FOUND                  : WARNF("File not found: '%s'",ARG(char *)); break;
+  case W_UNKNOWN_EXTENSION               : {
+   struct tpp_extension *likely_extension;
+   temp_string = TPPConst_ToString(ARG(struct TPPConst *));
+   likely_extension = ARG(struct tpp_extension *);
+   WARNF("Unknown extension '%s'",temp_string->s_text);
+   if (likely_extension) WARNF(" (Did you mean '%s'?)",likely_extension->e_name);
+  } break;
   case W_NONPARTABLE_FILENAME_CASING     : { char *temp2; size_t temp3; temp = ARG(char *),temp2 = ARG(char *),temp3 = ARG(size_t); WARNF("Non-portable casing in '%s': '%.*s' should be '%s' instead",temp,(int)temp3,temp2,ARG(char *)); } break;
   case W_ERROR                           : temp = ARG(char *),WARNF("ERROR : %.*s",(int)ARG(size_t),temp); break;
   case W_WARNING                         : temp = ARG(char *),WARNF("WARNING : %.*s",(int)ARG(size_t),temp); break;
