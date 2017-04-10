@@ -23,6 +23,9 @@
 #ifndef TPP_CONFIG_EXPORT
 #define TPP_CONFIG_EXPORT  0 /* Export all 'extern' functions from the header, for use by shared libraries. */
 #endif
+#ifndef TPP_CONFIG_HOOKS
+#define TPP_CONFIG_HOOKS   0 /* Enable hooks for higher-level preprocessor functionality. */
+#endif
 
 
 
@@ -151,6 +154,35 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+
+/* Source hooks into higher-level compiler functions. */
+#if TPP_CONFIG_HOOKS
+#ifdef __cplusplus
+extern "C" {
+#endif
+extern int tpp_hook_inscomment(char *p, size_t s);
+#define TPP_HOOK_INSCOMMENT   tpp_hook_inscomment
+#ifdef __cplusplus
+}
+#endif
+#endif /* TPP_CONFIG_HOOKS */
+
+/* HOOK fallbacks & documentation. */
+
+/* HOOK: >> int TPP_HOOK_INSCOMMENT(char *p, size_t s);
+ *       Insert the given text into the ".comment" section of the current object file.
+ * @return: -1: Hook not supported (emit a warning for unsupported feature)
+ * @return:  0: Error occurred (stop processing code)
+ * @return:  1: Successfully inserted the given text.
+ */
+#ifndef TPP_HOOK_INSCOMMENT
+#define TPP_HOOK_INSCOMMENT(p,s) (-1)
+#endif
+
+
+
+
 
 #ifdef _MSC_VER
 LOCAL void *
@@ -400,6 +432,7 @@ do{ tok_t              _old_tok_id    = token.t_id;\
 #define HAVE_EXTENSION_DATEUTILS         (current.l_extensions&TPPLEXER_EXTENSION_DATEUTILS)
 #define HAVE_EXTENSION_TIMEUTILS         (current.l_extensions&TPPLEXER_EXTENSION_TIMEUTILS)
 #define HAVE_EXTENSION_TIMESTAMP         (current.l_extensions&TPPLEXER_EXTENSION_TIMESTAMP)
+#define HAVE_EXTENSION_COLUMN            (current.l_extensions&TPPLEXER_EXTENSION_COLUMN)
 #define HAVE_EXTENSION_TPP_EVAL          (current.l_extensions&TPPLEXER_EXTENSION_TPP_EVAL)
 #define HAVE_EXTENSION_TPP_UNIQUE        (current.l_extensions&TPPLEXER_EXTENSION_TPP_UNIQUE)
 #define HAVE_EXTENSION_TPP_LOAD_FILE     (current.l_extensions&TPPLEXER_EXTENSION_TPP_LOAD_FILE)
@@ -4386,7 +4419,12 @@ skip_block_and_parse:
     if (!HAVE_EXTENSION_IDENT_SCCS) goto default_directive;
     TPPLexer_Yield();
     if unlikely(!TPPLexer_Eval(&ident_string)) goto err;
-    werror = TPPLexer_Warn(W_IDENT_SCCS_IGNORED,&ident_string);
+    if unlikely(ident_string.c_kind != TPP_CONST_STRING) {
+     werror = TPPLexer_Warn(W_EXPECTED_STRING_AFTER_IDENT,&ident_string);
+    } else if ((werror = TPP_HOOK_INSCOMMENT(ident_string.c_data.c_string->s_text,
+                                             ident_string.c_data.c_string->s_size)) == -1) {
+     werror = TPPLexer_Warn(W_IDENT_SCCS_IGNORED,&ident_string);
+    }
     TPPConst_Quit(&ident_string);
     if unlikely(!werror) goto err;
     goto def_skip_until_lf;
@@ -4693,6 +4731,13 @@ create_int_file:
     pushfile_inherited(int_file);
     goto again;
    }
+
+   { /* Expand into an integral constant representing the current column number. */
+   case KWD___COLUMN__:
+    if (!HAVE_EXTENSION_COLUMN) break;
+    intval = (int_t)TPPLexer_COLUMN()+1;
+    goto create_int_file;
+   } break;
 
    { /* Expand into an integral constant representing the current include level. */
     struct TPPFile *file_iter;
@@ -7258,13 +7303,10 @@ PUBLIC int TPPLexer_Warn(int wnum, ...) {
  va_end(args);
  WARNF("\n");
  if (macro_name) {
-  if (current.l_flags&TPPLEXER_FLAG_MSVC_MESSAGEFORMAT) {
-   WARNF("%s(%d,%d) : See reference to effective code location\n",
-         used_filename,TPPLexer_LINE()+1,TPPLexer_COLUMN()+1);
-  } else {
-   WARNF("%s:%d:%d: See reference to effective code location\n",
-         used_filename,TPPLexer_LINE()+1,TPPLexer_COLUMN()+1);
-  }
+  WARNF(current.l_flags&TPPLEXER_FLAG_MSVC_MESSAGEFORMAT
+        ? "%s(%d,%d) : " : "%s:%d:%d: ",
+        used_filename,TPPLexer_LINE()+1,TPPLexer_COLUMN()+1);
+  WARNF("See reference to effective code location\n");
  }
  fflush(stderr);
  if (behavior == TPP_WARNINGMODE_ERROR) {
