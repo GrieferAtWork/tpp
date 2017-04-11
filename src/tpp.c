@@ -481,8 +481,10 @@ do{ tok_t              _old_tok_id    = token.t_id;\
 #define LOG_LEGACYGUARD 2
 #define LOG_PRAGMA      3
 #define LOG_ENCODING    4
+#define LOG_LEVEL       0x7fff
+#define LOG_RAW         0x8000
 #if TPP_CONFIG_DEBUG
-#define HAVELOG(level) (0 && (level) == LOG_LEGACYGUARD) /* Change this to select active logs. */
+#define HAVELOG(level) (0 && ((level)&LOG_LEVEL) == LOG_CALLMACRO) /* Change this to select active logs. */
 LOCAL void tpp_log(char const *fmt, ...) {
  va_list args;
  assert(TPPLexer_Current);
@@ -495,7 +497,14 @@ LOCAL void tpp_log(char const *fmt, ...) {
  va_end(args);
  fflush(stderr);
 }
-#define LOG(level,x)   (HAVELOG(level) ? tpp_log x : (void)0)
+LOCAL void tpp_log_raw(char const *fmt, ...) {
+ va_list args;
+ va_start(args,fmt);
+ vfprintf(stderr,fmt,args);
+ va_end(args);
+ fflush(stderr);
+}
+#define LOG(level,x)   (HAVELOG(level) ? ((level&LOG_RAW) ? tpp_log_raw x : tpp_log x) : (void)0)
 #else
 #define HAVELOG(level) 0
 #define LOG(level,x)   (void)0
@@ -5458,7 +5467,7 @@ create_int_file:
       *       this is only here for backwards-compatibility. */
     char escape_char; struct TPPConst val;
     /*ref*/struct TPPString *basestring;
-    int_t subindex; size_t sublen,escape_size;
+    size_t subindex,sublen,escape_size;
     char *sub_begin,*sub_end;
    case KWD___TPP_STR_AT:
    case KWD___TPP_STR_SUBSTR:
@@ -5487,23 +5496,29 @@ err_substr:  TPPString_Decref(basestring);
      goto seterr;
     }
     TPPConst_ToInt(&val);
-    subindex = val.c_data.c_int;
-    if (TOK != ',') sublen = basestring->s_size;
-    else {
+    subindex = 0;
+    if (basestring->s_size) {
+     val.c_data.c_int %= (int_t)basestring->s_size;
+     if (val.c_data.c_int < 0) val.c_data.c_int += (int_t)basestring->s_size;
+     subindex = (size_t)val.c_data.c_int;
+    }
+    if (TOK != ',') {
+     sublen = basestring->s_size ? 1 : 0;
+    } else {
      yield_fetch();
      if unlikely(!TPPLexer_Eval(&val)) goto err_substrf;
      TPPConst_ToInt(&val);
-     sublen = (size_t)val.c_data.c_int;
+     sublen = 0;
+     if (basestring->s_size) {
+      val.c_data.c_int %= (int_t)basestring->s_size;
+      if (val.c_data.c_int < 0) val.c_data.c_int += basestring->s_size;
+      sublen = (size_t)val.c_data.c_int;
+     }
     }
+    if (sublen >= basestring->s_size-subindex) sublen = basestring->s_size-subindex;
     if (TOK != ')') TPPLexer_Warn(W_EXPECTED_RPAREN);
     popf();
-    if (basestring->s_size) {
-     subindex %= (int_t)basestring->s_size;
-     if (subindex < 0) subindex += basestring->s_size;
-     if (sublen) sublen %= (int_t)basestring->s_size;
-    } else subindex = 0,sublen = 0;
-    if (sublen > basestring->s_size-subindex) sublen = basestring->s_size-(size_t)subindex;
-    sub_end = (sub_begin = basestring->s_text+(size_t)subindex)+sublen;
+    sub_end = (sub_begin = basestring->s_text+subindex)+sublen;
     assert(sub_begin <= sub_end);
     assert(sub_begin >= basestring->s_text);
     assert(sub_end <= basestring->s_text+basestring->s_size);
@@ -6365,14 +6380,14 @@ done_args:
       arg_last->ac_begin == arg_last->ac_end) assert(va_size),--va_size;
 
 
-#if 0 /* DEBUG: Log calls to macros. */
+#if HAVELOG(LOG_CALLMACRO) /* DEBUG: Log calls to macros. */
   {
    arg_end = (arg_iter = argv)+effective_argc;
-   printf("Calling: %.*s(",(int)macro->f_namesize,macro->f_name);
+   LOG(LOG_CALLMACRO|LOG_RAW,("[DEBUG] Calling: %.*s(",(int)macro->f_namesize,macro->f_name));
    for (; arg_iter != arg_end; ++arg_iter) {
-    printf("[%.*s],",(int)(arg_iter->ac_end-arg_iter->ac_begin),arg_iter->ac_begin);
+    LOG(LOG_CALLMACRO|LOG_RAW,("[%.*s],",(int)(arg_iter->ac_end-arg_iter->ac_begin),arg_iter->ac_begin));
    }
-   printf(")\n");
+   LOG(LOG_CALLMACRO|LOG_RAW,(")\n"));
   }
 #endif
   /* Everything has been checked!
@@ -6575,8 +6590,9 @@ PRIVATE void EVAL_CALL eval_unary(struct TPPConst *result) {
    char *begin; size_t size,esc_size;
   case TOK_CHAR:
    if (result) {
-    begin    = token.t_begin;
+    begin    = token.t_begin+1;
     size     = (size_t)(token.t_end-begin);
+    if (size && begin[size-1] == '\'') --size;
     esc_size = TPP_SizeofUnescape(begin,size);
     if (esc_size > sizeof(buf)) {
      if unlikely(!TPPLexer_Warn(W_CHARACTER_TOO_LONG)) return;
@@ -6585,10 +6601,10 @@ PRIVATE void EVAL_CALL eval_unary(struct TPPConst *result) {
 
     *(int_t *)buf = 0;
     size = TPP_Unescape(buf,begin,size)-buf;
-#if TPP_BYTEORDER == 1234
-    /* Adjust for little endian. */
+#if TPP_BYTEORDER == 4321
+    /* Adjust for big endian. */
     *(int_t *)buf >>= (sizeof(int_t)-size)*8;
-#elif TPP_BYTEORDER != 4321
+#elif TPP_BYTEORDER != 1234
 #   error FIXME
 #endif
     result->c_kind       = TPP_CONST_INTEGRAL;
