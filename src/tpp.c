@@ -5500,8 +5500,8 @@ err_substr:  TPPString_Decref(basestring);
     if (basestring->s_size) {
      subindex %= (int_t)basestring->s_size;
      if (subindex < 0) subindex += basestring->s_size;
-    } else subindex = 0;
-    if (sublen) sublen %= (int_t)basestring->s_size;
+     if (sublen) sublen %= (int_t)basestring->s_size;
+    } else subindex = 0,sublen = 0;
     if (sublen > basestring->s_size-subindex) sublen = basestring->s_size-(size_t)subindex;
     sub_end = (sub_begin = basestring->s_text+(size_t)subindex)+sublen;
     assert(sub_begin <= sub_end);
@@ -5517,6 +5517,7 @@ err_substr:  TPPString_Decref(basestring);
     TPP_Escape(string_text->s_text+1,sub_begin,(size_t)(sub_end-sub_begin));
     string_text->s_text[escape_size+1] = escape_char;
     string_text->s_text[escape_size+2] = '\0';
+    TPPString_Decref(basestring);
     goto create_string_file;
    } break;
 
@@ -5919,13 +5920,16 @@ expand_function_macro(struct TPPFile *__restrict macro,
  old_pos            = arguments_file->f_end;
  current.l_eob_file = arguments_file;
  result = expand_function_macro_impl(macro,argv,va_size);
- assert(token.t_file == arguments_file);
- assert(current.l_eob_file == arguments_file);
- current.l_eob_file      = old_eob;
- arguments_file->f_text  = old_text;
- arguments_file->f_begin = old_begin;
- arguments_file->f_pos   = old_end;
- arguments_file->f_end   = old_pos;
+ if likely(result) {
+  /* NOTE: Must not restore data if an error occurred! */
+  assert(token.t_file == arguments_file);
+  assert(current.l_eob_file == arguments_file);
+  current.l_eob_file      = old_eob;
+  arguments_file->f_text  = old_text;
+  arguments_file->f_begin = old_begin;
+  arguments_file->f_pos   = old_end;
+  arguments_file->f_end   = old_pos;
+ }
  return result;
 }
 
@@ -6257,7 +6261,7 @@ add_arg:
    TPPLexer_YieldPP(); /* YieldPP: Allow preprocessor directives in macro arguments. */
   }
 done_args:
-  if (va_size < effective_argc) va_size = 0;
+  if (va_size < effective_argc) va_size = 1;
   else va_size -= (effective_argc-1);
   assert(token.t_file == arguments_file);
   if (arg_iter != arg_last) {
@@ -6302,27 +6306,17 @@ done_args:
    }
   }
 
-  switch (macro->f_macro.m_function.f_argc) {
-   case 0: /* Check for special case: No-arguments macro. */
-    /* The one argument that we parsed must only contain whitespace.
-     * >> If it does not, emit a warning. */
-    iter = argv[0].ac_begin,end = argv[0].ac_end;
-    while (iter != end) {
-     while (SKIP_WRAPLF(iter,end));
-     if unlikely(!isspace(*iter)) {
-      if unlikely(!TPPLexer_Warn(W_TOO_MANY_MACRO_ARGUMENTS,macro)) goto err_argv;
-      break;
-     }
-     ++iter;
-    }
-    break;
-   case 1: /* Check for special case: single-argument varargs function. */
-    /* If the only argument of a variadic function is empty, the variadic size drops to ZERO(0). */
-    if (macro->f_macro.m_flags&TPP_MACROFILE_FLAG_FUNC_VARIADIC &&
-        argv[0].ac_begin == argv[0].ac_end) assert(va_size == 1),va_size = 0;
-    break;
-   default: break;
+  /* Check for special case: No-arguments macro. */
+  if (!macro->f_macro.m_function.f_argc) {
+   /* The one argument that we parsed must only contain whitespace.
+    * >> If it does not, emit a warning. */
+   if unlikely((argv[0].ac_begin != argv[0].ac_end) &&
+               !TPPLexer_Warn(W_TOO_MANY_MACRO_ARGUMENTS,macro)) goto err_argv;
   }
+  /* If the variadic portion of varargs function is empty, the variadic size drops to ZERO(0).
+   * >> This is required to properly implement __VA_COMMA__/__VA_NARGS__ semantics. */
+  if (macro->f_macro.m_flags&TPP_MACROFILE_FLAG_FUNC_VARIADIC &&
+      arg_last->ac_begin == arg_last->ac_end) assert(va_size),--va_size;
 
 
 #if 0 /* DEBUG: Log calls to macros. */
@@ -7304,6 +7298,7 @@ TPPLexer_ParsePragma(tok_t endat) {
    } else {
     keyword = TPPLexer_LookupKeyword(const_val.c_data.c_string->s_text,
                                      const_val.c_data.c_string->s_size,1);
+    TPPString_Decref(const_val.c_data.c_string);
     if unlikely(!keyword || !TPPKeyword_MAKERARE(keyword)) return 0;
    }
    if unlikely(TOK != ',') TPPLexer_Warn(W_EXPECTED_COMMA);
