@@ -114,6 +114,7 @@
 #if defined(__CYGWIN__) || defined(__MINGW32__)
 #include <Windows.h>
 #endif
+#include <alloca.h>
 #include <endian.h>
 #include <fcntl.h>
 #include <unistd.h>
@@ -2966,6 +2967,7 @@ PRIVATE struct tpp_extension const tpp_extensions[] = {
 
 #define tolower(c) ((c) >= 'A' && (c) <= 'Z' ? ((c)+('a'-'A')) : (c))
 
+#if 0
 /* Fuzzy match two strings */
 PRIVATE size_t fuzzy_match(char const *__restrict a,
                            char const *__restrict b) {
@@ -2996,30 +2998,63 @@ PRIVATE size_t fuzzy_match(char const *__restrict a,
  }
  return result;
 }
+#endif
 
-PRIVATE struct tpp_extension const *
+/* As found here: https://en.wikipedia.org/wiki/Levenshtein_distance */
+PRIVATE size_t
+fuzzy_match(char const *__restrict a, size_t alen,
+            char const *__restrict b, size_t blen) {
+ size_t *v0,*v1,i,j,cost,temp;
+ if unlikely(!alen) return blen;
+ if unlikely(!blen) return alen;
+ v0 = (size_t *)alloca((blen+1)*sizeof(size_t));
+ v1 = (size_t *)alloca((blen+1)*sizeof(size_t));
+ for (i = 0; i < blen; ++i) v0[i] = i;
+ for (i = 0; i < alen; ++i) {
+  v1[0] = i+1;
+  for (j = 0; j < blen; j++) {
+   cost  = (tolower(a[i]) == tolower(b[j])) ? 0 : 1;
+   cost += v0[j];
+   temp  = v1[j]+1;
+   if (temp < cost) cost = temp;
+   temp  = v0[j+1]+1;
+   if (temp < cost) cost = temp;
+   v1[j+1] = cost;
+  }
+  memcpy(v0,v1,blen*sizeof(size_t));
+ }
+ return v1[blen];
+}
+
+PRIVATE char const *
+find_most_likely_warning(char const *__restrict name) {
+ char const *const *iter,*result = NULL;
+ size_t name_len = strlen(name),new_weight,result_weight = (size_t)-1;
+ for (iter = wgroup_names; *iter; ++iter) {
+  new_weight = fuzzy_match(*iter,strlen(*iter),name,name_len);
+  /* Select this new extension if it has a lower fuzzy matching value. */
+  if (new_weight < result_weight) {
+   result = *iter;
+   result_weight = new_weight;
+  }
+ }
+ return result;
+}
+
+PRIVATE char const *
 find_most_likely_extension(char const *__restrict name) {
- /* In theory, this works. But in the real world,
-  * this function takes exponentially longer for long names.
-  * >> And I'm talking multiple minutes at 100% CPU
-  *    usage for a little more than 10 character. */
-#if 1
- (void)name;
- return NULL;
-#else
  struct tpp_extension const *iter,*result = NULL;
- size_t new_weight,result_weight = (size_t)-1;
+ size_t name_len = strlen(name),new_weight,result_weight = (size_t)-1;
  for (iter = tpp_extensions; iter->e_name; ++iter) {
-  printf("FUZZY: %s,%s\n",iter->e_name,name);
-  new_weight = fuzzy_match(iter->e_name,name);
+  new_weight = fuzzy_match(iter->e_name,iter->e_size,
+                           name,name_len);
   /* Select this new extension if it has a lower fuzzy matching value. */
   if (new_weight < result_weight) {
    result = iter;
    result_weight = new_weight;
   }
  }
- return result;
-#endif
+ return result->e_name;
 }
 
 PUBLIC int
@@ -7256,8 +7291,7 @@ set_warning_newstate:
     if (!memcmp(name,"no-",3)) name += 3,mode = 0;
     ext_error = TPPLexer_SetExtension(name,mode);
     if unlikely(!ext_error) {
-     ext_error = TPPLexer_Warn(W_UNKNOWN_EXTENSION,&extname,
-                               find_most_likely_extension(name));
+     ext_error = TPPLexer_Warn(W_UNKNOWN_EXTENSION,name);
     }
     TPPString_Decref(extname.c_data.c_string);
     if unlikely(!ext_error) return 0;
@@ -7456,17 +7490,22 @@ PUBLIC int TPPLexer_Warn(int wnum, ...) {
   case W_EXPECTED_STRING_AFTER_EXTENSION : WARNF("Expected string after #pragma extension, but got '%s'",CONST_STR()); break;
   case W_EXPECTED_STRING_AFTER_GCC_DIAG  : WARNF("Expected string after #pragma GCC diagnostic <mode>, but got '%s'",CONST_STR()); break;
   case W_FILE_NOT_FOUND                  : WARNF("File not found: '%s'",ARG(char *)); break;
-  case W_UNKNOWN_EXTENSION               : {
-   struct tpp_extension *likely_extension;
-   temp_string = TPPConst_ToString(ARG(struct TPPConst *));
-   likely_extension = ARG(struct tpp_extension *);
-   WARNF("Unknown extension '%s'",temp_string->s_text);
-   if (likely_extension) WARNF(" (Did you mean '%s'?)",likely_extension->e_name);
-  } break;
+  case W_UNKNOWN_EXTENSION               : temp = ARG(char *); WARNF("Unknown extension '%s' (Did you mean '%s'?)",temp,find_most_likely_extension(temp)); break;
   case W_NONPARTABLE_FILENAME_CASING     : { char *temp2; size_t temp3; temp = ARG(char *),temp2 = ARG(char *),temp3 = ARG(size_t); WARNF("Non-portable casing in '%s': '%.*s' should be '%s' instead",temp,(int)temp3,temp2,ARG(char *)); } break;
   case W_ERROR                           : temp = ARG(char *),WARNF("ERROR : %.*s",(int)ARG(size_t),temp); break;
   case W_WARNING                         : temp = ARG(char *),WARNF("WARNING : %.*s",(int)ARG(size_t),temp); break;
-  case W_INVALID_WARNING                 : WARNF("Invalid warning '%s'",CONST_STR()); break;
+  case W_INVALID_WARNING                 : {
+   struct TPPConst *c = ARG(struct TPPConst *);
+   if (c->c_kind == TPP_CONST_STRING) {
+    char const *wname = c->c_data.c_string->s_text;
+    if (*wname == '-') ++wname;
+    if (*wname == 'W') ++wname;
+    if (!memcmp(wname,"no-",3)) wname += 3;
+    WARNF("Invalid warning '%s' (Did you mean '%s')",wname,find_most_likely_warning(wname));
+   } else {
+    WARNF("Invalid warning '%lld'",(long long)c->c_data.c_int);
+   }
+  } break;
   case W_CANT_POP_WARNINGS               : WARNF("Can't pop warnings"); break;
   case W_MACRO_RECURSION_LIMIT_EXCEEDED  : WARNF("Macro recursion limit exceeded when expanding '%s'",FILENAME()); break;
   case W_INCLUDE_RECURSION_LIMIT_EXCEEDED: WARNF("Include recursion limit exceeded when including '%s'",FILENAME()); break;
