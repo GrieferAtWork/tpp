@@ -201,8 +201,8 @@ DEF_EXTENSION_IF(tpp_lxor,                        HAS_EXTENSION(TPPLEXER_EXTENSI
 DEF_EXTENSION_IF(tpp_token_tilde_tilde,           TPPLexer_Current->l_extokens&TPPLEXER_TOKEN_TILDETILDE)
 DEF_EXTENSION_IF(tpp_token_pow,                   TPPLexer_Current->l_extokens&TPPLEXER_TOKEN_STARSTAR)
 DEF_EXTENSION_IF(tpp_token_lxor,                  TPPLexer_Current->l_extokens&TPPLEXER_TOKEN_ROOFROOF)
-DEF_EXTENSION_IF(tpp_token_arrow,                 1) /* TODO: Add a way of disabling this. */
-DEF_EXTENSION_IF(tpp_token_collon_assign,         1) /* TODO: Add a way of disabling this. */
+DEF_EXTENSION_IF(tpp_token_arrow,                 TPPLexer_Current->l_extokens&TPPLEXER_TOKEN_ARROW)
+DEF_EXTENSION_IF(tpp_token_collon_assign,         TPPLexer_Current->l_extokens&TPPLEXER_TOKEN_COLLONASSIGN)
 DEF_EXTENSION_IF(tpp_token_collon_collon,         TPPLexer_Current->l_extokens&TPPLEXER_TOKEN_COLLONCOLLON)
 DEF_EXTENSION_IF(tpp_macro_calling_conventions,   HAS_EXTENSION(TPPLEXER_EXTENSION_ALTMAC))
 DEF_EXTENSION_IF(tpp_strict_whitespace,           (TPPLexer_Current->l_flags&TPPLEXER_FLAG_KEEP_ARG_WHITESPACE))

@@ -564,7 +564,8 @@ skip_whitespace_and_comments(char *iter, char *end) {
   if (*iter == '/' && iter+1 != end) {
    char *forward = iter+1;
    while (SKIP_WRAPLF(forward,end));
-   if (*forward == '*') {
+   if (*forward == '*' &&
+      (current.l_extokens&TPPLEXER_TOKEN_C_COMMENT)) {
     ++forward;
     while (forward != end) {
      while (forward != end && *forward != '*') ++forward;
@@ -573,7 +574,18 @@ skip_whitespace_and_comments(char *iter, char *end) {
      if (*forward == '/') { ++forward; break; }
     }
     iter = forward;
-    continue;;
+    continue;
+   }
+   if (*forward == '/' &&
+      (current.l_extokens&TPPLEXER_TOKEN_C_COMMENT)) {
+    iter = forward;
+    while (iter != end) {
+     if (*iter == '\\' && iter+1 != end && islf(iter[1])) {
+      if (*++iter == '\r' && *iter == '\n' && iter+1 != end) ++iter;
+      ++iter;
+     } else if (islf(*iter)) break;
+     ++iter;
+    }
    }
   }
   break;
@@ -583,18 +595,21 @@ skip_whitespace_and_comments(char *iter, char *end) {
 
 PRIVATE char *
 skip_whitespace_and_comments_rev(char *iter, char *begin) {
+ char *forward;
  assert(iter >= begin);
+next:
  while (iter != begin) {
   while (iter != begin) {
    while (SKIP_WRAPLF_REV(iter,begin));
-   if (!isspace(iter[-1])) break;
+   if (!isspace_nolf(iter[-1])) break;
    --iter;
   }
   if (iter == begin) break;
   if (iter[-1] == '/' && iter-1 != begin) {
-   char *forward = iter-1;
+   forward = iter-1;
    while (SKIP_WRAPLF_REV(forward,begin));
-   if (forward[-1] == '*') {
+   if (forward[-1] == '*' &&
+      (current.l_extokens&TPPLEXER_TOKEN_C_COMMENT)) {
     --forward;
     while (forward != begin) {
      while (forward != begin && forward[-1] != '*') --forward;
@@ -605,6 +620,26 @@ skip_whitespace_and_comments_rev(char *iter, char *begin) {
     iter = forward;
     continue;
    }
+  }
+  if (islf(iter[-1])) {
+   /* HINT: This linefeed is known not to be escaped, due to the 'SKIP_WRAPLF_REV' above. */
+   if (current.l_extokens&TPPLEXER_TOKEN_CPP_COMMENT) {
+    /* Check for a C++-style comment. */
+    forward = iter-1;
+    if (*forward == '\n' && forward != begin && forward[-1] == '\r') --forward;
+    while (forward != begin && !islf(forward[-1])) {
+     if (forward[-1] == '/' && *forward == '/') {
+      /* Found a C++-style comment.
+       * >> Now we must continue skipping whitespace before 'forward-1' */
+      iter = forward-1;
+      goto next;
+     }
+     --forward;
+    }
+   }
+   /* Handle this linefeed like space. */
+   --iter;
+   continue;
   }
   break;
  }
@@ -623,7 +658,8 @@ skip_whitespacenolf_and_comments_rev(char *iter, char *begin) {
    --iter;
   }
   if (iter == begin) break;
-  if (iter[-1] == '/' && iter-1 != begin) {
+  if (iter[-1] == '/' && iter-1 != begin &&
+     (current.l_extokens&TPPLEXER_TOKEN_C_COMMENT)) {
    char *forward = iter-1;
    while (SKIP_WRAPLF_REV(forward,begin));
    if (forward[-1] == '*') {
@@ -877,7 +913,8 @@ string_find_eol_after_comments(char *iter, char *end) {
  while (iter != end) {
        if (*iter == '\\') { if (++iter == end) break; }
   else if (islf(*iter)) break;
-  else if (*iter == '/') {
+  else if (*iter == '/' &&
+          (current.l_extokens&TPPLEXER_TOKEN_C_COMMENT)) {
    if (++iter != end) while (SKIP_WRAPLF(iter,end));
    if (*iter == '/') return (++iter,string_find_eol(iter,(size_t)(end-iter)));
    if (*iter == '*') {
@@ -3734,7 +3771,7 @@ parse_multichar:
    /* Scan forward until the end of the string/character. */
    while (iter != end && *iter != (char)ch) {
     while (SKIP_WRAPLF(iter,end));
-    if ((current.l_flags&TPPLEXER_FLAG_TERMINATE_STRING_LF) && islf(*iter)) {
+    if ((current.l_flags&TPPLEXER_FLAG_TERMINATE_STRING_LF) && islforzero(*iter)) {
      if unlikely(!TPPLexer_Warn(W_STRING_TERMINATED_BY_LINEFEED)) goto err;
      break;
     }
@@ -3861,7 +3898,8 @@ parse_multichar:
 
   case '/':
    if (*forward == '=') { ch = TOK_DIV_EQUAL; goto settok_forward1; }
-   if (*forward == '*') {
+   if (*forward == '*' &&
+      (current.l_extokens&TPPLEXER_TOKEN_C_COMMENT)) {
     /* Parse a multi-line-comment. */
     ++forward;
     if (forward == end) ch = 0;
@@ -3887,14 +3925,15 @@ parse_multichar:
     if unlikely(!(current.l_flags&TPPLEXER_FLAG_WANTCOMMENTS)) goto startover_iter;
     goto set_comment;
    }
-   if (*forward == '/') {
+   if (*forward == '/' &&
+      (current.l_extokens&TPPLEXER_TOKEN_CPP_COMMENT)) {
     /* Parse a line-comment. */
     do {
      ++forward;
      while (SKIP_WRAPLF(forward,end)) {
       if unlikely(!TPPLexer_Warn(W_LINE_COMMENT_CONTINUED)) goto err;
      }
-    } while (!islf(*forward));
+    } while (!islforzero(*forward));
     if (!(current.l_flags&TPPLEXER_FLAG_COMMENT_NOOWN_LF) &&
        (*forward && *forward++ == '\r' && *forward == '\n')) ++forward;
     iter = forward;
