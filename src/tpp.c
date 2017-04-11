@@ -6298,19 +6298,27 @@ done_args:
     arg_iter->ac_end = skip_whitespace_and_comments_rev(arg_iter->ac_end,arg_iter->ac_begin);
    }
   }
-  /* Check for special case: No-arguments macro. */
-  if (!macro->f_macro.m_function.f_argc) {
-   /* The one argument that we parsed must only contain whitespace.
-    * >> If it does not, emit a warning. */
-   iter = argv[0].ac_begin,end = argv[0].ac_end;
-   while (iter != end) {
-    while (SKIP_WRAPLF(iter,end));
-    if unlikely(!isspace(*iter)) {
-     if unlikely(!TPPLexer_Warn(W_TOO_MANY_MACRO_ARGUMENTS,macro)) goto err_argv;
-     break;
+
+  switch (macro->f_macro.m_function.f_argc) {
+   case 0: /* Check for special case: No-arguments macro. */
+    /* The one argument that we parsed must only contain whitespace.
+     * >> If it does not, emit a warning. */
+    iter = argv[0].ac_begin,end = argv[0].ac_end;
+    while (iter != end) {
+     while (SKIP_WRAPLF(iter,end));
+     if unlikely(!isspace(*iter)) {
+      if unlikely(!TPPLexer_Warn(W_TOO_MANY_MACRO_ARGUMENTS,macro)) goto err_argv;
+      break;
+     }
+     ++iter;
     }
-    ++iter;
-   }
+    break;
+   case 1: /* Check for special case: single-argument varargs function. */
+    /* If the only argument of a variadic function is empty, the variadic size drops to ZERO(0). */
+    if (macro->f_macro.m_flags&TPP_MACROFILE_FLAG_FUNC_VARIADIC &&
+        argv[0].ac_begin == argv[0].ac_end) assert(va_size == 1),va_size = 0;
+    break;
+   default: break;
   }
 
 
