@@ -6219,12 +6219,26 @@ at_next_non_whitespace:
                  !paren_recursion[RECURSION_BRACKET]
                   ) ++paren_recursion[RECURSION_BRACE];
               break;
-    case '<': if (calling_conv >= RECURSION_ANGLE &&
-                 !paren_recursion[RECURSION_PAREN] &&
-                 !paren_recursion[RECURSION_BRACKET] &&
-                 !paren_recursion[RECURSION_BRACE]
-                  ) ++paren_recursion[RECURSION_ANGLE];
-              break;
+    case TOK_LOWER_EQUAL: /* '<=' */
+    case TOK_SHL_EQUAL: /* '<<=' */
+     if (calling_conv >= RECURSION_ANGLE &&
+        !paren_recursion[RECURSION_PAREN] &&
+        !paren_recursion[RECURSION_BRACKET] &&
+        !paren_recursion[RECURSION_BRACE]) {
+      paren_recursion[RECURSION_ANGLE] += TOK == TOK_SHL_EQUAL ? 2 : 1;
+      arguments_file->f_pos = token.t_end-1;
+      assert(*arguments_file->f_pos == '=');
+     }
+     break;
+    case TOK_SHL:
+    case '<':
+     if (calling_conv >= RECURSION_ANGLE &&
+        !paren_recursion[RECURSION_PAREN] &&
+        !paren_recursion[RECURSION_BRACKET] &&
+        !paren_recursion[RECURSION_BRACE]) {
+      paren_recursion[RECURSION_ANGLE] += TOK == '<' ? 1 : 2;
+     }
+     break;
 
      /* Reduce parenthesis. */
      if (FALSE) { case ')': --paren_recursion[RECURSION_PAREN]; }
@@ -6235,11 +6249,38 @@ at_next_non_whitespace:
                                 paren_recursion[RECURSION_BRACKET] ||
                                 paren_recursion[RECURSION_PAREN]) break;
                             --paren_recursion[RECURSION_BRACE]; }
-     if (FALSE) { case '>': if (calling_conv < RECURSION_ANGLE ||
+     if (FALSE) { case TOK_SHR:
+                  case TOK_SHR_EQUAL:
+                  case TOK_GREATER_EQUAL:
+                  case '>': if (calling_conv < RECURSION_ANGLE ||
                                 paren_recursion[RECURSION_BRACE] ||
                                 paren_recursion[RECURSION_BRACKET] ||
                                 paren_recursion[RECURSION_PAREN]) break;
-                            --paren_recursion[RECURSION_ANGLE]; }
+                            assert(arguments_file->f_pos == token.t_end);
+                            if (TOK == '>') {
+                             --paren_recursion[RECURSION_ANGLE];
+                            } else if (TOK == TOK_GREATER_EQUAL) {
+                             --paren_recursion[RECURSION_ANGLE];
+                             --arguments_file->f_pos; /* Parse the '=' again. */
+                            } else if (paren_recursion[RECURSION_ANGLE] >= 2) {
+                             paren_recursion[RECURSION_ANGLE] -= 2;
+                             if (TOK == TOK_SHR_EQUAL) {
+                              assert(arguments_file->f_pos[-1] == '=');
+                              --arguments_file->f_pos; /* Parse the '=' again. */
+                             }
+                             ++token.t_begin;
+                            } else {
+                             --paren_recursion[RECURSION_ANGLE];
+                             if (TOK == TOK_SHR) {
+                              assert(arguments_file->f_pos[-1] == '>');
+                              --arguments_file->f_pos; /* Parse the second '>' again. */
+                             } else {
+                              assert(arguments_file->f_pos[-1] == '=');
+                              assert(token.t_begin[0] == '>');
+                              arguments_file->f_pos = token.t_begin+1; /* Parse everything after the first '>' again. */
+                             }
+                            }
+     }
      /* Check if the select calling convention has dropped to zero. */
      if (!paren_recursion[calling_conv]) goto add_arg;
      break;
