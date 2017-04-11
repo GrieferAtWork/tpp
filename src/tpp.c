@@ -3662,6 +3662,7 @@ TPPKeyword_Getflags(struct TPPKeyword const *__restrict self) {
  uint32_t result;
  assert(self);
  assert(TPPLexer_Current);
+again:
  switch (self->k_id) {
   /* Lookup dynamic flags. */
 #ifndef __INTELLISENSE__
@@ -3670,23 +3671,23 @@ TPPKeyword_Getflags(struct TPPKeyword const *__restrict self) {
 #undef KWD_FLAGS
 #endif
   default:
-   if (self->k_rare) result = self->k_rare->kr_flags;
+   if (self->k_rare && self->k_rare->kr_flags)
+    result = self->k_rare->kr_flags;
    else {
     char const *begin,*end,*real_end;
     /* Check for an alias with less underscores. */
     real_end = end = (begin = self->k_name)+self->k_size;
     while (begin != end && *begin == '_') ++begin;
-    while (end != real_end && end[-1] == '_') --end;
+    while (end != begin && end[-1] == '_') --end;
     result = TPP_KEYWORDFLAG_NONE;
     if (begin != self->k_name || end != real_end) {
      /* Was able to remove some leading/terminating underscores.
       * >> Check for an alternative keyword with them removed. */
      self = TPPLexer_LookupKeyword(begin,(size_t)(end-begin),0);
-     if (self && self->k_rare &&
+     if (self && (!self->k_rare ||
          /* Don't allow alias if the no-underscores flag is set. */
-       !(self->k_rare->kr_flags&TPP_KEYWORDFLAG_NO_UNDERSCORES)) {
-      result = TPPKeyword_Getflags(self);
-     }
+       !(self->k_rare->kr_flags&TPP_KEYWORDFLAG_NO_UNDERSCORES)
+         )) goto again;
     }
    }
    break;
@@ -5060,27 +5061,22 @@ create_int_file:
     size_t keyword_rawsize,keyword_realsize;
     struct TPPKeyword *keyword; tok_t mode;
     int create_missing_keyword;
-   case KWD___is_identifier:
-   case KWD___is_builtin_identifier:
-   case KWD___is_deprecated:
    case KWD___has_attribute:
    case KWD___has_builtin:
    case KWD___has_cpp_attribute:
    case KWD___has_declspec_attribute:
    case KWD___has_extension:
    case KWD___has_feature:
+    /* Create keywords for these to work around leading/terminating understore quirks. */
+    create_missing_keyword = 1;
+    if (FALSE) { case KWD___is_deprecated:
+                 case KWD___is_identifier:
+                 case KWD___is_builtin_identifier: create_missing_keyword = 0; }
     if (!HAVE_EXTENSION_CLANG_FEATURES) break;
-    create_missing_keyword = 0;
-    if (FALSE) {
-   case KWD___TPP_UNIQUE:
-     if (!HAVE_EXTENSION_TPP_UNIQUE) break;
-     create_missing_keyword = 1;
-    }
-    if (FALSE) {
-   case KWD___TPP_COUNTER:
-     if (!HAVE_EXTENSION_TPP_COUNTER) break;
-     create_missing_keyword = 1;
-    }
+    if (FALSE) { case KWD___TPP_UNIQUE:  if (!HAVE_EXTENSION_TPP_UNIQUE) break;
+                                         create_missing_keyword = 1; }
+    if (FALSE) { case KWD___TPP_COUNTER: if (!HAVE_EXTENSION_TPP_COUNTER) break;
+                                         create_missing_keyword = 1; }
     mode = TOK;
     pushf();
     current.l_flags &= ~(TPPLEXER_FLAG_WANTCOMMENTS|
@@ -5136,9 +5132,12 @@ create_int_file:
       if unlikely(!TPPKeyword_MAKERARE(keyword)) goto seterr;
       intval = keyword->k_rare->kr_counter++;
       break;
+     case KWD___is_deprecated:
+      /* Don't allow leading/terminating underscores here! */
+      intval = keyword->k_rare && !!(keyword->k_rare->kr_flags&TPP_KEYWORDFLAG_IS_DEPRECATED);
+      break;
      { /* Flag-based keyword properties. */
       uint32_t mask;
-      if (FALSE) { case KWD___is_deprecated:          mask  = TPP_KEYWORDFLAG_IS_DEPRECATED;          }
       if (FALSE) { case KWD___has_attribute:          mask  = TPP_KEYWORDFLAG_HAS_ATTRIBUTE;          }
       if (FALSE) { case KWD___has_builtin:            mask  = TPP_KEYWORDFLAG_HAS_BUILTIN;            }
       if (FALSE) { case KWD___has_cpp_attribute:      mask  = TPP_KEYWORDFLAG_HAS_CPP_ATTRIBUTE;      }
