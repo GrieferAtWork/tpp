@@ -1,8 +1,10 @@
 #!/bin/bash
 
+CFLAGS=""
+
 # I told you this is a ~tiny~ preprocessor.
 # >> No dependencies other than libc & only 2 source files.
-gcc -o tpp src/frontend.c src/tpp.c
+gcc $CFLAGS -o tpp src/frontend.c src/tpp.c
 
 # NOTE: TPP Also recognizes a few compiler options.
 #       All options begin with 'TPP_CONFIG_*' and must either
@@ -47,4 +49,3 @@ gcc -o tpp src/frontend.c src/tpp.c
 #                             For a list of required hooks, see 'tpp.c',
 #                             section >> /* HOOK fallbacks & documentation. */ <<
 #                             Not intended for use in a stand-alone preprocessor.
-

@@ -159,8 +159,8 @@
 #   pragma warning(disable: 4201)
 #elif (defined(__GNUC__) && \
       /* Anonymous unions support starts with gcc 2.96/g++ 2.95 */\
-      (__GNUC__ < 2) || ((__GNUC__ == 2) && ((__GNUC_MINOR__ < 95) ||\
-     ((__GNUC_MINOR__ == 95) && !defined(__cplusplus))))) || \
+      (__GNUC__ < 2 || (__GNUC__ == 2 && (__GNUC_MINOR__ < 95 ||\
+      (__GNUC_MINOR__ == 95 && !defined(__cplusplus)))))) || \
       defined(__SUNPRO_C) || defined(__SUNPRO_CC)
 #   define TPP_UNNAMED_UNION  0
 #else
@@ -190,9 +190,11 @@ typedef int TPP(stream_t);
 #define TPP_STREAM_INVALID  -1
 #endif
 
-typedef int           TPP(tok_t);      /* Unique token id. */
-typedef size_t        TPP(hash_t);     /* Hash-value of a string. */
-typedef unsigned char TPP(encoding_t); /* File-encoding ID (One of 'TPP_ENCODING_*'). */
+typedef int           TPP(tok_t);      /*< Unique token id. */
+typedef size_t        TPP(hash_t);     /*< Hash-value of a string. */
+typedef unsigned char TPP(encoding_t); /*< File-encoding ID (One of 'TPP_ENCODING_*'). */
+typedef signed char   TPP(wgroup_t);   /*< Warning group ID. */
+typedef unsigned int  TPP(refcnt_t);   /*< Reference counter. */
 
 #define TPP_ENCODING_UTF8     0
 #define TPP_ENCODING_UTF16_BE 1
@@ -204,9 +206,9 @@ struct TPPFile;
 struct TPPKeyword;
 
 struct TPPString {
- unsigned int s_refcnt; /*< String reference counter. */
- size_t       s_size;   /*< Size of the text in characters. */
- char         s_text[TPP_SYMARRAY_SIZE]; /*< [s_size] ZERO-terminated text. */
+ TPP(refcnt_t) s_refcnt; /*< String reference counter. */
+ size_t        s_size;   /*< Size of the text in characters. */
+ char          s_text[TPP_SYMARRAY_SIZE]; /*< [s_size] ZERO-terminated text. */
 };
 #define TPPString_Incref(self) (void)(++(self)->s_refcnt)
 #define TPPString_Decref(self) (void)(--(self)->s_refcnt || (free(self),0))
@@ -351,7 +353,7 @@ struct {
 
 struct TPPFile {
  /* Input file/user macro. */
- unsigned int             f_refcnt;    /*< File reference counter. */
+ TPP(refcnt_t)            f_refcnt;    /*< File reference counter. */
 #define TPPFILE_KIND_TEXT     0 /*< Input file. */
 #define TPPFILE_KIND_MACRO    1 /*< Macro file. */
 #define TPPFILE_KIND_EXPLICIT 2 /*< An explicit file, that is the result of manually inserting text, such as resulting from expanding builtin macros. */

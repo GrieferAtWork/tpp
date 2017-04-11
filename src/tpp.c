@@ -513,7 +513,7 @@ LOCAL void tpp_log_raw(char const *fmt, ...) {
 
 struct TPPExplicitFile {
  /* NOTE: Keep in sync with 'TPPFile'! */
- unsigned int             f_refcnt;
+ refcnt_t                 f_refcnt;
  unsigned int             f_kind;
  /*C:ref*/struct TPPFile *f_prev;
  char                    *f_name;
@@ -728,9 +728,9 @@ skip_whitespacenolf_and_comments_rev(char *iter, char *begin) {
 
 
 PRIVATE struct {
- unsigned int s_refcnt;
- size_t       s_size;
- char         s_text[1];
+ refcnt_t s_refcnt;
+ size_t   s_size;
+ char     s_text[1];
 } tpp_empty_string = {0x80000000,0,{'\0'}};
 #define empty_string  ((struct TPPString *)&tpp_empty_string)
 
@@ -1440,16 +1440,17 @@ TPPFile_NextChunk(struct TPPFile *__restrict self, int flags) {
    /* Create a new chunk, potentially copying some small portion of data
     * located after the end of the previous one, creating a new chunk
     * and freeing up memory that is no longer used. */
-   prefix_size = self->f_text->s_size-end_offset;
+   newchunk = self->f_text;
+   prefix_size = newchunk->s_size-end_offset;
    /* Adjust the current line-offset based on the data we're about to drop. */
    self->f_textfile.f_lineoff += string_count_lf(self->f_begin,
                                                 (size_t)(self->f_end-self->f_begin));
-   if (self->f_text->s_refcnt == 1) {
-    newchunk = (struct TPPString *)realloc(self->f_text,
-                                           TPP_OFFSETOF(struct TPPString,s_text)+
+   assert(self->f_end == newchunk->s_text+end_offset);
+   if (newchunk->s_refcnt == 1) {
+    memmove(newchunk->s_text,self->f_end,prefix_size*sizeof(char));
+    newchunk = (struct TPPString *)realloc(newchunk,TPP_OFFSETOF(struct TPPString,s_text)+
                                           (STREAM_BUFSIZE+1+prefix_size)*sizeof(char));
-    if unlikely(!newchunk) return 0;
-    memmove(newchunk->s_text,newchunk->s_text+end_offset,prefix_size*sizeof(char));
+    if unlikely(!newchunk) return 0; /* It ~should?~ be OK if we don't clean up the 'memmove' above. */
    } else {
     newchunk = (struct TPPString *)malloc(TPP_OFFSETOF(struct TPPString,s_text)+
                                          (STREAM_BUFSIZE+1+prefix_size)*sizeof(char));
@@ -2755,13 +2756,13 @@ PRIVATE char const *const wgroup_names[WG_COUNT+1] = {
 
 #ifndef __INTELLISENSE__
 #define EXPAND_GROUPS(...)  {__VA_ARGS__,-1}
-#define WARNING(name,groups,default) PRIVATE int const wgroups_##name[] = EXPAND_GROUPS groups;
+#define WARNING(name,groups,default) PRIVATE wgroup_t const wgroups_##name[] = EXPAND_GROUPS groups;
 #include "tpp-defs.inl"
 #undef WARNING
 #undef EXPAND_GROUPS
 #endif
 
-PRIVATE int const *const w_associated_groups[W_COUNT] = {
+PRIVATE wgroup_t const *const w_associated_groups[W_COUNT] = {
 #ifndef __INTELLISENSE__
 #define WARNING(name,groups,default) wgroups_##name,
 #include "tpp-defs.inl"
@@ -2945,7 +2946,7 @@ PRIVATE wstate_t do_invoke_wid(int wid) {
 
 PUBLIC int TPPLexer_InvokeWarning(int wnum) {
  wstate_t state; int found_warn = 0;
- int const *group_iter;
+ wgroup_t const *group_iter;
  if unlikely(wnum >= W_COUNT) return TPP_WARNINGMODE_WARN;
  state = do_invoke_wid(wnum+WG_COUNT);
  group_iter = w_associated_groups[wnum];
@@ -5654,7 +5655,7 @@ err_substr:  TPPString_Decref(basestring);
     struct TPPExplicitFile *predefined_macro;
     /* Predefined macros. */
 #define BUILTIN_MACRO(name,value) case name:\
-{ static struct { unsigned int a; size_t b; char c[COMPILER_STRLEN0(value)]; }\
+{ static struct { refcnt_t a; size_t b; char c[COMPILER_STRLEN0(value)]; }\
   text##name = {0x80000000,COMPILER_STRLEN(value),value};\
   static struct TPPExplicitFile predef##name = \
   {0x80000000,TPPFILE_KIND_EXPLICIT,NULL,"",0,EMPTY_STRING_HASH,\
@@ -6852,7 +6853,9 @@ PRIVATE void EVAL_CALL eval_unary(struct TPPConst *result) {
 
   default:defch:
    if (TOK < 0) return;
-   if (result) TPPLexer_Warn(W_UNKNOWN_TOKEN_IN_EXPR_IS_ZERO);
+   if (result) {
+    TPPLexer_Warn(W_UNKNOWN_TOKEN_IN_EXPR_IS_ZERO);
+   }
    if (TPP_ISKEYWORD(TOK)) yield_fetch();
    if (result) TPPConst_ZERO(result);
    break;
@@ -7162,17 +7165,22 @@ PRIVATE void EVAL_CALL eval_or(struct TPPConst *result) {
 
 PRIVATE void EVAL_CALL eval_land(struct TPPConst *result) {
  eval_or(result);
- while (TOK == TOK_LAND) {
-  yield_fetch();
-  if (result) {
-   TPPConst_ToBool(result);
-   if (!result->c_data.c_int) goto nullop2;
-   //TPPConst_Quit(result); /* Unnecessary. */
-   eval_or(result);
-   TPPConst_ToBool(result);
-  } else {
+ if (TOK == TOK_LAND) {
+  do {
+   yield_fetch();
+   if (result) {
+    TPPConst_ToBool(result);
+    if (!result->c_data.c_int) goto nullop2;
+    //TPPConst_Quit(result); /* Unnecessary. */
+    eval_or(result);
+    TPPConst_ToBool(result);
+   } else {
 nullop2:
-   eval_or(NULL);
+    eval_or(NULL);
+   }
+  } while (TOK == TOK_LAND);
+  if (result && TOK == TOK_LOR) {
+   TPPLexer_Warn(W_CONSIDER_PAREN_AROUND_LAND);
   }
  }
 }
@@ -7690,7 +7698,7 @@ err:    return 0;
 PUBLIC int TPPLexer_Warn(int wnum, ...) {
  va_list args; char const *used_filename,*true_filename;
  char const *macro_name = NULL;
- int macro_name_size,behavior; int const *wgroups;
+ int macro_name_size,behavior; wgroup_t const *wgroups;
  struct TPPFile *textfile;
  struct TPPKeyword *kwd; char *temp;
  struct TPPIfdefStackSlot *ifdef_slot;
@@ -7853,7 +7861,8 @@ PUBLIC int TPPLexer_Warn(int wnum, ...) {
   case W_EXPECTED_KEYWORD_AFTER_PREDICATE: WARNF("Expected keyword after predicate '%s' in #assert, but got " TOK_S,KWDNAME(),TOK_A); break;
   case W_EXPECTED_KEYWORD_AFTER_EXPR_HASH: WARNF("Expected keyword after # in expression, but got " TOK_S,TOK_A); break;
   case W_EXPECTED_KEYWORD_AFTER_EXPR_PRED: WARNF("Expected keyword after predicate '%s' in expression, but got " TOK_S,KWDNAME(),TOK_A); break;
-  case W_UNKNOWN_ASSERTION               : WARNF("Assertion '%s' does not contain a predicate '%s'",KWDNAME(),KWDNAME()); break;
+  case W_UNKNOWN_ASSERTION               : temp = KWDNAME(),WARNF("Assertion '%s' does not contain a predicate '%s'",temp,KWDNAME()); break;
+  case W_CONSIDER_PAREN_AROUND_LAND      : WARNF("Consider adding parenthesis around '&&' to prevent confusion with '||'"); break;
   default: WARNF("? %d",wnum); break;
  }
  if (temp_string) TPPString_Decref(temp_string);

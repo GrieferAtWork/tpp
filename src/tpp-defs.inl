@@ -249,6 +249,7 @@ WGROUP(WG_UNDEF,               "undef",               WSTATE_ERROR)
 WGROUP(WG_TRIGRAPHS,           "trigraphs",           WSTATE_DISABLE)
 WGROUP(WG_EXPANSION_TO_DEFINED,"expansion-to-defined",WSTATE_DISABLE)
 WGROUP(WG_DIRECTIVE,           "directive",           WSTATE_ERROR)
+WGROUP(WG_QUALITY,             "quality",             WSTATE_ERROR)
 
 /* NOTE: These warnings are arranged to mirror those from the old TPP. */
 /* 0*/WARNING(W_EXPECTED_KEYWORD_AFTER_DEFINE,   (WG_SYNTAX),  WSTATE_WARN)    /*< OLD(TPPWarn_ExpectedKeywordAfterDefine). */
@@ -362,6 +363,7 @@ WARNING(W_EXPECTED_KEYWORD_AFTER_EXPR_PRED,(WG_DIRECTIVE),WSTATE_WARN)   /*< . *
 WARNING(W_UNKNOWN_ASSERTION,               (WG_VALUE),   WSTATE_DISABLE) /*< [struct TPPKeyword *,struct TPPKeyword *]. */
 WARNING(W_EXPECTED_STRING_AFTER_GCC_DIAG,  (WG_VALUE),   WSTATE_WARN)    /*< [struct TPPConst *]. */
 WARNING(W_CANT_POP_EXTENSIONS,             (WG_VALUE),   WSTATE_WARN)    /*< . */
+WARNING(W_CONSIDER_PAREN_AROUND_LAND,      (WG_QUALITY), WSTATE_WARN)    /*< . */
 
 #ifdef TPP_DEFS_DEFINES_BUILTIN_MACRO
 #undef TPP_DEFS_DEFINES_BUILTIN_MACRO
