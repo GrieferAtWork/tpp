@@ -516,6 +516,9 @@ enum{
  TPP(TOK_COLLON_EQUAL),  /*< ":=". */
  TPP(TOK_NAMESPACE),     /*< "::". */
  TPP(TOK_KEYWORD_BEGIN),
+ TPP(TOK_ARROW_STAR),    /*< "->*". */
+ TPP(TOK_DOT_STAR),      /*< ".*". */
+ TPP(TOK_DOTDOT),        /*< "..". */
 
  /* Name aliases */
  TPP(TOK_POS)           = TPP(TOK_ADD),
@@ -809,11 +812,15 @@ TPP_LOCAL int TPPLexer_COLUMN(void) { struct TPPFile *f = TPPLexer_Textfile(); r
 #define TPPLEXER_TOKEN_COLLONASSIGN        0x00000008 /*< Enable recognition of ':=' tokens. */
 #define TPPLEXER_TOKEN_STARSTAR            0x00000010 /*< Enable recognition of '**' tokens. */
 #define TPPLEXER_TOKEN_ARROW               0x00000020 /*< Enable recognition of '->' tokens. */
+#define TPPLEXER_TOKEN_ARROWSTAR           0x00000040 /*< Enable recognition of '->*' tokens. */
+#define TPPLEXER_TOKEN_DOTSTAR             0x00000080 /*< Enable recognition of '.*' tokens. */
+#define TPPLEXER_TOKEN_DOTDOT              0x00000100 /*< Enable recognition of '..' tokens. */
 #define TPPLEXER_TOKEN_DEFAULT             0xffffffff /*< Default set of extension tokens (enable all). */
 
 /* Predefined set of extension tokens for some languages. */
 #define TPPLEXER_TOKEN_LANG_C       (TPPLEXER_TOKEN_ARROW)
-#define TPPLEXER_TOKEN_LANG_CPP     (TPPLEXER_TOKEN_COLLONCOLLON|TPPLEXER_TOKEN_ARROW)
+#define TPPLEXER_TOKEN_LANG_CPP     (TPPLEXER_TOKEN_COLLONCOLLON|TPPLEXER_TOKEN_ARROW|\
+                                     TPPLEXER_TOKEN_ARROWSTAR|TPPLEXER_TOKEN_DOTSTAR)
 #define TPPLEXER_TOKEN_LANG_JAVA    (TPPLEXER_TOKEN_NONE)
 #define TPPLEXER_TOKEN_LANG_DEEMON  (TPPLEXER_TOKEN_ROOFROOF|TPPLEXER_TOKEN_COLLONCOLLON|\
                                      TPPLEXER_TOKEN_COLLONASSIGN|TPPLEXER_TOKEN_STARSTAR|\

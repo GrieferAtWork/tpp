@@ -3806,9 +3806,19 @@ parse_multichar:
    goto settok;
 
   case '.':
+   if (*forward == '*' &&
+      (current.l_extokens&TPPLEXER_TOKEN_DOTSTAR)) { ch = TOK_DOT_STAR; goto settok_forward1; }
    if (*forward == '.') {
+    char *after_second = ++forward;
     while (SKIP_WRAPLF(forward,end));
-    if (*forward == '.') { ch = TOK_DOTS; iter = forward+2; goto settok; }
+    if (*forward == '.') {
+     ch = TOK_DOTS;
+     iter = forward+1;
+     goto settok;
+    } else if (current.l_extokens&TPPLEXER_TOKEN_DOTDOT) {
+     ch = TOK_DOTDOT;
+     iter = after_second;
+    }
    }
    goto settok;
 
@@ -3825,7 +3835,21 @@ parse_multichar:
    if (*forward == '=') { ch = TOK_SUB_EQUAL; goto settok_forward1; }
    if (*forward == '-') { ch = TOK_DEC; goto settok_forward1; }
    if (*forward == '>' &&
-      (current.l_extokens&TPPLEXER_TOKEN_ARROW)) { ch = TOK_ARROW; goto settok_forward1; }
+      (current.l_extokens&(TPPLEXER_TOKEN_ARROW|TPPLEXER_TOKEN_ARROWSTAR))) {
+    char *after_arrow = ++forward;
+    if (current.l_flags&TPPLEXER_TOKEN_ARROWSTAR) {
+     while (SKIP_WRAPLF(forward,end));
+     if (*forward == '*') {
+      iter = forward;
+      ch = TOK_ARROW_STAR; /*< "->*". */
+      goto settok_forward1;
+     }
+    }
+    if (current.l_extokens&TPPLEXER_TOKEN_ARROW) {
+     ch = TOK_ARROW;
+     iter = after_arrow;
+    }
+   }
    goto settok;
 
   case '*':
