@@ -681,6 +681,9 @@ struct TPPRareKeyword {
  TPP(int_t)                kr_counter;  /*< Counter value used by '__TPP_COUNTER()' */
 #define TPP_KEYWORDFLAG_NONE                   0x00000000
 #define TPP_KEYWORDFLAG_IMPORTED               0x80000000 /*< Set for for files after they've been #import-ed. */
+#define TPP_KEYWORDFLAG_NO_UNDERSCORES         0x00000100 /*< When looking up keyword flags, don't allow this keyword to alias another with additional underscores at the front and back:
+                                                           *  >> __has_feature(__tpp_dollar_is_alpha__) // If 'tpp_dollar_is_alpha' doesn't have this flag set, it can alias '__tpp_dollar_is_alpha__'
+                                                           */
  /* NOTE: These flags share their values with those
   *       from the old TPP for backwards compatibility. */
 #define TPP_KEYWORDFLAG_HAS_ATTRIBUTE          0x00000001
@@ -709,6 +712,12 @@ struct TPPKeyword {
 #define TPPKeyword_MAKERARE(self) \
  ((self)->k_rare || ((self)->k_rare = (struct TPPRareKeyword *)\
    calloc(1,sizeof(struct TPPRareKeyword))) != NULL)
+
+//////////////////////////////////////////////////////////////////////////
+// Returns the effective keyword flags of 'self'.
+// @return: A set of 'TPP_KEYWORDFLAG_*'
+TPPFUN uint32_t TPPKeyword_Getflags(struct TPPKeyword const *__restrict self);
+
 
 struct TPPKeywordMap {
  size_t              km_entryc;  /*< Amount of keyword entries stored. */
@@ -771,26 +780,29 @@ TPP_LOCAL int TPPLexer_COLUMN(void) { struct TPPFile *f = TPPLexer_Textfile(); r
 #define TPPLEXER_FLAG_DIRECTIVE_NOOWN_LF     0x00001000 /*< Linefeeds terminating preprocessor directives are not part of those directives and are instead re-emit.
                                                          *  WARNING: Using this flag is not recommended, as a freshly defined macro will re-use
                                                          *           text from the file and set the first character of that linefeed to '\0'. */
-#define TPPLEXER_FLAG_COMMENT_NOOWN_LF       0x00001000 /*< Linefeeds terminating a '// foo'-style comment are not owned by that comment, but are re-emit. */
-#define TPPLEXER_FLAG_MESSAGE_LOCATION       0x00002000 /*< Print the file+line location in messages from '#pragma message'. */
-#define TPPLEXER_FLAG_MESSAGE_NOLINEFEED     0x00004000 /*< Don't print a linefeed following the user-provided message in '#pragma message'. */
-#define TPPLEXER_FLAG_NO_TILDETILDE          0x00008000 /*< Disable recognition of '~~' tokens. */
-#define TPPLEXER_FLAG_NO_ROOFROOF            0x00010000 /*< Disable recognition of '^^' tokens. */
-#define TPPLEXER_FLAG_NO_COLLONCOLLON        0x00020000 /*< Disable recognition of '::' tokens. */
-#define TPPLEXER_FLAG_INCLUDESTRING          0x00040000 /*< Parse strings as #include strings (without \-escape sequences). */
-#define TPPLEXER_FLAG_KEEP_ARG_WHITESPACE    0x00080000 /*< When set, keep whitespace surrounding macro arguments. */
-#define TPPLEXER_FLAG_NO_LEGACY_GUARDS       0x00100000 /*< Don't recognize legacy #include-guards
+#define TPPLEXER_FLAG_COMMENT_NOOWN_LF       0x00002000 /*< Linefeeds terminating a '// foo'-style comment are not owned by that comment, but are re-emit. */
+#define TPPLEXER_FLAG_MESSAGE_LOCATION       0x00004000 /*< Print the file+line location in messages from '#pragma message'. */
+#define TPPLEXER_FLAG_MESSAGE_NOLINEFEED     0x00008000 /*< Don't print a linefeed following the user-provided message in '#pragma message'. */
+#define TPPLEXER_FLAG_NO_TILDETILDE          0x00010000 /*< Disable recognition of '~~' tokens. */
+#define TPPLEXER_FLAG_NO_ROOFROOF            0x00020000 /*< Disable recognition of '^^' tokens. */
+#define TPPLEXER_FLAG_NO_COLLONCOLLON        0x00040000 /*< Disable recognition of '::' tokens. */
+#define TPPLEXER_FLAG_NO_STARSTAR            0x00080000 /*< Disable recognition of '**' tokens. */
+#define TPPLEXER_FLAG_INCLUDESTRING          0x00100000 /*< Parse strings as #include strings (without \-escape sequences). */
+#define TPPLEXER_FLAG_KEEP_ARG_WHITESPACE    0x00200000 /*< When set, keep whitespace surrounding macro arguments. */
+#define TPPLEXER_FLAG_NO_LEGACY_GUARDS       0x00400000 /*< Don't recognize legacy #include-guards
                                                          *  WARNING: Not setting this option may lead to whitespace and comments at the
                                                          *           start and end of a guarded file to not be emit on a second pass.
                                                          *        >> Disable this option when either is important to your compiler. */
-#define TPPLEXER_FLAG_WERROR                 0x00200000 /*< All warnings are turned into errors (NOTE: less powerful than 'TPPLEXER_FLAG_WSYSTEMHEADERS'). */
-#define TPPLEXER_FLAG_WSYSTEMHEADERS         0x00400000 /*< Still emit warnings in system headers (alongside errors). */
-#define TPPLEXER_FLAG_MSVC_MESSAGEFORMAT     0x01000000 /*< Use msvc's file+line format '%s(%d,%d) : ' instead of GCC's '%s:%d:%d: '. */
-#define TPPLEXER_FLAG_NO_WARNINGS            0x02000000 /*< Don't emit warnings. */
-#define TPPLEXER_FLAG_NO_ENCODING            0x04000000 /*< Don't try to detect file encodings (Everything is UTF-8 without BOM; aka. raw text). */
+#define TPPLEXER_FLAG_WERROR                 0x00800000 /*< All warnings are turned into errors (NOTE: less powerful than 'TPPLEXER_FLAG_WSYSTEMHEADERS'). */
+#define TPPLEXER_FLAG_WSYSTEMHEADERS         0x01000000 /*< Still emit warnings in system headers (alongside errors). */
+#define TPPLEXER_FLAG_NO_DEPRECATED          0x02000000 /*< Don't warn about deprecated keywords. */
+#define TPPLEXER_FLAG_MSVC_MESSAGEFORMAT     0x04000000 /*< Use msvc's file+line format '%s(%d,%d) : ' instead of GCC's '%s:%d:%d: '. */
+#define TPPLEXER_FLAG_NO_WARNINGS            0x08000000 /*< Don't emit warnings. */
+#define TPPLEXER_FLAG_NO_ENCODING            0x10000000 /*< Don't try to detect file encodings (Everything is UTF-8 without BOM; aka. raw text). */
+#define TPPLEXER_FLAG_EAT_UNKNOWN_PRAGMA     0x20000000 /*< Don't re-emit unknown pragmas. */
 #define TPPLEXER_FLAG_RANDOM_INITIALIZED     0x40000000 /*< Set when rand() has been initialized. */
 #define TPPLEXER_FLAG_ERROR                  0x80000000 /*< When set, the lexer is in an error-state in which calls to yield() will return TOK_ERR. */
-#define TPPLEXER_FLAG_MERGEMASK              0xf0000000 /*< A mask of flags that are merged (or'd together) during popf(). */
+#define TPPLEXER_FLAG_MERGEMASK              0xC0000000 /*< A mask of flags that are merged (or'd together) during popf(). */
 #define TPPLEXER_FLAG_DEFAULT                0x00000000 /*< Default set of flags (suitable for use with most token-based compilers). */
 
 /* Extension flags. */
@@ -802,42 +814,44 @@ TPP_LOCAL int TPPLexer_COLUMN(void) { struct TPPFile *f = TPPLexer_Textfile(); r
 #define TPPLEXER_EXTENSION_GCC_IFELSE        0x0000000000000010ull /*< [name("if-else-optional-true")] Recognize 'foo ? : 42' as alias for 'foo ? foo : 42'. */
 #define TPPLEXER_EXTENSION_VA_COMMA          0x0000000000000020ull /*< [name("va-comma-in-macros")] Recognize '__VA_COMMA__' in variadic macros. */
 #define TPPLEXER_EXTENSION_VA_NARGS          0x0000000000000040ull /*< [name("va-nargs-in-macros")] Recognize '__VA_NARGS__' in variadic macros. */
-#define TPPLEXER_EXTENSION_STR_E             0x0000000000000080ull /*< [name("escape-e-in-strings")] Recognize '\e' as alias for '\033' in strings/characters. */
-#define TPPLEXER_EXTENSION_ALTMAC            0x0000000000000100ull /*< [name("alternative-macro-parenthesis")] Recognize additional function-style macros: '[...]', '{...}' and '<...>'. */
-#define TPPLEXER_EXTENSION_RECMAC            0x0000000000000200ull /*< [name("macro-recursion")] Newly defined macros functions are allowed to recursively self-expand (This flag is copied into 'TPP_MACROFILE_FLAG_FUNC_SELFEXPAND' when defining new macros). */
-#define TPPLEXER_EXTENSION_BININTEGRAL       0x0000000000000400ull /*< [name("binary-literals")] Allow the '0b' prefix in integral constants for binary values. */
-#define TPPLEXER_EXTENSION_MSVC_PRAGMA       0x0000000000000800ull /*< [name("msvc-pragma-support")] Enable the use of __pragma(x) as alias for _Pragma(#x) (visual-c style). */
-#define TPPLEXER_EXTENSION_STRINGOPS         0x0000000000001000ull /*< [name("strings-in-expressions")] Enable special (non-c) operands for operating with strings in constant expressions (string compare, sub-string, string-length). */
-#define TPPLEXER_EXTENSION_HASH_AT           0x0000000000002000ull /*< [name("charize-macro-argument")] Enable support for "#@" in function macros to generate the character-representation of an argument. */
-#define TPPLEXER_EXTENSION_HASH_XCLAIM       0x0000000000004000ull /*< [name("dont-expand-macro-argument")] Enable support for "#!" in function macros to reference an argument without expansion. */
-#define TPPLEXER_EXTENSION_WARNING           0x0000000000008000ull /*< [name("warning-directives")] Recognize the #warning directive. */
-#define TPPLEXER_EXTENSION_SHEBANG           0x0000000000010000ull /*< [name("shebang-directives")] Ignore shebang-style directives ("#!..."). */
-#define TPPLEXER_EXTENSION_INCLUDE_NEXT      0x0000000000020000ull /*< [name("include-next-directives")] Recognize gcc's #include_next directive. */
-#define TPPLEXER_EXTENSION_IMPORT            0x0000000000040000ull /*< [name("import-directives")] Recognize #import directives. */
-#define TPPLEXER_EXTENSION_IDENT_SCCS        0x0000000000080000ull /*< [name("ident-directives")] Recognize (and ignore) #ident/#sccs directives. */
-#define TPPLEXER_EXTENSION_BASEFILE          0x0000000000100000ull /*< [name("basefile-macro")] Enable the built-in macro '__BASE_FILE__'. */
-#define TPPLEXER_EXTENSION_INCLUDE_LEVEL     0x0000000000200000ull /*< [name("include-level-macro")] Recognize __INCLUDE_LEVEL__ & __INCLUDE_DEPTH__ preprocessor macros. */
-#define TPPLEXER_EXTENSION_COUNTER           0x0000000000400000ull /*< [name("counter-macro")] Recognize the __COUNTER__ preprocessor macro. */
-#define TPPLEXER_EXTENSION_CLANG_FEATURES    0x0000000000800000ull /*< [name("has-feature-macros")] Recognize clang's __has_(feature|extension|attribute|...) and __is_(deprecated|{builtin_}identifier) special macros. */
-#define TPPLEXER_EXTENSION_HAS_INCLUDE       0x0000000001000000ull /*< [name("has-include-macros")] Recognize clang's __has_{next_}include special macros. */
-#define TPPLEXER_EXTENSION_LXOR              0x0000000002000000ull /*< [name("logical-xor-in-expressions")] Allow the use of '^^' in expressions as logical xor. */
-#define TPPLEXER_EXTENSION_MULTICHAR_CONST   0x0000000004000000ull /*< [name("multichar-constants")] Recognize multi-character constants (e.g.: [x][=]['abc']). */
-#define TPPLEXER_EXTENSION_DATEUTILS         0x0000000008000000ull /*< [name("numeric-date-macros")] Recognize a set of macros to expand to integral parts of the current date. */
-#define TPPLEXER_EXTENSION_TIMEUTILS         0x0000000010000000ull /*< [name("numeric-time-macros")] Recognize a set of macros to expand to integral parts of the current time. */
-#define TPPLEXER_EXTENSION_TIMESTAMP         0x0000000020000000ull /*< [name("timestamp-macro")] Recognize the '__TIMESTAMP__' preprocessor macro. */
-#define TPPLEXER_EXTENSION_COLUMN            0x0000000040000000ull /*< [name("column-macro")] Recognize '__COLUMN__' as a builtin macro expanding the current column number. */
-#define TPPLEXER_EXTENSION_TPP_EVAL          0x0000000080000000ull /*< [name("tpp-eval-macro")] Enable the '__TPP_EVAL(...)' builtin macro. */
-#define TPPLEXER_EXTENSION_TPP_UNIQUE        0x0000000100000000ull /*< [name("tpp-unique-macro")] Enable the '__TPP_UNIQUE(...)' builtin macro. */
-#define TPPLEXER_EXTENSION_TPP_LOAD_FILE     0x0000000200000000ull /*< [name("tpp-load-file-macro")] Enable the '__TPP_LOAD_FILE(...)' builtin macro. */
-#define TPPLEXER_EXTENSION_TPP_COUNTER       0x0000000400000000ull /*< [name("tpp-counter-macro")] Enable the '__TPP_COUNTER(...)' builtin macro. */
-#define TPPLEXER_EXTENSION_TPP_RANDOM        0x0000000800000000ull /*< [name("tpp-random-macro")] Enable the '__TPP_RANDOM(...)' builtin macro. */
-#define TPPLEXER_EXTENSION_TPP_STR_DECOMPILE 0x0000001000000000ull /*< [name("tpp-str-decompile-macro")] Enable the '__TPP_STR_DECOMPILE(...)' builtin macro. */
-#define TPPLEXER_EXTENSION_TPP_STR_SUBSTR    0x0000002000000000ull /*< [name("tpp-str-substr-macro")] Enable the '__TPP_STR_AT(...)' and '__TPP_STR_SUBSTR(...)' builtin macros. */
-#define TPPLEXER_EXTENSION_TPP_STR_PACK      0x0000004000000000ull /*< [name("tpp-str-pack-macro")] Enable the '__TPP_STR_PACK(...)' builtin macro. */
-#define TPPLEXER_EXTENSION_TPP_STR_SIZE      0x0000008000000000ull /*< [name("tpp-str-size-macro")] Enable the '__TPP_STR_SIZE(...)' builtin macro. */
-#define TPPLEXER_EXTENSION_DOLLAR_IS_ALPHA   0x0000010000000000ull /*< [name("dollars-in-identifiers")] Interpret '$' as an alphabetical character. */
-#define TPPLEXER_EXTENSION_ASSERTIONS        0x0000020000000000ull /*< [name("assertions")] Recognize #assert/#unassert directives, as well as #predicate(answer) expressions. */
-#define TPPLEXER_EXTENSION_CANONICAL_HEADERS 0x0000040000000000ull /*< [name("canonical-system-headers")] Fix paths to normalize '/' vs. '\\', in order to prevent problems with #pragma once. */
+#define TPPLEXER_EXTENSION_VA_ARGS           0x0000000000000080ull /*< [name("va-args-in-macros")][FEATURE] Recognize '__VA_ARGS__' in variadic macros. */
+#define TPPLEXER_EXTENSION_STR_E             0x0000000000000100ull /*< [name("escape-e-in-strings")] Recognize '\e' as alias for '\033' in strings/characters. */
+#define TPPLEXER_EXTENSION_ALTMAC            0x0000000000000200ull /*< [name("alternative-macro-parenthesis")] Recognize additional function-style macros: '[...]', '{...}' and '<...>'. */
+#define TPPLEXER_EXTENSION_RECMAC            0x0000000000000400ull /*< [name("macro-recursion")] Newly defined macros functions are allowed to recursively self-expand (This flag is copied into 'TPP_MACROFILE_FLAG_FUNC_SELFEXPAND' when defining new macros). */
+#define TPPLEXER_EXTENSION_BININTEGRAL       0x0000000000000800ull /*< [name("binary-literals")] Allow the '0b' prefix in integral constants for binary values. */
+#define TPPLEXER_EXTENSION_MSVC_PRAGMA       0x0000000000001000ull /*< [name("msvc-pragma-support")] Enable the use of __pragma(x) as alias for _Pragma(#x) (visual-c style). */
+#define TPPLEXER_EXTENSION_STRINGOPS         0x0000000000002000ull /*< [name("strings-in-expressions")] Enable special (non-c) operands for operating with strings in constant expressions (string compare, sub-string, string-length). */
+#define TPPLEXER_EXTENSION_HASH_AT           0x0000000000004000ull /*< [name("charize-macro-argument")] Enable support for "#@" in function macros to generate the character-representation of an argument. */
+#define TPPLEXER_EXTENSION_HASH_XCLAIM       0x0000000000008000ull /*< [name("dont-expand-macro-argument")] Enable support for "#!" in function macros to reference an argument without expansion. */
+#define TPPLEXER_EXTENSION_WARNING           0x0000000000010000ull /*< [name("warning-directives")] Recognize the #warning directive. */
+#define TPPLEXER_EXTENSION_SHEBANG           0x0000000000020000ull /*< [name("shebang-directives")] Ignore shebang-style directives ("#!..."). */
+#define TPPLEXER_EXTENSION_INCLUDE_NEXT      0x0000000000040000ull /*< [name("include-next-directives")] Recognize gcc's #include_next directive. */
+#define TPPLEXER_EXTENSION_IMPORT            0x0000000000080000ull /*< [name("import-directives")] Recognize #import directives. */
+#define TPPLEXER_EXTENSION_IDENT_SCCS        0x0000000000100000ull /*< [name("ident-directives")] Recognize (and ignore) #ident/#sccs directives. */
+#define TPPLEXER_EXTENSION_BASEFILE          0x0000000000200000ull /*< [name("basefile-macro")] Enable the built-in macro '__BASE_FILE__'. */
+#define TPPLEXER_EXTENSION_INCLUDE_LEVEL     0x0000000000400000ull /*< [name("include-level-macro")] Recognize __INCLUDE_LEVEL__ & __INCLUDE_DEPTH__ preprocessor macros. */
+#define TPPLEXER_EXTENSION_COUNTER           0x0000000000800000ull /*< [name("counter-macro")] Recognize the __COUNTER__ preprocessor macro. */
+#define TPPLEXER_EXTENSION_CLANG_FEATURES    0x0000000001000000ull /*< [name("has-feature-macros")] Recognize clang's __has_(feature|extension|attribute|...) and __is_(deprecated|{builtin_}identifier) special macros. */
+#define TPPLEXER_EXTENSION_HAS_INCLUDE       0x0000000002000000ull /*< [name("has-include-macros")] Recognize clang's __has_{next_}include special macros. */
+#define TPPLEXER_EXTENSION_LXOR              0x0000000004000000ull /*< [name("logical-xor-in-expressions")] Allow the use of '^^' in expressions as logical xor. */
+#define TPPLEXER_EXTENSION_MULTICHAR_CONST   0x0000000008000000ull /*< [name("multichar-constants")] Recognize multi-character constants (e.g.: [x][=]['abc']). */
+#define TPPLEXER_EXTENSION_DATEUTILS         0x0000000010000000ull /*< [name("numeric-date-macros")] Recognize a set of macros to expand to integral parts of the current date. */
+#define TPPLEXER_EXTENSION_TIMEUTILS         0x0000000020000000ull /*< [name("numeric-time-macros")] Recognize a set of macros to expand to integral parts of the current time. */
+#define TPPLEXER_EXTENSION_TIMESTAMP         0x0000000040000000ull /*< [name("timestamp-macro")] Recognize the '__TIMESTAMP__' preprocessor macro. */
+#define TPPLEXER_EXTENSION_COLUMN            0x0000000080000000ull /*< [name("column-macro")] Recognize '__COLUMN__' as a builtin macro expanding the current column number. */
+#define TPPLEXER_EXTENSION_TPP_EVAL          0x0000000100000000ull /*< [name("tpp-eval-macro")] Enable the '__TPP_EVAL(...)' builtin macro. */
+#define TPPLEXER_EXTENSION_TPP_UNIQUE        0x0000000200000000ull /*< [name("tpp-unique-macro")] Enable the '__TPP_UNIQUE(...)' builtin macro. */
+#define TPPLEXER_EXTENSION_TPP_LOAD_FILE     0x0000000400000000ull /*< [name("tpp-load-file-macro")] Enable the '__TPP_LOAD_FILE(...)' builtin macro. */
+#define TPPLEXER_EXTENSION_TPP_COUNTER       0x0000000800000000ull /*< [name("tpp-counter-macro")] Enable the '__TPP_COUNTER(...)' builtin macro. */
+#define TPPLEXER_EXTENSION_TPP_RANDOM        0x0000001000000000ull /*< [name("tpp-random-macro")] Enable the '__TPP_RANDOM(...)' builtin macro. */
+#define TPPLEXER_EXTENSION_TPP_STR_DECOMPILE 0x0000002000000000ull /*< [name("tpp-str-decompile-macro")] Enable the '__TPP_STR_DECOMPILE(...)' builtin macro. */
+#define TPPLEXER_EXTENSION_TPP_STR_SUBSTR    0x0000004000000000ull /*< [name("tpp-str-substr-macro")] Enable the '__TPP_STR_AT(...)' and '__TPP_STR_SUBSTR(...)' builtin macros. */
+#define TPPLEXER_EXTENSION_TPP_STR_PACK      0x0000008000000000ull /*< [name("tpp-str-pack-macro")] Enable the '__TPP_STR_PACK(...)' builtin macro. */
+#define TPPLEXER_EXTENSION_TPP_STR_SIZE      0x0000010000000000ull /*< [name("tpp-str-size-macro")] Enable the '__TPP_STR_SIZE(...)' builtin macro. */
+#define TPPLEXER_EXTENSION_DOLLAR_IS_ALPHA   0x0000020000000000ull /*< [name("dollars-in-identifiers")] Interpret '$' as an alphabetical character. */
+#define TPPLEXER_EXTENSION_ASSERTIONS        0x0000040000000000ull /*< [name("assertions")] Recognize #assert/#unassert directives, as well as #predicate(answer) expressions. */
+#define TPPLEXER_EXTENSION_CANONICAL_HEADERS 0x0000080000000000ull /*< [name("canonical-system-headers")] Fix paths to normalize '/' vs. '\\', in order to prevent problems with #pragma once. */
+#define TPPLEXER_EXTENSION_EXT_ARE_FEATURES  0x0000100000000000ull /*< [name("extensions-are-features")] extensions (__has_extension) are also considered features (__has_feature). */
 #define TPPLEXER_EXTENSION_DEFAULT           0xfffffffffffffffeull /*< Enable (almost) all extensions. */
 
 struct TPPLexer {
@@ -860,7 +874,6 @@ struct TPPLexer {
 };
 #define TPPLEXER_DEFAULT_LIMIT_MREC 512 /* Even when generated text differs from previous version, don't allow more self-recursion per macro than this. */
 #define TPPLEXER_DEFAULT_LIMIT_INCL 64  /* User attempts to #include a file more often that file will fail with an error message. */
-
 
 #if TPP_CONFIG_ONELEXER
 #define TPPLexer_Current  (&TPPLexer_Global)
@@ -904,6 +917,17 @@ TPPFUN struct TPPFile *TPPLexer_OpenFile(int mode, char *filename, size_t filena
 #define TPPLEXER_OPENFILE_FLAG_NEXT       4 /* FLAG: Only open a file not already part of the #include-stack
                                              * WARNING: May not be used for 'TPPLEXER_OPENFILE_MODE_NORMAL'! */
 #define TPPLEXER_OPENFILE_FLAG_NOCASEWARN 8 /* FLAG: Don't warn about filename casing on windows. */
+
+//////////////////////////////////////////////////////////////////////////
+// Push a given file into the #include-stack of the current lexer.
+// NOTE: These functions never fail and return void.
+// HINT: Call 'TPPLexer_PushFileInherited' if you want the lexer to inherit the file.
+// WARNING: The file argument may be evaluated more than once!
+#define TPPLexer_PushFileInherited(f) \
+ (void)((f)->f_prev = TPPLexer_Current->l_token.t_file,\
+                      TPPLexer_Current->l_token.t_file = (f))
+#define TPPLexer_PushFile(f) \
+ (TPPFile_Incref(f),TPPLexer_PushFileInherited(f))
 
 //////////////////////////////////////////////////////////////////////////
 // Lookup or create a keyword entry for the given name.

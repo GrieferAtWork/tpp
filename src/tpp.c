@@ -37,6 +37,9 @@
 #ifndef __has_attribute
 #   define __has_attribute(x) 0
 #endif
+#ifndef __has_builtin
+#   define __has_builtin(x) 0
+#endif
 #ifndef _WIN64
 #ifdef WIN64
 #   define _WIN64 WIN64
@@ -83,8 +86,10 @@
 #ifndef PRIVATE
 #ifdef __ELF__
 #   define PRIVATE  __attribute__((__visibility__("private")))
-#elif 1
+#elif defined(_MSC_VER)
 #   define PRIVATE  extern
+#elif 1
+#   define PRIVATE  /* nothing */
 #else
 #   define PRIVATE  static
 #endif
@@ -209,19 +214,31 @@ memrchr(void const *p, int c, size_t n) {
 __attribute__((__noreturn__))
 #endif
 void tpp_assertion_failed(char const *expr, char const *file, int line) {
- fprintf(stderr,"%s(%d) : Assertion failed : %s\n",file,line,expr);
+ fprintf(stderr,
+#ifdef _MSC_VER
+         (!TPPLexer_Current || (TPPLexer_Current->l_flags&TPPLEXER_FLAG_MSVC_MESSAGEFORMAT))
+#else
+         (TPPLexer_Current && (TPPLexer_Current->l_flags&TPPLEXER_FLAG_MSVC_MESSAGEFORMAT))
+#endif
+         ? "%s(%d) : " : "%s:%d: ",file,line);
+ fprintf(stderr,"Assertion failed : %s\n",expr);
 #ifndef _MSC_VER
  _exit(1);
 #endif
 }
 #ifdef _MSC_VER
 extern void __debugbreak(void);
-#define assert(expr) ((expr) || (tpp_assertion_failed(#expr,__FILE__,__LINE__),__debugbreak(),1))
+#define assert(expr) ((expr) || (tpp_assertion_failed(#expr,__FILE__,__LINE__),__debugbreak(),0))
+#elif defined(__GNUC__)
+#define assert(expr) ((expr) || (tpp_assertion_failed(#expr,__FILE__,__LINE__),\
+                     ({ __asm__ __volatile__("int $3\n" : : : "memory"); 0; })))
 #else
-#define assert(expr) ((expr) || (tpp_assertion_failed(#expr,__FILE__,__LINE__),1))
+#define assert(expr) ((expr) || (tpp_assertion_failed(#expr,__FILE__,__LINE__),0))
 #endif
 #elif defined(_MSC_VER)
 #define assert        __assume
+#elif __has_builtin(__builtin_assume)
+#define assert        __builtin_assume
 #else /* TPP_CONFIG_DEBUG */
 #define assert(expr) (void)0
 #endif /* !TPP_CONFIG_DEBUG */
@@ -417,6 +434,7 @@ do{ tok_t              _old_tok_id    = token.t_id;\
 #define HAVE_EXTENSION_GCC_IFELSE        (current.l_extensions&TPPLEXER_EXTENSION_GCC_IFELSE)
 #define HAVE_EXTENSION_VA_COMMA          (current.l_extensions&TPPLEXER_EXTENSION_VA_COMMA)
 #define HAVE_EXTENSION_VA_NARGS          (current.l_extensions&TPPLEXER_EXTENSION_VA_NARGS)
+#define HAVE_EXTENSION_VA_ARGS           (current.l_extensions&TPPLEXER_EXTENSION_VA_ARGS)
 #define HAVE_EXTENSION_STR_E             (current.l_extensions&TPPLEXER_EXTENSION_STR_E)
 #define HAVE_EXTENSION_ALTMAC            (current.l_extensions&TPPLEXER_EXTENSION_ALTMAC)
 #define HAVE_EXTENSION_RECMAC            (current.l_extensions&TPPLEXER_EXTENSION_RECMAC)
@@ -453,6 +471,7 @@ do{ tok_t              _old_tok_id    = token.t_id;\
 #define HAVE_EXTENSION_DOLLAR_IS_ALPHA   (current.l_extensions&TPPLEXER_EXTENSION_DOLLAR_IS_ALPHA)
 #define HAVE_EXTENSION_ASSERTIONS        (current.l_extensions&TPPLEXER_EXTENSION_ASSERTIONS)
 #define HAVE_EXTENSION_CANONICAL_HEADERS (current.l_extensions&TPPLEXER_EXTENSION_CANONICAL_HEADERS)
+#define HAVE_EXTENSION_EXT_ARE_FEATURES  (current.l_extensions&TPPLEXER_EXTENSION_EXT_ARE_FEATURES)
 
 
 
@@ -1456,7 +1475,7 @@ search_suitable_end_again:
     else if (ch == '\"' && !(mode&~(MODE_INSTRING))) mode ^= MODE_INSTRING;
     /* TODO: Linefeeds should also terminate strings when the line started with a '#':
      *    >> #define m  This macro's fine!
-     *    >> #error This error contains an unmatched ", but that's file (< and so was that)
+     *    >> #error This error contains an unmatched ", but that's OK (< and so was that)
      * NOTE: Though remember that escaped linefeeds are always more powerful!
      */
     else if (termstring_onlf && islf(ch)) mode &= ~(MODE_INCHAR|MODE_INSTRING);
@@ -2122,7 +2141,7 @@ skip_argument_name:
      /* Expected ')' after varargs argument name. */
      if (!TPPLexer_Warn(W_EXPECTED_ARGEND_AFTER_VARARGS,argend_token)) goto err_arginfo;
     }
-   } else if (TOK == TOK_DOTS) {
+   } else if (TOK == TOK_DOTS && HAVE_EXTENSION_VA_ARGS) {
     argument_name            = KWD___VA_ARGS__;
     result->f_macro.m_flags |= TPP_MACROFILE_FLAG_FUNC_VARIADIC;
     goto add_macro_argument;
@@ -2925,6 +2944,7 @@ PRIVATE struct tpp_extension const tpp_extensions[] = {
  EXTENSION("if-else-optional-true",TPPLEXER_EXTENSION_GCC_IFELSE),
  EXTENSION("va-comma-in-macros",TPPLEXER_EXTENSION_VA_COMMA),
  EXTENSION("va-nargs-in-macros",TPPLEXER_EXTENSION_VA_NARGS),
+ EXTENSION("va-args-in-macros",TPPLEXER_EXTENSION_VA_ARGS),
  EXTENSION("escape-e-in-strings",TPPLEXER_EXTENSION_STR_E),
  EXTENSION("alternative-macro-parenthesis",TPPLEXER_EXTENSION_ALTMAC),
  EXTENSION("macro-recursion",TPPLEXER_EXTENSION_RECMAC),
@@ -2961,10 +2981,12 @@ PRIVATE struct tpp_extension const tpp_extensions[] = {
  EXTENSION("dollars-in-identifiers",TPPLEXER_EXTENSION_DOLLAR_IS_ALPHA),
  EXTENSION("assertions",TPPLEXER_EXTENSION_ASSERTIONS),
  EXTENSION("canonical-system-headers",TPPLEXER_EXTENSION_CANONICAL_HEADERS),
+ EXTENSION("extensions-are-features",TPPLEXER_EXTENSION_EXT_ARE_FEATURES),
 #undef EXTENSION
  {NULL,0,0},
 };
 
+#undef tolower
 #define tolower(c) ((c) >= 'A' && (c) <= 'Z' ? ((c)+('a'-'A')) : (c))
 
 #if 0
@@ -3597,6 +3619,44 @@ lookup_escaped_keyword(char const *name, size_t namelen,
 }
 
 
+PUBLIC uint32_t
+TPPKeyword_Getflags(struct TPPKeyword const *__restrict self) {
+ uint32_t result;
+ assert(self);
+ assert(TPPLexer_Current);
+ switch (self->k_id) {
+  /* Lookup dynamic flags. */
+#ifndef __INTELLISENSE__
+#define KWD_FLAGS(name,flags)  case name: result = flags; break;
+#include "tpp-defs.inl"
+#undef KWD_FLAGS
+#endif
+  default:
+   if (self->k_rare) result = self->k_rare->kr_flags;
+   else {
+    char const *begin,*end,*real_end;
+    /* Check for an alias with less underscores. */
+    real_end = end = (begin = self->k_name)+self->k_size;
+    while (begin != end && *begin == '_') ++begin;
+    while (end != real_end && end[-1] == '_') --end;
+    result = TPP_KEYWORDFLAG_NONE;
+    if (begin != self->k_name || end != real_end) {
+     /* Was able to remove some leading/terminating underscores.
+      * >> Check for an alternative keyword with them removed. */
+     self = TPPLexer_LookupKeyword(begin,(size_t)(end-begin),0);
+     if (self && self->k_rare &&
+         /* Don't allow alias if the no-underscores flag is set. */
+       !(self->k_rare->kr_flags&TPP_KEYWORDFLAG_NO_UNDERSCORES)) {
+      result = TPPKeyword_Getflags(self);
+     }
+    }
+   }
+   break;
+ }
+ return result;
+}
+
+
 
 
 #ifdef _MSC_VER
@@ -3767,7 +3827,8 @@ parse_multichar:
    goto settok;
 
   case '*':
-   if (*forward == '*') { ch = TOK_POW; goto settok_forward1; }
+   if (*forward == '*' &&
+     !(current.l_flags&TPPLEXER_FLAG_NO_STARSTAR)) { ch = TOK_POW; goto settok_forward1; }
    if (*forward == '=') { ch = TOK_MUL_EQUAL; goto settok_forward1; }
    if (*forward == '/') { if (!TPPLexer_Warn(W_STARSLASH_OUTSIDE_OF_COMMENT,iter-1)) goto err; }
    goto settok;
@@ -3907,7 +3968,8 @@ set_comment:
     token.t_id = kwd_entry->k_id;
     token.t_kwd = kwd_entry;
     if (kwd_entry->k_rare &&
-       (kwd_entry->k_rare->kr_flags&TPP_KEYWORDFLAG_IS_DEPRECATED)) {
+       (kwd_entry->k_rare->kr_flags&TPP_KEYWORDFLAG_IS_DEPRECATED) &&
+      !(current.l_flags&TPPLEXER_FLAG_NO_DEPRECATED)) {
      /* Check 'kwd_entry' for being a keyword marked as '#pragma deprecated'.
       * If it is, emit a warning. */
      token.t_end = iter;
@@ -4056,7 +4118,8 @@ PRIVATE int do_skip_pp_block(void) {
     *       contain an incomplete string ("#error a'b" is complete)
     */
    current.l_flags = oldflags|(TPPLEXER_FLAG_TERMINATE_STRING_LF|
-                               TPPLEXER_FLAG_WANTLF);
+                               TPPLEXER_FLAG_WANTLF|
+                               TPPLEXER_FLAG_COMMENT_NOOWN_LF);
    TPPLexer_YieldRaw();
    switch (TOK) {
     case KWD_ifdef: case KWD_ifndef: case KWD_if: ++recursion; break;
@@ -4132,7 +4195,9 @@ again:
       ) return result; /* Directives are not being parsed. */
   if (!at_start_of_line()) return result; /* Not actually a preprocessor directive! */
   pushf();
-  current.l_flags |= (TPPLEXER_FLAG_WANTLF|TPPLEXER_FLAG_TERMINATE_STRING_LF);
+  current.l_flags |= (TPPLEXER_FLAG_WANTLF|
+                      TPPLEXER_FLAG_TERMINATE_STRING_LF|
+                      TPPLEXER_FLAG_COMMENT_NOOWN_LF);
   current.l_flags &= ~(TPPLEXER_FLAG_WANTSPACE|TPPLEXER_FLAG_WANTCOMMENTS);
   pusheob();
   /* Parse these are assembler comments. */
@@ -4203,6 +4268,7 @@ def_skip_until_lf:
                         TPPLEXER_FLAG_NO_DIRECTIVES|
                         TPPLEXER_FLAG_NO_BUILTIN_MACROS);
     pragma_error = TPPLexer_ParsePragma('\n');
+    if (!pragma_error && (current.l_flags&TPPLEXER_FLAG_EAT_UNKNOWN_PRAGMA)) pragma_error = 1;
     while (token.t_file != current.l_eob_file) popfile();
     assert(hash_begin >= token.t_file->f_begin);
     assert(hash_begin <= token.t_file->f_end);
@@ -4790,6 +4856,7 @@ again:
                          TPPLEXER_FLAG_NO_BUILTIN_MACROS);
      pusheof();
      pragma_error = TPPLexer_ParsePragma(0);
+     if (!pragma_error && (current.l_flags&TPPLEXER_FLAG_EAT_UNKNOWN_PRAGMA)) pragma_error = 1;
      while (token.t_file != current.l_eof_file) popfile();
      popeof();
     }
@@ -5008,14 +5075,15 @@ create_int_file:
       break;
      { /* Flag-based keyword properties. */
       uint32_t mask;
-      if (FALSE) { case KWD___is_deprecated:          mask = TPP_KEYWORDFLAG_IS_DEPRECATED;          }
-      if (FALSE) { case KWD___has_attribute:          mask = TPP_KEYWORDFLAG_HAS_ATTRIBUTE;          }
-      if (FALSE) { case KWD___has_builtin:            mask = TPP_KEYWORDFLAG_HAS_BUILTIN;            }
-      if (FALSE) { case KWD___has_cpp_attribute:      mask = TPP_KEYWORDFLAG_HAS_CPP_ATTRIBUTE;      }
-      if (FALSE) { case KWD___has_declspec_attribute: mask = TPP_KEYWORDFLAG_HAS_DECLSPEC_ATTRIBUTE; }
-      if (FALSE) { case KWD___has_extension:          mask = TPP_KEYWORDFLAG_HAS_EXTENSION;          }
-      if (FALSE) { case KWD___has_feature:            mask = TPP_KEYWORDFLAG_HAS_FEATURE;            }
-      intval = keyword->k_rare && !!(keyword->k_rare->kr_flags&mask);
+      if (FALSE) { case KWD___is_deprecated:          mask  = TPP_KEYWORDFLAG_IS_DEPRECATED;          }
+      if (FALSE) { case KWD___has_attribute:          mask  = TPP_KEYWORDFLAG_HAS_ATTRIBUTE;          }
+      if (FALSE) { case KWD___has_builtin:            mask  = TPP_KEYWORDFLAG_HAS_BUILTIN;            }
+      if (FALSE) { case KWD___has_cpp_attribute:      mask  = TPP_KEYWORDFLAG_HAS_CPP_ATTRIBUTE;      }
+      if (FALSE) { case KWD___has_declspec_attribute: mask  = TPP_KEYWORDFLAG_HAS_DECLSPEC_ATTRIBUTE; }
+      if (FALSE) { case KWD___has_extension:          mask  = TPP_KEYWORDFLAG_HAS_EXTENSION;          }
+      if (FALSE) { case KWD___has_feature:            mask  = TPP_KEYWORDFLAG_HAS_FEATURE;
+                 if (HAVE_EXTENSION_EXT_ARE_FEATURES) mask |= TPP_KEYWORDFLAG_HAS_EXTENSION; }
+      intval = !!(TPPKeyword_Getflags(keyword)&mask);
       break;
      }
     }
@@ -5141,6 +5209,7 @@ create_int_file:
     /* WARNING: We leave macros turned on for this, because (perhaps surprisingly),
     /*          visual studio _does_ expand macros inside its __pragma helper. */
     pragma_error = TPPLexer_ParsePragma(')');
+    if (!pragma_error && (current.l_flags&TPPLEXER_FLAG_EAT_UNKNOWN_PRAGMA)) pragma_error = 1;
     while (token.t_file != current.l_eof_file) popfile();
     if (pragma_error) {
      int recursion = 1;
@@ -5758,7 +5827,8 @@ expand_function_macro(struct TPPFile *__restrict macro,
  /* Enable all tokens to properly include _everything_ when expanding arguments. */
  current.l_flags |= TPPLEXER_FLAG_WANTCOMMENTS|
                     TPPLEXER_FLAG_WANTSPACE|
-                    TPPLEXER_FLAG_WANTLF;
+                    TPPLEXER_FLAG_WANTLF|
+                    TPPLEXER_FLAG_COMMENT_NOOWN_LF;
  /* We use explicit EOB by setting the 'l_eob_file' field below! */
  current.l_flags &= ~(TPPLEXER_FLAG_NO_SEEK_ON_EOB);
  /* NOTE: The expansion implementation screws with the current lexer's
@@ -7507,7 +7577,7 @@ PUBLIC int TPPLexer_Warn(int wnum, ...) {
    }
   } break;
   case W_CANT_POP_WARNINGS               : WARNF("Can't pop warnings"); break;
-  case W_MACRO_RECURSION_LIMIT_EXCEEDED  : WARNF("Macro recursion limit exceeded when expanding '%s'",FILENAME()); break;
+  case W_MACRO_RECURSION_LIMIT_EXCEEDED  : WARNF("Macro recursion limit exceeded when expanding '%s' (Consider passing '-fno-macro-recursion')",FILENAME()); break;
   case W_INCLUDE_RECURSION_LIMIT_EXCEEDED: WARNF("Include recursion limit exceeded when including '%s'",FILENAME()); break;
   case W_ELSE_WITHOUT_IF                 : WARNF("#else without #if"); break;
   case W_ELIF_WITHOUT_IF                 : WARNF("#elif without #if"); break;

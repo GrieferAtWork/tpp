@@ -122,6 +122,20 @@ typedef size_t     TPPKeywordHash;
 #define TPPKeywordFlag_HAS_FEATURE            0x20
 #define TPPKeywordFlag_IS_DEPRECATED          0x40
 
+#  define TPPLexer_FLAG_NONE          TPPLEXER_FLAG_NONE
+#  define TPPLexer_FLAG_WANT_LF       TPPLEXER_FLAG_WANTLF
+#  define TPPLexer_FLAG_WANT_SPC      TPPLEXER_FLAG_WANTSPACE
+#  define TPPLexer_FLAG_NO_MACROS     TPPLEXER_FLAG_NO_MACROS
+#  define TPPLexer_FLAG_NO_DIRECTIVES TPPLEXER_FLAG_NO_DIRECTIVES
+#  define TPPLexer_FLAG_ASM_COMMENTS  TPPLEXER_FLAG_ASM_COMMENTS
+#  define TPPLexer_FLAG_ONE_FILE      TPPLEXER_FLAG_NO_POP_ON_EOF
+//#define TPPLexer_FLAG_ONE_REAL_FILE TPPLEXER_FLAG_NO_POP_ON_EOF
+#  define TPPLexer_FLAG_INC_STRING    TPPLEXER_FLAG_INCLUDESTRING
+#  define TPPLexer_FLAG_RAND_INIT     TPPLEXER_FLAG_RANDOM_INITIALIZED
+#  define TPPLexer_FLAG_NO_DEPRECATED TPPLEXER_FLAG_NO_DEPRECATED
+#  define TPPLexer_FLAG_TOK_COMMENTS  TPPLEXER_FLAG_WANTCOMMENTS
+
+
 
 #  define f_refcnt       f_refcnt
 #  define f_prev         f_prev
@@ -184,8 +198,12 @@ typedef struct TPPIfdefStack TPPIfdefStackObject;
 //typedef ... TPPIncludeCacheEntry;  /* Merged with 'TPPKeyword'. */
 //typedef ... TPPIncludeCacheObject; /* Merged with 'TPPKeywordMap'. */
 
-//typedef ... TPPWarningsFrameObject; /* Missing? */
-//typedef ... TPPWarningsObject;      /* Missing? */
+#define wc_prev     ws_prev
+#define wc_warnings ws_state
+typedef struct TPPWarningState TPPWarningsFrameObject;
+
+#define w_top       w_curstate
+typedef struct TPPWarnings TPPWarningsObject;
 
 
 #  define l_files            l_token.t_file
@@ -197,9 +215,14 @@ typedef struct TPPIfdefStack TPPIfdefStackObject;
 #  define l_ifdef_stack      l_ifdef
 #  define l_include_cache    l_keywords
 //#define l_one_file_rec     ...
-//#define l_warnings         ...
+#  define l_warnings         l_warnings
 #  define l_counter          l_counter
 typedef struct TPPLexer TPPLexerObject;
+
+
+
+#define TPPLexer_FastDefine(self,name,code) \
+ (assert(TPPLexer_Current == (self)),TPPLexer_Define(name,strlen(name),code,strlen(code)) ? 0 : -1)
 
 
 

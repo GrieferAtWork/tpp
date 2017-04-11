@@ -16,9 +16,17 @@
  *    misrepresented as being the original software.                          *
  * 3. This notice may not be removed or altered from any source distribution. *
  */
+#if (defined(KWD_FLAGS) || defined(MACRO)) && !defined(HAS_EXTENSION)
+#define HAS_EXTENSION(x) (TPPLexer_Current->l_extensions & (x))
+#endif
+
 #ifndef KWD
 #define TPP_DEFS_DEFINES_KWD
 #define KWD(name,str)
+#endif
+#ifndef KWD_FLAGS
+#define TPP_DEFS_DEFINES_KWD_FLAGS
+#define KWD_FLAGS(kwd,flags)
 #endif
 #ifndef WGROUP
 #define TPP_DEFS_DEFINES_WGROUP
@@ -36,10 +44,6 @@
  *       but may later be #undef-ined again to re-enable
  *       its original meaning. */
 #define MACRO(name,if)
-#else
-#ifndef HAS_EXTENSION
-#define HAS_EXTENSION(x) (TPPLexer_Current->l_extensions & (x))
-#endif
 #endif
 #ifndef BUILTIN_MACRO
 #define TPP_DEFS_DEFINES_BUILTIN_MACRO
@@ -164,12 +168,58 @@ DEF_M_IF(__TIME_SEC__,  HAS_EXTENSION(TPPLEXER_EXTENSION_TIMEUTILS))
 DEF_M_IF(__TIME_MIN__,  HAS_EXTENSION(TPPLEXER_EXTENSION_TIMEUTILS))
 DEF_M_IF(__TIME_HOUR__, HAS_EXTENSION(TPPLEXER_EXTENSION_TIMEUTILS))
 
+
+#define DEF_FEATURE_IF(name,if)   KWD(KWD_##name,#name) KWD_FLAGS(KWD_##name,(if) ? TPP_KEYWORDFLAG_HAS_FEATURE : 0)
+#define DEF_EXTENSION_IF(name,if) KWD(KWD_##name,#name) KWD_FLAGS(KWD_##name,(if) ? TPP_KEYWORDFLAG_HAS_EXTENSION : 0)
+
+DEF_EXTENSION_IF(tpp_dollar_is_alpha,             HAS_EXTENSION(TPPLEXER_EXTENSION_DOLLAR_IS_ALPHA))
+DEF_EXTENSION_IF(tpp_va_args,                     HAS_EXTENSION(TPPLEXER_EXTENSION_VA_ARGS))
+DEF_EXTENSION_IF(tpp_named_va_args,               HAS_EXTENSION(TPPLEXER_EXTENSION_GCC_VA_ARGS))
+DEF_EXTENSION_IF(tpp_va_comma,                    HAS_EXTENSION(TPPLEXER_EXTENSION_VA_COMMA))
+DEF_EXTENSION_IF(tpp_reemit_unknown_pragmas,      !(TPPLexer_Current->l_flags&TPPLEXER_FLAG_EAT_UNKNOWN_PRAGMA))
+//DEF_EXTENSION_IF(tpp_msvc_integer_suffix,       HAS_EXTENSION(0))
+DEF_EXTENSION_IF(tpp_charize_operator,            HAS_EXTENSION(TPPLEXER_EXTENSION_HASH_AT))
+DEF_EXTENSION_IF(tpp_trigraphs,                   HAS_EXTENSION(TPPLEXER_EXTENSION_TRIGRAPHS))
+DEF_EXTENSION_IF(tpp_digraphs,                    HAS_EXTENSION(TPPLEXER_EXTENSION_DIGRAPHS))
+DEF_EXTENSION_IF(tpp_pragma_push_macro,           1)
+DEF_EXTENSION_IF(tpp_pragma_pop_macro,            1)
+DEF_EXTENSION_IF(tpp_pragma_region,               1)
+DEF_EXTENSION_IF(tpp_pragma_endregion,            1)
+DEF_EXTENSION_IF(tpp_pragma_warning,              1)
+DEF_EXTENSION_IF(tpp_pragma_message,              1)
+DEF_EXTENSION_IF(tpp_pragma_error,                1)
+DEF_EXTENSION_IF(tpp_pragma_once,                 1)
+DEF_EXTENSION_IF(tpp_pragma_tpp_exec,             1)
+DEF_EXTENSION_IF(tpp_pragma_deprecated,           1)
+DEF_EXTENSION_IF(tpp_pragma_tpp_set_keyword_flags,1)
+DEF_EXTENSION_IF(tpp_directive_include_next,      HAS_EXTENSION(TPPLEXER_EXTENSION_INCLUDE_NEXT))
+DEF_EXTENSION_IF(tpp_directive_import,            HAS_EXTENSION(TPPLEXER_EXTENSION_IMPORT))
+DEF_EXTENSION_IF(tpp_directive_warning,           HAS_EXTENSION(TPPLEXER_EXTENSION_WARNING))
+DEF_EXTENSION_IF(tpp_lxor,                        HAS_EXTENSION(TPPLEXER_EXTENSION_LXOR))
+DEF_EXTENSION_IF(tpp_token_tilde_tilde,           !(TPPLexer_Current->l_flags&TPPLEXER_FLAG_NO_TILDETILDE))
+DEF_EXTENSION_IF(tpp_token_pow,                   !(TPPLexer_Current->l_flags&TPPLEXER_FLAG_NO_STARSTAR))
+DEF_EXTENSION_IF(tpp_token_lxor,                  !(TPPLexer_Current->l_flags&TPPLEXER_FLAG_NO_ROOFROOF))
+DEF_EXTENSION_IF(tpp_token_arrow,                 1) /* TODO: Add a way of disabling this. */
+DEF_EXTENSION_IF(tpp_token_collon_assign,         1) /* TODO: Add a way of disabling this. */
+DEF_EXTENSION_IF(tpp_token_collon_collon,         !(TPPLexer_Current->l_flags&TPPLEXER_FLAG_NO_COLLONCOLLON))
+DEF_EXTENSION_IF(tpp_macro_calling_conventions,   HAS_EXTENSION(TPPLEXER_EXTENSION_ALTMAC))
+DEF_EXTENSION_IF(tpp_strict_whitespace,           (TPPLexer_Current->l_flags&TPPLEXER_FLAG_KEEP_ARG_WHITESPACE))
+DEF_EXTENSION_IF(tpp_strict_integer_overflow,     0) /* TODO: (Re-)add detection for this. */
+DEF_EXTENSION_IF(tpp_support_ansi_characters,     0) /* TODO: (Re-)add support for this. */
+DEF_EXTENSION_IF(tpp_emit_lf_after_directive,     (TPPLexer_Current->l_flags&TPPLEXER_FLAG_DIRECTIVE_NOOWN_LF))
+DEF_EXTENSION_IF(tpp_if_cond_expression,          0) /* TODO: (Re-)add support for this. ('__TPP_EVAL(if (foo) 42 else 10)') */
+DEF_EXTENSION_IF(tpp_debug,                       TPP_CONFIG_DEBUG)
+
+#undef DEF_EXTENSION_IF
+#undef DEF_FEATURE_IF
 #undef DEF_M_IF
 #undef DEF_M
 #undef DEF_K
 
 #define PREDEFINED_MACRO(name,value) \
-  KWD(KWD_##name,#name) BUILTIN_MACRO(KWD_##name,value)
+  KWD(KWD_##name,#name) \
+  MACRO(KWD_##name,1) \
+  BUILTIN_MACRO(KWD_##name,value)
 
 #define TPP_PP_STR2(x) #x
 #define TPP_PP_STR(x)  TPP_PP_STR2(x)
@@ -325,6 +375,10 @@ WARNING(W_EXPECTED_STRING_AFTER_GCC_DIAG,  (WG_VALUE),   WSTATE_WARN)    /*< [st
 #ifdef TPP_DEFS_DEFINES_WGROUP
 #undef TPP_DEFS_DEFINES_WGROUP
 #undef WGROUP
+#endif
+#ifdef TPP_DEFS_DEFINES_KWD_FLAGS
+#undef TPP_DEFS_DEFINES_KWD_FLAGS
+#undef KWD_FLAGS
 #endif
 #ifdef TPP_DEFS_DEFINES_KWD
 #undef TPP_DEFS_DEFINES_KWD

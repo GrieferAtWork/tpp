@@ -453,8 +453,7 @@ noopt:
  }
 use_infile:
  if (!infile) { result = 1; goto end; }
- infile->f_prev = TPPLexer_Current->l_token.t_file;
- TPPLexer_Current->l_token.t_file = infile;
+ TPPLexer_PushFileInherited(infile);
  /* Initial values to simulate the last token
   * ending where the first file starts. */
  last_token_file = NULL; // infile; /* Force a line directive at the first token. */
