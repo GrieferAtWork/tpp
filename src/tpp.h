@@ -254,7 +254,7 @@ struct TPPTextFile {
                                           *  >> #ifndef bar // This #ifndef will set 'TPP_TEXTFILE_FLAG_NOGUARD'
                                           *  >> #endif
                                           */
-#define TPP_TEXTFILE_FLAG_SYSHEADER 0x02 /*< This file is a system-header and all non-error warnings are suppressed. (Only set if 'f_cacheentry == NULL') */
+#define TPP_TEXTFILE_FLAG_SYSHEADER 0x02 /*< This file is a system-header and all non-error warnings are suppressed. */
  unsigned char            f_flags;       /*< A set of 'TPP_TEXTFILE_FLAG_*' */
  TPP(encoding_t)          f_encoding;    /*< Encoding determined to-be used by this file. */
  char                     f_padding[1];  /*< Padding data... */

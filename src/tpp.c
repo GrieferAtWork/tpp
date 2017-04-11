@@ -1385,6 +1385,8 @@ TPPFile_NextChunk(struct TPPFile *__restrict self, int flags) {
     TPPString_Decref(self->f_text);
    }
    newchunk->s_size = STREAM_BUFSIZE+prefix_size;
+   assert(end_offset < newchunk->s_size);
+   newchunk->s_text[end_offset] = self->f_textfile.f_prefixdel; /* Restore the previously deleted file end. */
    self->f_begin = newchunk->s_text+(self->f_begin-self->f_text->s_text);
    self->f_pos   = newchunk->s_text+(self->f_pos-self->f_text->s_text);
   } else {
@@ -2264,6 +2266,7 @@ skip_argument_name:
  }
 
  assert(result->f_macro.m_deffile);
+ assert(*result->f_end != '#');
  *result->f_end = '\0';
 
  /* Check for special case: Empty text block.
@@ -3741,7 +3744,7 @@ parse_multichar:
         current.l_eob_file == file) goto settok;
    /* Check for more data chunks within the current file. */
    file->f_pos = iter;
-   if (TPPFile_NextChunk(file,TPPFILE_NEXTCHUNK_FLAG_EXTEND)) goto again;
+   if (TPPFile_NextChunk(file,TPPFILE_NEXTCHUNK_FLAG_NONE)) goto again;
    iter = file->f_pos,end = file->f_end;
    if ((current.l_flags&TPPLEXER_FLAG_NO_POP_ON_EOF) ||
         current.l_eof_file == file) goto settok;
@@ -7304,6 +7307,7 @@ TPPLexer_ParsePragma(tok_t endat) {
     if unlikely(!keyword || !TPPKeyword_MAKERARE(keyword)) return 0;
    }
    if unlikely(TOK != ',') TPPLexer_Warn(W_EXPECTED_COMMA);
+   else yield_fetch();
    if unlikely(!TPPLexer_Eval(&const_val)) return 0;
    TPPConst_ToInt(&const_val);
    new_flags = (uint32_t)const_val.c_data.c_int;
@@ -7314,6 +7318,7 @@ TPPLexer_ParsePragma(tok_t endat) {
     keyword->k_rare->kr_flags &= ~(TPP_KEYWORDFLAG_USERMASK);
     keyword->k_rare->kr_flags |= (new_flags&TPP_KEYWORDFLAG_USERMASK);
    }
+   return 1;
   } break;
 
   { /* Configure warning behavior by group/id.
@@ -7487,7 +7492,6 @@ set_warning_newstate:
     struct TPPFile *textfile;
     yield_fetch();
     textfile = TPPLexer_Textfile();
-    if (textfile->f_textfile.f_cacheentry) textfile = textfile->f_textfile.f_cacheentry;
     /* Set the system-header flag in the current file (thus suppressing warnings) */
     textfile->f_textfile.f_flags |= TPP_TEXTFILE_FLAG_SYSHEADER;
     return 1;
@@ -7531,7 +7535,6 @@ PUBLIC int TPPLexer_Warn(int wnum, ...) {
   /* Ignore warnings in system headers. */
   if (!(current.l_flags&TPPLEXER_FLAG_WSYSTEMHEADERS)) {
    textfile = TPPLexer_Textfile(); /* Walk the chain of a cached #include file. */
-   if (textfile->f_textfile.f_cacheentry) textfile = textfile->f_textfile.f_cacheentry;
    if (textfile->f_textfile.f_flags&TPP_TEXTFILE_FLAG_SYSHEADER) return 1;
   }
   /* Turn warnings into errors. */
