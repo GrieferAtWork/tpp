@@ -135,9 +135,42 @@
 #ifndef TPPFUN
 #define TPPFUN  extern
 #endif
-#define TPP_LOCAL            static inline
-#define TPP_OFFSETOF(m,s)    ((size_t)(&((m *)0)->s))
-#define TPP_OFFSETAFTER(m,s) ((size_t)(&((m *)0)->s+1))
+#if defined(__cplusplus) || defined(inline)
+#   define TPP_LOCAL            static inline
+#elif defined(_MSC_VER)
+#   define TPP_LOCAL            static __inline
+#else
+#   define TPP_LOCAL            static __inline__
+#endif
+#ifndef __has_attribute
+#   define __has_attribute(x) 0
+#endif
+#ifndef __has_builtin
+#   define __has_builtin(x) 0
+#endif
+#if defined(__GNUC__) || __has_builtin(__builtin_offsetof)
+#   define TPP_OFFSETOF           __builtin_offsetof
+#else
+#   define TPP_OFFSETOF(m,s)    ((size_t)(&((m *)0)->s))
+#endif
+#   define TPP_OFFSETAFTER(m,s) ((size_t)(&((m *)0)->s+1))
+#if defined(_MSC_VER)
+#   define TPP_UNNAMED_UNION  1
+#   pragma warning(disable: 4201)
+#elif (defined(__GNUC__) && \
+      /* Anonymous unions support starts with gcc 2.96/g++ 2.95 */\
+      (__GNUC__ < 2) || ((__GNUC__ == 2) && ((__GNUC_MINOR__ < 95) ||\
+     ((__GNUC_MINOR__ == 95) && !defined(__cplusplus))))) || \
+      defined(__SUNPRO_C) || defined(__SUNPRO_CC)
+#   define TPP_UNNAMED_UNION  0
+#else
+#   define TPP_UNNAMED_UNION  1
+#endif
+#if TPP_UNNAMED_UNION
+#   define TPP_UNNAMED_UNION_DEF(name) /* nothing */
+#else
+#   define TPP_UNNAMED_UNION_DEF(name) name
+#endif
 
 #ifdef __cplusplus
 extern "C" {
@@ -305,7 +338,7 @@ struct {
  /*ref*/struct TPPFile *e_expand_origin; /*< [const][1..1] Original macro-file that was expanded.
                                           *   NOTE: This pointer also holds a reference to 'e_expand_origin->f_macro.m_function.f_onstack'. */
 }                       m_expand;        /*< [TPP_MACROFILE_KIND_EXPANDED]. */
-};
+} TPP_UNNAMED_UNION_DEF(m_specific);
 };
 
 /* Minimum malloc-sizes of various kinds of TPP files types. */
@@ -338,7 +371,7 @@ struct TPPFile {
  union {
   struct TPPTextFile      f_textfile;  /*< [if(f_kind == TPPFILE_KIND_TEXT)] Text-specific data. */
   struct TPPMacroFile     f_macro;     /*< [if(f_kind == TPPFILE_KIND_MACRO)] Macro-specific data. */
- };
+ } TPP_UNNAMED_UNION_DEF(f_specific);
 };
 
 #define TPPFile_Incref(self)          (void)(++(self)->f_refcnt)
@@ -1158,6 +1191,16 @@ TPPFUN /*ref*/struct TPPString *TPPLexer_ParseString(void);
 #undef TPP_NAMESPACE_DEFINED
 #undef TPP
 #endif
+
+
+/* Fix unnamed union/struct members. */
+#if !TPP_UNNAMED_UNION
+#define m_function     m_specific.m_function
+#define m_expand       m_specific.m_expand
+#define f_textfile     f_specific.f_textfile
+#define f_macro        f_specific.f_macro
+#endif
+
 
 #ifdef __cplusplus
 }

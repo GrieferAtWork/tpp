@@ -577,7 +577,7 @@ skip_whitespace_and_comments(char *iter, char *end) {
     continue;
    }
    if (*forward == '/' &&
-      (current.l_extokens&TPPLEXER_TOKEN_C_COMMENT)) {
+      (current.l_extokens&TPPLEXER_TOKEN_CPP_COMMENT)) {
     iter = forward;
     while (iter != end) {
      if (*iter == '\\' && iter+1 != end && islf(iter[1])) {
@@ -684,8 +684,8 @@ PRIVATE struct {
  unsigned int s_refcnt;
  size_t       s_size;
  char         s_text[1];
-} __empty_string = {0x80000000,0,{'\0'}};
-#define empty_string  ((struct TPPString *)&__empty_string)
+} tpp_empty_string = {0x80000000,0,{'\0'}};
+#define empty_string  ((struct TPPString *)&tpp_empty_string)
 
 
 PUBLIC /*ref*/struct TPPString *
@@ -978,10 +978,10 @@ TPPFile_OpenStream(TPP(stream_t) stream, char const *name) {
  memcpy(result->f_name,name,(result->f_namesize+1)*sizeof(char));
  result->f_namehash = hashof(result->f_name,result->f_namesize);
  TPPString_Incref(empty_string);
- result->f_text     = empty_string;
- result->f_begin    =
- result->f_end      =
- result->f_pos      = empty_string->s_text;
+ result->f_text  = empty_string;
+ result->f_begin =
+ result->f_end   =
+ result->f_pos   = empty_string->s_text;
  /* Read the first chunk. */
  return result;
 err_r:
@@ -5576,11 +5576,17 @@ seterr:
 }
 
 struct argcache_t {
- union{ char *ac_begin; uintptr_t ac_offset_begin; };
- union{ char *ac_end;   uintptr_t ac_offset_end; };
+ union{ char *ac_begin; uintptr_t ac_offset_begin; } TPP_UNNAMED_UNION_DEF(ac_specific_begin);
+ union{ char *ac_end;   uintptr_t ac_offset_end;   } TPP_UNNAMED_UNION_DEF(ac_specific_end);
  char  *ac_expand_begin; /*< [?..1][owned] Dynamically allocated buffer for the expanded version of the text. */
  size_t ac_expand_size;
 };
+#if !TPP_UNNAMED_UNION
+#define ac_begin         ac_specific_begin.ac_begin
+#define ac_end           ac_specific_end.ac_end
+#define ac_offset_begin  ac_specific_begin.ac_offset_begin
+#define ac_offset_end    ac_specific_end.ac_offset_end
+#endif
 
 
 /* Expand the given 'text_begin..text_size' using regular
