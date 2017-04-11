@@ -53,28 +53,30 @@
 #define DEF_K(name)         KWD(KWD_##name,#name)
 #define DEF_M(name)         KWD(KWD_##name,#name) MACRO(KWD_##name,1)
 #define DEF_M_IF(name,expr) KWD(KWD_##name,#name) MACRO(KWD_##name,expr)
-DEF_K(if)
-DEF_K(ifdef)
-DEF_K(ifndef)
-DEF_K(elif)
-DEF_K(else)
-DEF_K(endif)
-DEF_K(define)
-DEF_K(defined)
-DEF_K(undef)
-DEF_K(include)
-DEF_K(include_next)
-DEF_K(import)
-DEF_K(line)
-DEF_K(error)
-DEF_K(warning)
-DEF_K(ident)
-DEF_K(sccs)
-DEF_K(assert)
-DEF_K(unassert)
+
+/* Keywords for known preprocessor directives. */
+DEF_K(if)           /*< #if defined(FOO) && FOO == 10. */
+DEF_K(ifdef)        /*< #ifdef FOOBAR. */
+DEF_K(ifndef)       /*< #ifndef FOOBAR. */
+DEF_K(elif)         /*< #elif defined(BAR) && BAR == 20. */
+DEF_K(else)         /*< #else. */
+DEF_K(endif)        /*< #endif. */
+DEF_K(define)       /*< #define FOO 42. */
+DEF_K(defined)      /*< #if defined(FOO). */
+DEF_K(undef)        /*< #undef FOO. */
+DEF_K(include)      /*< #include "header.h". */
+DEF_K(include_next) /*< #include_next <stdlib.h>. */
+DEF_K(import)       /*< #import "header.h". */
+DEF_K(line)         /*< #line 42 "foo.h". */
+DEF_K(error)        /*< #error C5A9. */
+DEF_K(warning)      /*< #warning $H17. */
+DEF_K(ident)        /*< #ident "text". */
+DEF_K(sccs)         /*< #sccs "text". */
+DEF_K(assert)       /*< #assert machine(i386). */
+DEF_K(unassert)     /*< #assert unmachine. */
 
 /* Various names for #pragma-directives (TPP supports everything) */
-DEF_K(pragma)
+DEF_K(pragma)   /*< #pragma once. */
 DEF_M(_Pragma)  /*< GCC defines _Pragma as a macro... So I'll just do that as well! */
 DEF_M(__pragma) /*< I promised this would be defined as a macro... */
 
@@ -196,12 +198,12 @@ DEF_EXTENSION_IF(tpp_directive_include_next,      HAS_EXTENSION(TPPLEXER_EXTENSI
 DEF_EXTENSION_IF(tpp_directive_import,            HAS_EXTENSION(TPPLEXER_EXTENSION_IMPORT))
 DEF_EXTENSION_IF(tpp_directive_warning,           HAS_EXTENSION(TPPLEXER_EXTENSION_WARNING))
 DEF_EXTENSION_IF(tpp_lxor,                        HAS_EXTENSION(TPPLEXER_EXTENSION_LXOR))
-DEF_EXTENSION_IF(tpp_token_tilde_tilde,           !(TPPLexer_Current->l_flags&TPPLEXER_FLAG_NO_TILDETILDE))
-DEF_EXTENSION_IF(tpp_token_pow,                   !(TPPLexer_Current->l_flags&TPPLEXER_FLAG_NO_STARSTAR))
-DEF_EXTENSION_IF(tpp_token_lxor,                  !(TPPLexer_Current->l_flags&TPPLEXER_FLAG_NO_ROOFROOF))
+DEF_EXTENSION_IF(tpp_token_tilde_tilde,           TPPLexer_Current->l_extokens&TPPLEXER_TOKEN_TILDETILDE)
+DEF_EXTENSION_IF(tpp_token_pow,                   TPPLexer_Current->l_extokens&TPPLEXER_TOKEN_STARSTAR)
+DEF_EXTENSION_IF(tpp_token_lxor,                  TPPLexer_Current->l_extokens&TPPLEXER_TOKEN_ROOFROOF)
 DEF_EXTENSION_IF(tpp_token_arrow,                 1) /* TODO: Add a way of disabling this. */
 DEF_EXTENSION_IF(tpp_token_collon_assign,         1) /* TODO: Add a way of disabling this. */
-DEF_EXTENSION_IF(tpp_token_collon_collon,         !(TPPLexer_Current->l_flags&TPPLEXER_FLAG_NO_COLLONCOLLON))
+DEF_EXTENSION_IF(tpp_token_collon_collon,         TPPLexer_Current->l_extokens&TPPLEXER_TOKEN_COLLONCOLLON)
 DEF_EXTENSION_IF(tpp_macro_calling_conventions,   HAS_EXTENSION(TPPLEXER_EXTENSION_ALTMAC))
 DEF_EXTENSION_IF(tpp_strict_whitespace,           (TPPLexer_Current->l_flags&TPPLEXER_FLAG_KEEP_ARG_WHITESPACE))
 DEF_EXTENSION_IF(tpp_strict_integer_overflow,     0) /* TODO: (Re-)add detection for this. */

@@ -783,27 +783,41 @@ TPP_LOCAL int TPPLexer_COLUMN(void) { struct TPPFile *f = TPPLexer_Textfile(); r
 #define TPPLEXER_FLAG_COMMENT_NOOWN_LF       0x00002000 /*< Linefeeds terminating a '// foo'-style comment are not owned by that comment, but are re-emit. */
 #define TPPLEXER_FLAG_MESSAGE_LOCATION       0x00004000 /*< Print the file+line location in messages from '#pragma message'. */
 #define TPPLEXER_FLAG_MESSAGE_NOLINEFEED     0x00008000 /*< Don't print a linefeed following the user-provided message in '#pragma message'. */
-#define TPPLEXER_FLAG_NO_TILDETILDE          0x00010000 /*< Disable recognition of '~~' tokens. */
-#define TPPLEXER_FLAG_NO_ROOFROOF            0x00020000 /*< Disable recognition of '^^' tokens. */
-#define TPPLEXER_FLAG_NO_COLLONCOLLON        0x00040000 /*< Disable recognition of '::' tokens. */
-#define TPPLEXER_FLAG_NO_STARSTAR            0x00080000 /*< Disable recognition of '**' tokens. */
-#define TPPLEXER_FLAG_INCLUDESTRING          0x00100000 /*< Parse strings as #include strings (without \-escape sequences). */
-#define TPPLEXER_FLAG_KEEP_ARG_WHITESPACE    0x00200000 /*< When set, keep whitespace surrounding macro arguments. */
-#define TPPLEXER_FLAG_NO_LEGACY_GUARDS       0x00400000 /*< Don't recognize legacy #include-guards
+#define TPPLEXER_FLAG_INCLUDESTRING          0x00010000 /*< Parse strings as #include strings (without \-escape sequences). */
+#define TPPLEXER_FLAG_KEEP_ARG_WHITESPACE    0x00020000 /*< When set, keep whitespace surrounding macro arguments. */
+#define TPPLEXER_FLAG_NO_LEGACY_GUARDS       0x00040000 /*< Don't recognize legacy #include-guards
                                                          *  WARNING: Not setting this option may lead to whitespace and comments at the
                                                          *           start and end of a guarded file to not be emit on a second pass.
                                                          *        >> Disable this option when either is important to your compiler. */
-#define TPPLEXER_FLAG_WERROR                 0x00800000 /*< All warnings are turned into errors (NOTE: less powerful than 'TPPLEXER_FLAG_WSYSTEMHEADERS'). */
-#define TPPLEXER_FLAG_WSYSTEMHEADERS         0x01000000 /*< Still emit warnings in system headers (alongside errors). */
-#define TPPLEXER_FLAG_NO_DEPRECATED          0x02000000 /*< Don't warn about deprecated keywords. */
-#define TPPLEXER_FLAG_MSVC_MESSAGEFORMAT     0x04000000 /*< Use msvc's file+line format '%s(%d,%d) : ' instead of GCC's '%s:%d:%d: '. */
-#define TPPLEXER_FLAG_NO_WARNINGS            0x08000000 /*< Don't emit warnings. */
-#define TPPLEXER_FLAG_NO_ENCODING            0x10000000 /*< Don't try to detect file encodings (Everything is UTF-8 without BOM; aka. raw text). */
-#define TPPLEXER_FLAG_EAT_UNKNOWN_PRAGMA     0x20000000 /*< Don't re-emit unknown pragmas. */
+#define TPPLEXER_FLAG_WERROR                 0x00080000 /*< All warnings are turned into errors (NOTE: less powerful than 'TPPLEXER_FLAG_WSYSTEMHEADERS'). */
+#define TPPLEXER_FLAG_WSYSTEMHEADERS         0x00100000 /*< Still emit warnings in system headers (alongside errors). */
+#define TPPLEXER_FLAG_NO_DEPRECATED          0x00200000 /*< Don't warn about deprecated keywords. */
+#define TPPLEXER_FLAG_MSVC_MESSAGEFORMAT     0x00400000 /*< Use msvc's file+line format '%s(%d,%d) : ' instead of GCC's '%s:%d:%d: '. */
+#define TPPLEXER_FLAG_NO_WARNINGS            0x00800000 /*< Don't emit warnings. */
+#define TPPLEXER_FLAG_NO_ENCODING            0x01000000 /*< Don't try to detect file encodings (Everything is UTF-8 without BOM; aka. raw text). */
+#define TPPLEXER_FLAG_EAT_UNKNOWN_PRAGMA     0x02000000 /*< Don't re-emit unknown pragmas. */
 #define TPPLEXER_FLAG_RANDOM_INITIALIZED     0x40000000 /*< Set when rand() has been initialized. */
 #define TPPLEXER_FLAG_ERROR                  0x80000000 /*< When set, the lexer is in an error-state in which calls to yield() will return TOK_ERR. */
-#define TPPLEXER_FLAG_MERGEMASK              0xC0000000 /*< A mask of flags that are merged (or'd together) during popf(). */
+#define TPPLEXER_FLAG_MERGEMASK              0xf0000000 /*< A mask of flags that are merged (or'd together) during popf(). */
 #define TPPLEXER_FLAG_DEFAULT                0x00000000 /*< Default set of flags (suitable for use with most token-based compilers). */
+
+/* Recognized extension token flags. */
+#define TPPLEXER_TOKEN_NONE                0x00000000
+#define TPPLEXER_TOKEN_TILDETILDE          0x00000001 /*< Enable recognition of '~~' tokens. */
+#define TPPLEXER_TOKEN_ROOFROOF            0x00000002 /*< Enable recognition of '^^' tokens. */
+#define TPPLEXER_TOKEN_COLLONCOLLON        0x00000004 /*< Enable recognition of '::' tokens. */
+#define TPPLEXER_TOKEN_COLLONASSIGN        0x00000008 /*< Enable recognition of ':=' tokens. */
+#define TPPLEXER_TOKEN_STARSTAR            0x00000010 /*< Enable recognition of '**' tokens. */
+#define TPPLEXER_TOKEN_ARROW               0x00000020 /*< Enable recognition of '->' tokens. */
+#define TPPLEXER_TOKEN_DEFAULT             0xffffffff /*< Default set of extension tokens (enable all). */
+
+/* Predefined set of extension tokens for some languages. */
+#define TPPLEXER_TOKEN_LANG_C       (TPPLEXER_TOKEN_ARROW)
+#define TPPLEXER_TOKEN_LANG_CPP     (TPPLEXER_TOKEN_COLLONCOLLON|TPPLEXER_TOKEN_ARROW)
+#define TPPLEXER_TOKEN_LANG_JAVA    (TPPLEXER_TOKEN_NONE)
+#define TPPLEXER_TOKEN_LANG_DEEMON  (TPPLEXER_TOKEN_ROOFROOF|TPPLEXER_TOKEN_COLLONCOLLON|\
+                                     TPPLEXER_TOKEN_COLLONASSIGN|TPPLEXER_TOKEN_STARSTAR|\
+                                     TPPLEXER_TOKEN_ARROW)
 
 /* Extension flags. */
 #define TPPLEXER_EXTENSION_NONE              0x0000000000000000ull
@@ -862,6 +876,7 @@ struct TPPLexer {
                                       *     you to safely parse data until the current chunk of a given file ends. */
  struct TPPFile       *l_eof_file;   /*< [0..1] Similar to 'l_eob_file', but used for end-of-file instead. */
  uint32_t              l_flags;      /*< A set of 'TPPLEXER_FLAG_*' */
+ uint32_t              l_extokens;   /*< A set of 'TPPLEXER_TOKEN_*' */
  uint64_t              l_extensions; /*< Enabled preprocessor features/extensions (A set of 'TPPLEXER_EXTENSION_*'). */
  struct TPPKeywordMap  l_keywords;   /*< Hash-map used to map keyword strings to their ids. */
  struct TPPIncludeList l_syspaths;   /*< List of paths searched when looking for system #include files. */

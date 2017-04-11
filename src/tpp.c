@@ -2837,6 +2837,7 @@ PUBLIC int TPPLexer_Init(struct TPPLexer *__restrict self) {
  /* Load builtin keywords. */
  if (!load_builtin_keywords(&self->l_keywords)) return 0;
  self->l_flags      = TPPLEXER_FLAG_DEFAULT;
+ self->l_extokens   = TPPLEXER_TOKEN_DEFAULT;
  self->l_extensions = TPPLEXER_EXTENSION_DEFAULT;
  TPPFile_Incref(&TPPFile_Empty);
  self->l_token.t_id        = TOK_EOF;
@@ -3823,12 +3824,13 @@ parse_multichar:
   case '-':
    if (*forward == '=') { ch = TOK_SUB_EQUAL; goto settok_forward1; }
    if (*forward == '-') { ch = TOK_DEC; goto settok_forward1; }
-   if (*forward == '>') { ch = TOK_ARROW; goto settok_forward1; }
+   if (*forward == '>' &&
+      (current.l_extokens&TPPLEXER_TOKEN_ARROW)) { ch = TOK_ARROW; goto settok_forward1; }
    goto settok;
 
   case '*':
    if (*forward == '*' &&
-     !(current.l_flags&TPPLEXER_FLAG_NO_STARSTAR)) { ch = TOK_POW; goto settok_forward1; }
+      (current.l_extokens&TPPLEXER_TOKEN_STARSTAR)) { ch = TOK_POW; goto settok_forward1; }
    if (*forward == '=') { ch = TOK_MUL_EQUAL; goto settok_forward1; }
    if (*forward == '/') { if (!TPPLexer_Warn(W_STARSLASH_OUTSIDE_OF_COMMENT,iter-1)) goto err; }
    goto settok;
@@ -3907,7 +3909,7 @@ set_comment:
     goto settok_forward1;
    }
    if (*forward == (char)ch &&
-      (!(current.l_flags&TPPLEXER_FLAG_NO_ROOFROOF) || ch != '^')) {
+      ((current.l_extokens&TPPLEXER_TOKEN_ROOFROOF) || ch != '^')) {
     ch = (ch == '&') ? TOK_LAND :
          (ch == '|') ? TOK_LOR :
                        TOK_LXOR;
@@ -3922,7 +3924,7 @@ set_comment:
   case '~':
    /* NOTE: '~~' tokens can be disabled. */
    if (*forward == '~' &&
-     !(current.l_flags&TPPLEXER_FLAG_NO_TILDETILDE)) {
+      (current.l_extokens&TPPLEXER_TOKEN_TILDETILDE)) {
     ch = TOK_TILDE_TILDE;
     goto settok_forward1;
    }
@@ -3930,11 +3932,9 @@ set_comment:
 
   case ':':
    if (*forward == ':' &&
-     !(current.l_flags&TPPLEXER_FLAG_NO_COLLONCOLLON)) {
-    ch = TOK_COLLON_COLLON;
-    goto settok_forward1;
-   }
-   if (*forward == '=') { ch = TOK_COLLON_EQUAL; goto settok_forward1; }
+      (current.l_extokens&TPPLEXER_TOKEN_COLLONCOLLON)) { ch = TOK_COLLON_COLLON; goto settok_forward1; }
+   if (*forward == '=' &&
+      (current.l_extokens&TPPLEXER_TOKEN_COLLONASSIGN)) { ch = TOK_COLLON_EQUAL; goto settok_forward1; }
    if (HAVE_FEATURE_DIGRAPHS &&
        *forward == '>') { ch = ']'; goto settok_forward1; } /* [:>] --> []] */
    goto settok;
