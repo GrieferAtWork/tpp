@@ -284,7 +284,7 @@ for (local i = 0; i < 256; ++i) {
   if (i >= 32 && i < 127) flags |= CH_ISPRINT;
   if (i in ['=','(','/',')','\'','<','!','>','-','?']) flags |= CH_ISTRIGRAPH;
   if (i in ['<','>','=','!','.','+','-','*','/','%',
-            '&','|','^','#','~',':']) flags |= CH_ISMULTICHAR;
+            '&','|','^','#','~',':','@']) flags |= CH_ISMULTICHAR;
   if (i in ['\r','\n']) flags |= CH_ISLF;
   if (i in ['\0']) flags |= CH_ISZERO;
   print "0x%.2x," % flags,;
@@ -295,7 +295,7 @@ for (local i = 0; i < 256; ++i) {
   0x04,0x04,0x04,0x04,0x04,0x04,0x04,0x04,0x04,0x04,0x04,0x04,0x04,0x04,0x04,0x04,
   0x0c,0x38,0x08,0x28,0x09,0x28,0x28,0x18,0x18,0x18,0x28,0x28,0x08,0x38,0x28,0x38,
   0x0a,0x0a,0x0a,0x0a,0x0a,0x0a,0x0a,0x0a,0x0a,0x0a,0x28,0x08,0x38,0x38,0x38,0x18,
-  0x08,0x09,0x09,0x09,0x09,0x09,0x09,0x09,0x09,0x09,0x09,0x09,0x09,0x09,0x09,0x09,
+  0x28,0x09,0x09,0x09,0x09,0x09,0x09,0x09,0x09,0x09,0x09,0x09,0x09,0x09,0x09,0x09,
   0x09,0x09,0x09,0x09,0x09,0x09,0x09,0x09,0x09,0x09,0x09,0x08,0x08,0x08,0x28,0x09,
   0x08,0x09,0x09,0x09,0x09,0x09,0x09,0x09,0x09,0x09,0x09,0x09,0x09,0x09,0x09,0x09,
   0x09,0x09,0x09,0x09,0x09,0x09,0x09,0x09,0x09,0x09,0x09,0x08,0x28,0x08,0x28,0x00,
@@ -533,15 +533,18 @@ _funop_getarg(funop_t **piter) {
  uint8_t byte;
  do {
   byte = *(*piter)++;
-  result = (result << 7)+(byte&0x7f);
+  result = (result << 7)|(byte&0x7f);
  } while (byte&0x80);
  return result;
 }
 LOCAL funop_t *
 funop_putarg(funop_t *piter, size_t arg) {
+ size_t byte,shift;
  while (arg > 0x7f) {
-  *piter++ = (funop_t)(0x80|(arg&0x7f));
-  arg >>= 7;
+  byte = arg,shift = 0;
+  do byte >>= 7,shift += 7; while (byte > 0x7f);
+  *piter++ = (funop_t)(0x80|(byte&0x7f));
+  arg &= ~(((size_t)-1) << shift);
  }
  *piter++ = (funop_t)arg;
  return piter;
@@ -550,6 +553,41 @@ funop_putarg(funop_t *piter, size_t arg) {
 
 
 #define EMPTY_STRING_HASH 1
+
+#if defined(__TPP_VERSION__) && \
+   (__SIZEOF_POINTER__ == 4 || __SIZEOF_POINTER__ == 8)
+#define PP_CAT2(a,b) a##b
+#define PP_CAT(a,b) PP_CAT2(a,b)
+#define pp_hashof2_0(result,str) result
+
+/* Using some sick-a$$ TPP extensions, we can actually
+ * calculate keyword hashes within the preprocessor! */
+#pragma extension(push,"-fmacro-recursion")
+#if __SIZEOF_POINTER__ == 4
+#   define pp_hashof2_1(result,str) pp_hashof2(__TPP_EVAL((result*263+str[0])&0xfffffffful),__TPP_EVAL(str[1:]))
+#elif __SIZEOF_POINTER__ == 8
+#   define pp_hashof2_1(result,str) pp_hashof2(__TPP_EVAL((result*263+str[0])&0xfffffffffffffffful),__TPP_EVAL(str[1:]))
+#endif
+#define pp_hashof2(result,str) PP_CAT(pp_hashof2_,__TPP_EVAL(!!str))(result,str)
+#pragma extension(pop)
+#define pp_hashof(str)         pp_hashof2(1,str)
+#endif
+
+#ifdef pp_hashof
+#define pp_maybe_hashof      pp_hashof
+#else
+#define pp_maybe_hashof(str) 0
+#endif
+
+#ifdef __TPP_EVAL
+#define COMPILER_STRLEN(str)  __TPP_EVAL(#(str))
+#define COMPILER_STRLEN0(str) __TPP_EVAL(#(str)+1)
+#else
+#define COMPILER_STRLEN(str)  (sizeof(str)/sizeof(char)-1)
+#define COMPILER_STRLEN0(str) (sizeof(str)/sizeof(char))
+#endif
+
+
 PRIVATE hash_t
 hashof(char const *data, size_t size) {
  hash_t result = 1;
@@ -1569,6 +1607,7 @@ search_suitable_end_again:
   }
   /* Check if the data that was read contains a suitable end. */
   flags |= TPPFILE_NEXTCHUNK_FLAG_EXTEND; /* Extend the data some more... */
+  self->f_end = self->f_text->s_text+self->f_text->s_size;
  }
  assert(self->f_pos   >= self->f_begin);
  assert(self->f_pos   <= self->f_end);
@@ -2498,7 +2537,7 @@ PUBLIC int
 TPP_ISBUILTINMACRO(TPP(tok_t) id) {
  int result = 0;
  switch (id) {
-#define MACRO(name,if)              case name: result = !!(if); break;
+#define MACRO(name,if) case name: result = !!(if); break;
 #include "tpp-defs.inl"
 #undef MACRO
   default: break;
@@ -2506,23 +2545,31 @@ TPP_ISBUILTINMACRO(TPP(tok_t) id) {
  return result;
 }
 
-
 #if TPP_CONFIG_ONELEXER
 #define KWD(name,str) \
- static struct {\
-   void *a[3];\
-   tok_t b; size_t c; hash_t d;\
-   char e[sizeof(str)/sizeof(char)];\
- } builtin_##name = {{NULL,NULL,NULL},name,(sizeof(str)/sizeof(char))-1,0,str};
+static struct {\
+ void *a[3];\
+ tok_t b; size_t c; hash_t d;\
+ char e[COMPILER_STRLEN0(str)];\
+} builtin_##name = {{NULL,NULL,NULL},name,COMPILER_STRLEN(str),pp_maybe_hashof(str),str};
 #else
 struct kwd_def {
  tok_t  kd_id;
  size_t kd_size;
+#ifdef pp_hashof
+ size_t kd_hash;
+#endif
  char   kd_name[TPP_SYMARRAY_SIZE];
 };
+#ifdef pp_hashof
 #define KWD(name,str) \
- static struct { tok_t a; size_t b; char c[sizeof(str)/sizeof(char)]; }\
- const builtin_##name = {name,(sizeof(str)/sizeof(char))-1,str};
+ static struct { tok_t a; size_t b; size_t c; char d[COMPILER_STRLEN0(str)]; }\
+ const builtin_##name = {name,pp_hashof(str),COMPILER_STRLEN(str),str};
+#else
+#define KWD(name,str) \
+ static struct { tok_t a; size_t b; char c[COMPILER_STRLEN0(str)]; }\
+ const builtin_##name = {name,COMPILER_STRLEN(str),str};
+#endif
 #endif
 #include "tpp-defs.inl"
 #undef KWD
@@ -2594,7 +2641,11 @@ destroy_keyword_map(struct TPPKeywordMap *__restrict self) {
 PRIVATE void
 def_builtin_keyword(struct TPPKeyword *keyword) {
  struct TPPKeyword **bucket;
+#ifdef pp_hashof
+ assert(keyword->k_hash == hashof(keyword->k_name,keyword->k_size));
+#else
  keyword->k_hash = hashof(keyword->k_name,keyword->k_size);
+#endif
  bucket = &keywords.km_bucketv[keyword->k_hash % keywords.km_bucketc];
  keyword->k_next = *bucket;
  *bucket = keyword;
@@ -2611,7 +2662,12 @@ def_builtin_keyword(struct TPPKeywordMap *__restrict self,
  keyword->k_macro = NULL;
  keyword->k_rare  = NULL;
  keyword->k_id    = def->kd_id;
+#ifdef pp_hashof
+ assert(def->kd_hash == hashof(def->kd_name,def->kd_size));
+ keyword->k_hash  = def->kd_hash;
+#else
  keyword->k_hash  = hashof(def->kd_name,def->kd_size);
+#endif
  keyword->k_size  = def->kd_size;
  memcpy(keyword->k_name,def->kd_name,(def->kd_size+1)*sizeof(char));
  bucket = &self->km_bucketv[keyword->k_hash % self->km_bucketc];
@@ -2753,6 +2809,31 @@ PUBLIC int TPPLexer_PopWarnings(void) {
  free(curstate);
  return 1;
 }
+
+PUBLIC int TPPLexer_PushExtensions(void) {
+ uint64_t *newvec; size_t newalloc;
+ assert(TPPLexer_Current);
+ newvec = current.l_extstack.es_stackv;
+ if (            current.l_extstack.es_stackc ==
+    (newalloc = current.l_extstack.es_stacka)) {
+  if ((newalloc <<= 1) == 0) newalloc = 2;
+  newvec = (uint64_t *)realloc(newvec,newalloc*sizeof(uint64_t));
+  if (!newvec) return 0;
+  current.l_extstack.es_stackv = newvec;
+  current.l_extstack.es_stacka = newalloc;
+ }
+ newvec += current.l_extstack.es_stackc++;
+ *newvec = current.l_extensions;
+ return 1;
+}
+PUBLIC int TPPLexer_PopExtensions(void) {
+ assert(TPPLexer_Current);
+ if unlikely(!current.l_extstack.es_stackc) return 0;
+ current.l_extensions = current.l_extstack.es_stackv[
+                      --current.l_extstack.es_stackc];
+ return 1;
+}
+
 
 PRIVATE int set_wstate(int wid, wstate_t state) {
  struct TPPWarningState *curstate; size_t newalloc;
@@ -2908,6 +2989,9 @@ PUBLIC int TPPLexer_Init(struct TPPLexer *__restrict self) {
  self->l_warnings.w_basestate.ws_extendeda = 0;
  self->l_warnings.w_basestate.ws_extendedv = NULL;
  self->l_warnings.w_basestate.ws_prev      = NULL;
+ self->l_extstack.es_stacka = 0;
+ self->l_extstack.es_stackc = 0;
+ self->l_extstack.es_stackv = NULL;
  assert(sizeof(default_warnings_state) >= TPP_WARNING_BITSETSIZE &&
         sizeof(default_warnings_state) <= TPP_OFFSETAFTER(struct TPPWarningState,ws_padding));
  memcpy(self->l_warnings.w_basestate.ws_state,
@@ -2978,6 +3062,7 @@ PUBLIC void TPPLexer_Quit(struct TPPLexer *__restrict self) {
   for (; iter != end; ++iter) free(iter->ip_path);
   free(self->l_syspaths.il_pathv);
  }
+ free(self->l_extstack.es_stackv);
 }
 
 struct tpp_extension {
@@ -2986,7 +3071,7 @@ struct tpp_extension {
  uint64_t    e_flag;
 };
 PRIVATE struct tpp_extension const tpp_extensions[] = {
-#define EXTENSION(name,flag) {name,sizeof(name)/sizeof(char)-1,flag}
+#define EXTENSION(name,flag) {name,COMPILER_STRLEN(name),flag}
  EXTENSION("trigraphs",TPPLEXER_EXTENSION_TRIGRAPHS),
  EXTENSION("digraphs",TPPLEXER_EXTENSION_DIGRAPHS),
  EXTENSION("named-varargs-in-macros",TPPLEXER_EXTENSION_GCC_VA_ARGS),
@@ -4013,6 +4098,11 @@ set_comment:
       (current.l_extokens&TPPLEXER_TOKEN_COLLONASSIGN)) { ch = TOK_COLLON_EQUAL; goto settok_forward1; }
    if (HAVE_FEATURE_DIGRAPHS &&
        *forward == '>') { ch = ']'; goto settok_forward1; } /* [:>] --> []] */
+   goto settok;
+
+  case '@':
+   if (*forward == '=' &&
+      (current.l_extokens&TPPLEXER_TOKEN_ATEQUAL)) { ch = TOK_AT_EQUAL; goto settok_forward1; }
    goto settok;
 
   case '$':
@@ -5298,7 +5388,7 @@ create_int_file:
     if (!pragma_error) token.t_file->f_pos = old_filepos; /* Restore the old file pointer. */
     popeof();
     popf();
-    if (!pragma_error || !TOK) TPPLexer_YieldRaw();
+    if (!pragma_error || !TOK) goto again;
     /* If we managed to parse the pragma, continue parsing afterwards. */
     result = TOK;
    } break;
@@ -5564,12 +5654,12 @@ err_substr:  TPPString_Decref(basestring);
     struct TPPExplicitFile *predefined_macro;
     /* Predefined macros. */
 #define BUILTIN_MACRO(name,value) case name:\
-{ static struct { unsigned int a; size_t b; char c[sizeof(value)/sizeof(char)]; }\
-  text##name = {0x80000000,sizeof(value)/sizeof(char)-1,value};\
+{ static struct { unsigned int a; size_t b; char c[COMPILER_STRLEN0(value)]; }\
+  text##name = {0x80000000,COMPILER_STRLEN(value),value};\
   static struct TPPExplicitFile predef##name = \
   {0x80000000,TPPFILE_KIND_EXPLICIT,NULL,"",0,EMPTY_STRING_HASH,\
   (struct TPPString *)&text##name,text##name.c,\
-  text##name.c+(sizeof(value)/sizeof(char)-1),NULL\
+  text##name.c+COMPILER_STRLEN(value),NULL\
   };\
   predefined_macro = &predef##name;\
   goto predef_macro;\
@@ -6066,10 +6156,12 @@ incback_restore(struct incback_t *__restrict self,
  arguments_file->f_pos = self->ib_args_fpos;
 }
 
+
 PRIVATE int
-compare_text(char const *old_text, char const *new_text, size_t text_size) {
- char const *oend;
- oend = old_text+text_size;
+compare_text(char const *__restrict old_text,
+             char const *__restrict new_text,
+             size_t text_size) {
+ char const *oend = old_text+text_size;
  for (; old_text != oend; ++old_text,++new_text) {
   /* NOTE: Must ignore \0-characters in the old text! */
   if (*old_text && *old_text != *new_text) return 0;
@@ -6798,7 +6890,7 @@ skip_array_deref:
      if (index_begin < 0) index_begin = (ptrdiff_t)result->c_data.c_string->s_size+index_begin;
      if (index_begin < 0 || (size_t)index_begin >= result->c_data.c_string->s_size) {
       TPPLexer_Warn(W_INTEX_OUT_OF_BOUNDS,result->c_data.c_string,index_begin);
-      index_begin %= result->c_data.c_string->s_size;
+      index_begin %= (result->c_data.c_string->s_size+1);
       if (index_begin < 0) index_begin += result->c_data.c_string->s_size;
      }
      yield_fetch();
@@ -6811,7 +6903,7 @@ skip_array_deref:
       if (index_end < 0) index_end = (ptrdiff_t)result->c_data.c_string->s_size+index_end;
       if (index_end < 0 || (size_t)index_end >= result->c_data.c_string->s_size) {
        TPPLexer_Warn(W_INTEX_OUT_OF_BOUNDS,result->c_data.c_string,index_end);
-       index_end %= result->c_data.c_string->s_size;
+       index_end %= (result->c_data.c_string->s_size+1);
        if (index_end < 0) index_end += result->c_data.c_string->s_size;
       }
      }
@@ -7200,7 +7292,7 @@ TPPLexer_ParsePragma(tok_t endat) {
    yield_fetch();
    if (TOK == '(') yield_fetch();
    else TPPLexer_Warn(W_EXPECTED_LPAREN);
-   if (!TPPLexer_Eval(&const_val)) return 0;
+   if unlikely(!TPPLexer_Eval(&const_val)) goto err;
    if (const_val.c_kind != TPP_CONST_STRING) {
     TPPLexer_Warn(W_EXPECTED_STRING_AFTER_PUSHMACRO,&const_val);
    } else {
@@ -7234,7 +7326,7 @@ TPPLexer_ParsePragma(tok_t endat) {
     *       gcc does make them be (so we must follow its example...) */
    with_paren = TOK == '(';
    if (with_paren) yield_fetch();
-   if (!TPPLexer_Eval(&message)) return 0;
+   if unlikely(!TPPLexer_Eval(&message)) goto err;
    if (message.c_kind != TPP_CONST_STRING) {
     TPPLexer_Warn(W_EXPECTED_STRING_AFTER_MESSAGE,&message);
    } else {
@@ -7272,14 +7364,14 @@ TPPLexer_ParsePragma(tok_t endat) {
    yield_fetch();
    if unlikely(TOK != '(') TPPLexer_Warn(W_EXPECTED_LPAREN);
    else yield_fetch();
-   if unlikely(!TPPLexer_Eval(&error_message)) return 0;
+   if unlikely(!TPPLexer_Eval(&error_message)) goto err;
    if (error_message.c_kind != TPP_CONST_STRING) {
-    if (!TPPLexer_Warn(W_EXPECTED_STRING_AFTER_PRGERROR,&error_message)) return 0;
+    if (!TPPLexer_Warn(W_EXPECTED_STRING_AFTER_PRGERROR,&error_message)) goto err;
    } else {
     warning_error = TPPLexer_Warn(W_ERROR,error_message.c_data.c_string->s_text,
                                           error_message.c_data.c_string->s_size);
     TPPString_Decref(error_message.c_data.c_string);
-    if (!warning_error) return 0;
+    if unlikely(!warning_error) goto err;
    }
    if unlikely(TOK != ')') TPPLexer_Warn(W_EXPECTED_RPAREN);
    else yield_fetch();
@@ -7292,14 +7384,14 @@ TPPLexer_ParsePragma(tok_t endat) {
    yield_fetch();
    if unlikely(TOK != '(') TPPLexer_Warn(W_EXPECTED_LPAREN);
    else yield_fetch();
-   if unlikely(!TPPLexer_Eval(&ident_name)) return 0;
+   if unlikely(!TPPLexer_Eval(&ident_name)) goto err;
    if unlikely(ident_name.c_kind != TPP_CONST_STRING) {
-    if (!TPPLexer_Warn(W_EXPECTED_STRING_AFTER_DEPRECATED,&ident_name)) return 0;
+    if (!TPPLexer_Warn(W_EXPECTED_STRING_AFTER_DEPRECATED,&ident_name)) goto err;
    } else {
     keyword = TPPLexer_LookupKeyword(ident_name.c_data.c_string->s_text,
                                      ident_name.c_data.c_string->s_size,1);
     TPPConst_Quit(&ident_name);
-    if unlikely(!keyword || !TPPKeyword_MAKERARE(keyword)) return 0;;
+    if unlikely(!keyword || !TPPKeyword_MAKERARE(keyword)) goto err;
     keyword->k_rare->kr_flags |= TPP_KEYWORDFLAG_IS_DEPRECATED;
    }
    if unlikely(TOK != ')') TPPLexer_Warn(W_EXPECTED_RPAREN);
@@ -7315,16 +7407,16 @@ TPPLexer_ParsePragma(tok_t endat) {
    yield_fetch();
    if unlikely(TOK != '(') TPPLexer_Warn(W_EXPECTED_LPAREN);
    else yield_fetch();
-   if unlikely(!TPPLexer_Eval(&exec_code)) return 0;
+   if unlikely(!TPPLexer_Eval(&exec_code)) goto err;
    if unlikely(TOK != ')') TPPLexer_Warn(W_EXPECTED_RPAREN);
    else yield_fetch();
    if unlikely(exec_code.c_kind != TPP_CONST_STRING) {
-    if (!TPPLexer_Warn(W_EXPECTED_STRING_AFTER_TPP_EXEC,&exec_code)) return 0;
+    if (!TPPLexer_Warn(W_EXPECTED_STRING_AFTER_TPP_EXEC,&exec_code)) goto err;
    } else {
     char *old_token_begin;
     struct TPPFile *prev_file;
     exec_file = TPPFile_NewExplicitInherited(exec_code.c_data.c_string);
-    if unlikely(!exec_file) { TPPString_Decref(exec_code.c_data.c_string); return 0; }
+    if unlikely(!exec_file) { TPPString_Decref(exec_code.c_data.c_string); goto err; }
     old_token_begin = token.t_begin;
     pushfile_inherited(exec_file);
     pushf();
@@ -7363,7 +7455,7 @@ TPPLexer_ParsePragma(tok_t endat) {
    yield_fetch();
    if unlikely(TOK != '(') TPPLexer_Warn(W_EXPECTED_LPAREN);
    else yield_fetch();
-   if unlikely(!TPPLexer_Eval(&const_val)) return 0;
+   if unlikely(!TPPLexer_Eval(&const_val)) goto err;
    if (const_val.c_kind != TPP_CONST_STRING) {
     TPPLexer_Warn(W_EXPECTED_STRING_AFTER_TPP_SETF,&const_val);
     keyword = NULL;
@@ -7371,11 +7463,11 @@ TPPLexer_ParsePragma(tok_t endat) {
     keyword = TPPLexer_LookupKeyword(const_val.c_data.c_string->s_text,
                                      const_val.c_data.c_string->s_size,1);
     TPPString_Decref(const_val.c_data.c_string);
-    if unlikely(!keyword || !TPPKeyword_MAKERARE(keyword)) return 0;
+    if unlikely(!keyword || !TPPKeyword_MAKERARE(keyword)) goto err;
    }
    if unlikely(TOK != ',') TPPLexer_Warn(W_EXPECTED_COMMA);
    else yield_fetch();
-   if unlikely(!TPPLexer_Eval(&const_val)) return 0;
+   if unlikely(!TPPLexer_Eval(&const_val)) goto err;
    TPPConst_ToInt(&const_val);
    new_flags = (uint32_t)const_val.c_data.c_int;
    if unlikely(TOK != ')') TPPLexer_Warn(W_EXPECTED_RPAREN);
@@ -7404,7 +7496,7 @@ TPPLexer_ParsePragma(tok_t endat) {
       break;
      case KWD_pop: /* Pop warnings. */
       if (!TPPLexer_PopWarnings() &&
-          !TPPLexer_Warn(W_CANT_POP_WARNINGS)) return 0;
+          !TPPLexer_Warn(W_CANT_POP_WARNINGS)) goto err;
       yield_fetch();
       break;
 
@@ -7419,12 +7511,12 @@ TPPLexer_ParsePragma(tok_t endat) {
 set_warning_newstate:
       if (TOK != ':') {
        /* NOTE: The old TPP didn't have a warning here. */
-       if unlikely(TPPLexer_Warn(W_EXPECTED_COLLON_AFTER_WARNING)) return 0;
+       if unlikely(TPPLexer_Warn(W_EXPECTED_COLLON_AFTER_WARNING)) goto err;
       } else {
        yield_fetch();
        /* Parse warning numbers/names. */
        while (TOK > 0 && TOK != ',' && TOK != ')') {
-        if unlikely(!TPPLexer_Eval(&val)) return 0;
+        if unlikely(!TPPLexer_Eval(&val)) goto err;
         if (val.c_kind == TPP_CONST_INTEGRAL) {
          wset_error = TPPLexer_SetWarning((int)val.c_data.c_int,newstate);
         } else {
@@ -7451,7 +7543,7 @@ set_warning_newstate:
         * Both of these idea are be merged here!
         */
      default:
-      if unlikely(!TPPLexer_Eval(&val)) return 0;
+      if unlikely(!TPPLexer_Eval(&val)) goto err;
       if (val.c_kind == TPP_CONST_INTEGRAL) {
        /* NOTE: Technically, the old TPP allowed numbers 'x' greater than 2 to
         *       be specified here, which would in return suppress the warning
@@ -7498,21 +7590,33 @@ set_warning_newstate:
    yield_fetch();
    if unlikely(TOK != '(') TPPLexer_Warn(W_EXPECTED_LPAREN);
    else yield_fetch();
-   if unlikely(!TPPLexer_Eval(&extname)) return 0;
-   if (extname.c_kind != TPP_CONST_STRING) {
-    if unlikely(!TPPLexer_Warn(W_EXPECTED_STRING_AFTER_EXTENSION,&extname)) return 0;
-   } else {
-    int ext_error,mode = 1;
-    char const *name = extname.c_data.c_string->s_text;
-    if (*name == '-') ++name;
-    if (*name == 'f') ++name;
-    if (!memcmp(name,"no-",3)) name += 3,mode = 0;
-    ext_error = TPPLexer_SetExtension(name,mode);
-    if unlikely(!ext_error) {
-     ext_error = TPPLexer_Warn(W_UNKNOWN_EXTENSION,name);
+   for (;;) {
+    if (TOK == KWD_push) {
+     if unlikely(!TPPLexer_PushExtensions()) goto seterr;
+     goto yield_after_extension;
+    } else if (TOK == KWD_pop) {
+     if unlikely(!TPPLexer_PopExtensions() &&
+                 !TPPLexer_Warn(W_CANT_POP_EXTENSIONS)) goto err;
+yield_after_extension:
+     yield_fetch();
+    } else {
+     if unlikely(!TPPLexer_Eval(&extname)) goto err;
+     if (extname.c_kind != TPP_CONST_STRING) {
+      if unlikely(!TPPLexer_Warn(W_EXPECTED_STRING_AFTER_EXTENSION,&extname)) goto err;
+     } else {
+      int ext_error,mode = 1;
+      char const *name = extname.c_data.c_string->s_text;
+      if (*name == '-') ++name;
+      if (*name == 'f') ++name;
+      if (!memcmp(name,"no-",3)) name += 3,mode = 0;
+      ext_error = TPPLexer_SetExtension(name,mode);
+      if unlikely(!ext_error) ext_error = TPPLexer_Warn(W_UNKNOWN_EXTENSION,name);
+      TPPString_Decref(extname.c_data.c_string);
+      if unlikely(!ext_error) goto err;
+     }
     }
-    TPPString_Decref(extname.c_data.c_string);
-    if unlikely(!ext_error) return 0;
+    if (TOK != ',') break;
+    yield_fetch();
    }
    if unlikely(TOK != ')') TPPLexer_Warn(W_EXPECTED_RPAREN);
    else yield_fetch();
@@ -7527,7 +7631,7 @@ set_warning_newstate:
     switch (TOK) {
      /* Push/Pop warnings */
      case KWD_push: if unlikely(!TPPLexer_PushWarnings()) goto seterr; break;
-     case KWD_pop: if (!TPPLexer_PopWarnings() && !TPPLexer_Warn(W_CANT_POP_WARNINGS)) return 0; break;
+     case KWD_pop: if (!TPPLexer_PopWarnings() && !TPPLexer_Warn(W_CANT_POP_WARNINGS)) goto err; break;
 
      { /* Configure the mode for a GCC diagnostic. */
       wstate_t newmode; struct TPPConst group_name;
@@ -7535,9 +7639,9 @@ set_warning_newstate:
       if (FALSE) { case KWD_error:   newmode = WSTATE_ERROR; }
       if (FALSE) { case KWD_ignored: newmode = WSTATE_DISABLE; }
       yield_fetch();
-      if unlikely(!TPPLexer_Eval(&group_name)) return 0;
+      if unlikely(!TPPLexer_Eval(&group_name)) goto err;
       if (group_name.c_kind != TPP_CONST_STRING) {
-       if unlikely(!TPPLexer_Warn(W_EXPECTED_STRING_AFTER_GCC_DIAG,&group_name)) return 0;
+       if unlikely(!TPPLexer_Warn(W_EXPECTED_STRING_AFTER_GCC_DIAG,&group_name)) goto err;
       } else {
        int wset_error;
        char const *warning_name = group_name.c_data.c_string->s_text;
@@ -7572,9 +7676,8 @@ set_warning_newstate:
    break;
  }
  return 0;
-seterr:
- TPPLexer_SetErr();
- return 0;
+seterr: TPPLexer_SetErr();
+err:    return 0;
 }
 
 
@@ -7723,6 +7826,7 @@ PUBLIC int TPPLexer_Warn(int wnum, ...) {
    }
   } break;
   case W_CANT_POP_WARNINGS               : WARNF("Can't pop warnings"); break;
+  case W_CANT_POP_EXTENSIONS             : WARNF("Can't pop extensions"); break;
   case W_MACRO_RECURSION_LIMIT_EXCEEDED  : WARNF("Macro recursion limit exceeded when expanding '%s' (Consider passing '-fno-macro-recursion')",FILENAME()); break;
   case W_INCLUDE_RECURSION_LIMIT_EXCEEDED: WARNF("Include recursion limit exceeded when including '%s'",FILENAME()); break;
   case W_ELSE_WITHOUT_IF                 : WARNF("#else without #if"); break;

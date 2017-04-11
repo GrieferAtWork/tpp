@@ -536,6 +536,7 @@ enum{
  TPP(TOK_AND_EQUAL),     /*< "&=". */
  TPP(TOK_OR_EQUAL),      /*< "|=". */
  TPP(TOK_XOR_EQUAL),     /*< "^=". */
+ TPP(TOK_AT_EQUAL),      /*< "@=". */
  TPP(TOK_GLUE),          /*< "##". */
  TPP(TOK_LAND),          /*< "&&". */
  TPP(TOK_LOR),           /*< "||". */
@@ -680,7 +681,11 @@ struct TPPIfdefStack {
  size_t                    is_slota; /*< Allocated amount of #ifdef slots. */
  struct TPPIfdefStackSlot *is_slotv; /*< [0..is_slotc|alloc(is_slota)][owned] Vector of #ifdef slots. */
 };
-
+struct TPPExtStack {
+ size_t    es_stacka; /*< Allocated size of the extension stack. */
+ size_t    es_stackc; /*< Current size of the extension stack. */
+ uint64_t *es_stackv; /*< [0..es_stackc|alloc(es_stacka)][owned] Vector of pushed extension states. */
+};
 
 struct TPPIncludePath {
  /* NOTE: A special #include-path exists that is only a '.'.
@@ -848,8 +853,9 @@ TPP_LOCAL int TPPLexer_COLUMN(void) { struct TPPFile *f = TPPLexer_Textfile(); r
 #define TPPLEXER_TOKEN_ARROWSTAR             0x00000040 /*< Enable recognition of '->*' tokens. */
 #define TPPLEXER_TOKEN_DOTSTAR               0x00000080 /*< Enable recognition of '.*' tokens. */
 #define TPPLEXER_TOKEN_DOTDOT                0x00000100 /*< Enable recognition of '..' tokens. */
-#define TPPLEXER_TOKEN_C_COMMENT             0x00000200 /*< Enable recognition of '/[]* comment *[]/' tokens. */
-#define TPPLEXER_TOKEN_CPP_COMMENT           0x00000400 /*< Enable recognition of '// comment' tokens. */
+#define TPPLEXER_TOKEN_ATEQUAL               0x00000200 /*< Enable recognition of '@=' tokens. */
+#define TPPLEXER_TOKEN_C_COMMENT             0x00000400 /*< Enable recognition of '/[]* comment *[]/' tokens. */
+#define TPPLEXER_TOKEN_CPP_COMMENT           0x00000800 /*< Enable recognition of '// comment' tokens. */
 #define TPPLEXER_TOKEN_DEFAULT               0xffffffff /*< Default set of extension tokens (enable all). */
 
 /* Predefined set of extension tokens for some languages.
@@ -909,7 +915,7 @@ TPP_LOCAL int TPPLexer_COLUMN(void) { struct TPPFile *f = TPPLexer_Textfile(); r
 #define TPPLEXER_EXTENSION_ASSERTIONS        0x0000040000000000ull /*< [name("assertions")] Recognize #assert/#unassert directives, as well as #predicate(answer) expressions. */
 #define TPPLEXER_EXTENSION_CANONICAL_HEADERS 0x0000080000000000ull /*< [name("canonical-system-headers")] Fix paths to normalize '/' vs. '\\', in order to prevent problems with #pragma once. */
 #define TPPLEXER_EXTENSION_EXT_ARE_FEATURES  0x0000100000000000ull /*< [name("extensions-are-features")] extensions (__has_extension) are also considered features (__has_feature). */
-#define TPPLEXER_EXTENSION_DEFAULT           0xfffffffffffffffeull /*< Enable (almost) all extensions. */
+#define TPPLEXER_EXTENSION_DEFAULT          (0xffffffffffffffffull&~(TPPLEXER_EXTENSION_TRIGRAPHS|TPPLEXER_EXTENSION_RECMAC)) /*< Enable (almost) all extensions. */
 
 struct TPPLexer {
  struct TPPToken       l_token;      /*< The current token. */
@@ -929,6 +935,7 @@ struct TPPLexer {
  int_t                 l_counter;    /*< Value returned the next time '__COUNTER__' is expanded (Initialized to ZERO(0)). */
  struct TPPIfdefStack  l_ifdef;      /*< #ifdef stack. */
  struct TPPWarnings    l_warnings;   /*< Current user-configured warnings state. */
+ struct TPPExtStack    l_extstack;   /*< Extension stack (used for '#pragma extension(push)') */
 };
 #define TPPLEXER_DEFAULT_LIMIT_MREC 512 /* Even when generated text differs from previous version, don't allow more self-recursion per macro than this. */
 #define TPPLEXER_DEFAULT_LIMIT_INCL 64  /* User attempts to #include a file more often that file will fail with an error message. */
@@ -948,6 +955,14 @@ TPPFUN struct TPPLexer *TPPLexer_Current;
 // @return: 0: Not enough available memory to setup builtin keywords.
 TPPFUN int  TPPLexer_Init(struct TPPLexer *__restrict self);
 TPPFUN void TPPLexer_Quit(struct TPPLexer *__restrict self);
+
+//////////////////////////////////////////////////////////////////////////
+// Push/Pop the current extension state.
+// @return: 0: [TPPLexer_PushExtensions] Not enough available memory.
+// @return: 0: [TPPLexer_PopExtensions] No older extension state was available to restore.
+// @return: 1: Successfully pushed/popped active extensions.
+TPPFUN int TPPLexer_PushExtensions(void);
+TPPFUN int TPPLexer_PopExtensions(void);
 
 //////////////////////////////////////////////////////////////////////////
 // Set the state of a given extension 'name'.
