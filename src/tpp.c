@@ -5612,8 +5612,8 @@ argcache_genexpand(struct argcache_t *__restrict self,
                       file->f_text->s_size);
  assert(file == current.l_eob_file);
  /* Clobber the file pointers. */
- file->f_pos   =
- file->f_begin = text_begin;
+ /*file->f_begin =*/
+ file->f_pos   = text_begin;
  file->f_end   = text_end;
  old_end = *text_end,*text_end = '\0';
  buf_begin = buf_end = buf_pos = NULL;
@@ -6188,15 +6188,20 @@ at_next_non_whitespace:
   assert(calling_conv >= 0 && calling_conv <= 3);
   memset(paren_recursion,0,sizeof(paren_recursion));
   paren_recursion[calling_conv] = 1;
-  assert(token.t_file == arguments_file);
   arg_iter->ac_offset_begin = (size_t)(token.t_begin-token.t_file->f_text->s_text);
   for (;;) {
+   assert(token.t_file  == arguments_file);
+   assert(token.t_begin <= token.t_end);
+   assert(token.t_begin >= token.t_file->f_begin);
+   assert(token.t_end   <= token.t_file->f_end);
    switch (TOK) {
 
     case 0:
      /* Special case: Must load more data from the arguments file. */
      if (!TPPFile_NextChunk(arguments_file,TPPFILE_NEXTCHUNK_FLAG_EXTEND)) {
-      arg_iter->ac_offset_end = (size_t)(token.t_begin-token.t_file->f_text->s_text);
+      assert(token.t_file == arguments_file);
+      token.t_begin = token.t_end = arguments_file->f_end;
+      arg_iter->ac_offset_end = (size_t)(token.t_begin-arguments_file->f_text->s_text);
       if (!TPPLexer_Warn(W_EOF_IN_MACRO_ARGUMENT_LIST)) goto err_argv;
       goto done_args;
      }
@@ -7177,7 +7182,7 @@ TPPLexer_ParsePragma(tok_t endat) {
      register char oldch,*poldch;
      oldch = *(poldch = message.c_data.c_string->s_text+
                         message.c_data.c_string->s_size);
-     *poldch = '\0';
+     *poldch = '\n';
      fwrite(message.c_data.c_string->s_text,sizeof(char),
             message.c_data.c_string->s_size+1,stderr);
      *poldch = oldch;
