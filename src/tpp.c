@@ -5430,6 +5430,7 @@ create_int_file:
     TPPString_Incref(empty_string);
     while (TOK != ')') {
      if unlikely(!TPPLexer_Eval(&val)) { breakf(); return TOK_ERR; }
+     if (TOK == ',') yield_fetch();
      TPPConst_ToInt(&val);
      ch = (char)val.c_data.c_int;
      reqsize = cursize+TPP_SizeofEscape(&ch,1);
@@ -5443,8 +5444,6 @@ create_int_file:
      }
      TPP_Escape(string_text->s_text+(cursize+1),&ch,1);
      cursize = reqsize;
-          if (TOK == ',') yield_fetch();
-     else if (TOK != ')') TPPLexer_Warn(W_EXPECTED_COMMA);
     }
     popf();
     if (!string_text) {
@@ -6067,6 +6066,17 @@ incback_restore(struct incback_t *__restrict self,
  arguments_file->f_pos = self->ib_args_fpos;
 }
 
+PRIVATE int
+compare_text(char const *old_text, char const *new_text, size_t text_size) {
+ char const *oend;
+ oend = old_text+text_size;
+ for (; old_text != oend; ++old_text,++new_text) {
+  /* NOTE: Must ignore \0-characters in the old text! */
+  if (*old_text && *old_text != *new_text) return 0;
+ }
+ return 1;
+}
+
 
 /* Parenthesis recursion IDs. */
 #define RECURSION_OF(flag)((flag) >> 12)
@@ -6383,9 +6393,9 @@ done_args:
 #if HAVELOG(LOG_CALLMACRO) /* DEBUG: Log calls to macros. */
   {
    arg_end = (arg_iter = argv)+effective_argc;
-   LOG(LOG_CALLMACRO|LOG_RAW,("[DEBUG] Calling: %.*s(",(int)macro->f_namesize,macro->f_name));
+   LOG(LOG_CALLMACRO|LOG_RAW,("[DEBUG] Calling: %.*s(\n",(int)macro->f_namesize,macro->f_name));
    for (; arg_iter != arg_end; ++arg_iter) {
-    LOG(LOG_CALLMACRO|LOG_RAW,("[%.*s],",(int)(arg_iter->ac_end-arg_iter->ac_begin),arg_iter->ac_begin));
+    LOG(LOG_CALLMACRO|LOG_RAW,("\t[%.*s],\n",(int)(arg_iter->ac_end-arg_iter->ac_begin),arg_iter->ac_begin));
    }
    LOG(LOG_CALLMACRO|LOG_RAW,(")\n"));
   }
@@ -6423,9 +6433,9 @@ done_args:
        (file_iter->f_macro.m_flags&TPP_MACROFILE_KIND) == TPP_MACROFILE_KIND_EXPANDED &&
         file_iter->f_macro.m_expand.e_expand_origin == macro &&
         file_iter->f_text->s_size == expand_file->f_text->s_size &&
-       !memcmp(file_iter->  f_text->s_text,
-               expand_file->f_text->s_text,
-               expand_file->f_text->s_size*sizeof(char))) {
+        compare_text(file_iter->  f_text->s_text,
+                     expand_file->f_text->s_text,
+                     expand_file->f_text->s_size)) {
      TPPFile_Decref(expand_file);
      incback_restore(&popped_includes,arguments_file);
      goto end2;
