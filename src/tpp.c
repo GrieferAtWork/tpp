@@ -33,6 +33,7 @@
 
 /* Ugh... Every f-ing time. I'M NOT GONNA BIND MYSELF TO YOUR PLATFORM! */
 #define _CRT_SECURE_NO_WARNINGS
+#define _CRT_NONSTDC_NO_WARNINGS
 
 #ifndef __has_attribute
 #   define __has_attribute(x) 0
@@ -259,17 +260,17 @@ extern void __debugbreak(void);
 #undef isalnum
 #undef isspace
 #undef isprint
-#define isalpha(ch)         (chrattr[ch]&CH_ISALPHA)
-#define isdigit(ch)         (chrattr[ch]&CH_ISDIGIT)
-#define isalnum(ch)         (chrattr[ch]&(CH_ISALPHA|CH_ISDIGIT))
-#define isspace(ch)         (chrattr[ch]&CH_ISSPACE)
-#define islf(ch)            (chrattr[ch]&CH_ISLF)
-#define islforzero(ch)      (chrattr[ch]&(CH_ISLF|CH_ISZERO))
-#define isspace_nolf(ch)   ((chrattr[ch]&(CH_ISSPACE|CH_ISLF))==CH_ISSPACE)
-#define isnospace_orlf(ch) ((chrattr[ch]&(CH_ISSPACE|CH_ISLF))!=CH_ISSPACE)
-#define isprint(ch)         (chrattr[ch]&CH_ISPRINT)
-#define istrigraph(ch)      (chrattr[ch]&CH_ISTRIGRAPH)
-#define ismultichar(ch)     (chrattr[ch]&CH_ISMULTICHAR)
+#define isalpha(ch)         (chrattr[(uint8_t)(ch)]&CH_ISALPHA)
+#define isdigit(ch)         (chrattr[(uint8_t)(ch)]&CH_ISDIGIT)
+#define isalnum(ch)         (chrattr[(uint8_t)(ch)]&(CH_ISALPHA|CH_ISDIGIT))
+#define isspace(ch)         (chrattr[(uint8_t)(ch)]&CH_ISSPACE)
+#define islf(ch)            (chrattr[(uint8_t)(ch)]&CH_ISLF)
+#define islforzero(ch)      (chrattr[(uint8_t)(ch)]&(CH_ISLF|CH_ISZERO))
+#define isspace_nolf(ch)   ((chrattr[(uint8_t)(ch)]&(CH_ISSPACE|CH_ISLF))==CH_ISSPACE)
+#define isnospace_orlf(ch) ((chrattr[(uint8_t)(ch)]&(CH_ISSPACE|CH_ISLF))!=CH_ISSPACE)
+#define isprint(ch)         (chrattr[(uint8_t)(ch)]&CH_ISPRINT)
+#define istrigraph(ch)      (chrattr[(uint8_t)(ch)]&CH_ISTRIGRAPH)
+#define ismultichar(ch)     (chrattr[(uint8_t)(ch)]&CH_ISMULTICHAR)
 
 static uint8_t const chrattr[256] = {
 /*[[[deemon
@@ -468,6 +469,7 @@ do{ tok_t              _old_tok_id    = token.t_id;\
 #define HAVE_EXTENSION_TPP_STR_SUBSTR    (current.l_extensions&TPPLEXER_EXTENSION_TPP_STR_SUBSTR)
 #define HAVE_EXTENSION_TPP_STR_SIZE      (current.l_extensions&TPPLEXER_EXTENSION_TPP_STR_SIZE)
 #define HAVE_EXTENSION_TPP_STR_PACK      (current.l_extensions&TPPLEXER_EXTENSION_TPP_STR_PACK)
+#define HAVE_EXTENSION_TPP_COUNT_TOKENS  (current.l_extensions&TPPLEXER_EXTENSION_TPP_COUNT_TOKENS)
 #define HAVE_EXTENSION_DOLLAR_IS_ALPHA   (current.l_extensions&TPPLEXER_EXTENSION_DOLLAR_IS_ALPHA)
 #define HAVE_EXTENSION_ASSERTIONS        (current.l_extensions&TPPLEXER_EXTENSION_ASSERTIONS)
 #define HAVE_EXTENSION_CANONICAL_HEADERS (current.l_extensions&TPPLEXER_EXTENSION_CANONICAL_HEADERS)
@@ -3114,6 +3116,7 @@ PRIVATE struct tpp_extension const tpp_extensions[] = {
  EXTENSION("tpp-str-substr-macro",TPPLEXER_EXTENSION_TPP_STR_SUBSTR),
  EXTENSION("tpp-str-pack-macro",TPPLEXER_EXTENSION_TPP_STR_PACK),
  EXTENSION("tpp-str-size-macro",TPPLEXER_EXTENSION_TPP_STR_SIZE),
+ EXTENSION("tpp-count-tokens-macro",TPPLEXER_EXTENSION_TPP_COUNT_TOKENS),
  EXTENSION("dollars-in-identifiers",TPPLEXER_EXTENSION_DOLLAR_IS_ALPHA),
  EXTENSION("assertions",TPPLEXER_EXTENSION_ASSERTIONS),
  EXTENSION("canonical-system-headers",TPPLEXER_EXTENSION_CANONICAL_HEADERS),
@@ -5372,7 +5375,7 @@ create_int_file:
     if (TOK == '(') TPPLexer_Yield();
     else TPPLexer_Warn(W_EXPECTED_LPAREN);
     /* WARNING: We leave macros turned on for this, because (perhaps surprisingly),
-    /*          visual studio _does_ expand macros inside its __pragma helper. */
+     *          visual studio _does_ expand macros inside its __pragma helper. */
     pragma_error = TPPLexer_ParsePragma(')');
     if (!pragma_error && (current.l_flags&TPPLEXER_FLAG_EAT_UNKNOWN_PRAGMA)) pragma_error = 1;
     while (token.t_file != current.l_eof_file) popfile();
@@ -5423,6 +5426,48 @@ create_int_file:
     if unlikely(!val_file) { TPPString_Decref(val_str); goto seterr; }
     pushfile_inherited(val_file);
     goto again;
+   } break;
+
+   { /* Expand into the integral representation of how may tokens are given.
+      * Very useful when wanting to detect extension token flags:
+      * >> #if __TPP_COUNT_TOKENS(":=") == 1
+      * >> #pragma message("The ':=' token is enabled")
+      * >> #endif
+      * >> #if __TPP_COUNT_TOKENS(" ") != 0
+      * >> #pragma message("Whitespace is treated as its own token")
+      * >> #endif
+      * >> #if __TPP_COUNT_TOKENS("\n") != 0
+      * >> #pragma message("Linefeeds are kept during preprocessing")
+      * >> #endif
+      */
+    struct TPPConst val;
+    struct TPPFile *cnt_file;
+   case KWD___TPP_COUNT_TOKENS:
+    if (!HAVE_EXTENSION_TPP_COUNT_TOKENS) break;
+    pushf();
+    current.l_flags &= ~(TPPLEXER_FLAG_WANTCOMMENTS|
+                         TPPLEXER_FLAG_WANTSPACE|
+                         TPPLEXER_FLAG_WANTLF);
+    yield_fetch();
+    if likely(TOK == '(') yield_fetch();
+    else TPPLexer_Warn(W_EXPECTED_LPAREN);
+    if unlikely(!TPPLexer_Eval(&val)) {err_cnttokf: breakf(); return TOK_ERR; }
+    if unlikely(val.c_kind != TPP_CONST_STRING &&
+               !TPPLexer_Warn(W_EXPECTED_STRING_AFTER_TPP_CNTTOK,&val)) goto err_cnttokf;
+    if unlikely(TOK != ')') TPPLexer_Warn(W_EXPECTED_RPAREN);
+    popf(); intval = 0;
+    if unlikely(val.c_kind != TPP_CONST_STRING) goto create_int_file;
+    cnt_file = TPPFile_NewExplicitInherited(val.c_data.c_string);
+    if unlikely(!cnt_file) { TPPString_Decref(val.c_data.c_string); goto seterr; }
+    /* Push the count-file and yield all tokens inside. */
+    pushfile_inherited(cnt_file);
+    pusheob();
+    while (TPPLexer_YieldRaw() > 0) ++intval;
+    popeob();
+    assert(token.t_file == cnt_file);
+    token.t_file = cnt_file->f_prev;
+    TPPFile_Decref(cnt_file);
+    goto create_int_file;
    } break;
 
    { /* Expand into a random integral. */
@@ -6180,10 +6225,11 @@ compare_text(char const *__restrict old_text,
 
 PUBLIC int
 TPPLexer_ExpandFunctionMacro(struct TPPFile *__restrict macro) {
+ static tok_t const paren_begin[4] = {'(','[','{','<'};
  struct TPPFile *arguments_file,*expand_file;
  tok_t begin_token; char *iter,*end;
  struct incback_t popped_includes;
- int check_mirrors,result;
+ int calling_conv,check_mirrors,result;
  assert(macro);
  assert(macro->f_kind == TPPFILE_KIND_MACRO);
  assert((macro->f_macro.m_flags&TPP_MACROFILE_KIND) == TPP_MACROFILE_KIND_FUNCTION);
@@ -6191,12 +6237,9 @@ TPPLexer_ExpandFunctionMacro(struct TPPFile *__restrict macro) {
  check_mirrors = macro->f_macro.m_flags&TPP_MACROFILE_FLAG_FUNC_SELFEXPAND;
  arguments_file = token.t_file;
  assert(arguments_file);
- switch (macro->f_macro.m_flags&TPP_MACROFILE_MASK_FUNC_STARTCH) {
-  case TPP_MACROFILE_FUNC_START_LBRACKET: begin_token = '['; break;
-  case TPP_MACROFILE_FUNC_START_LBRACE  : begin_token = '{'; break;
-  case TPP_MACROFILE_FUNC_START_LANGLE  : begin_token = '<'; break;
-  default                               : begin_token = '('; break;
- }
+ calling_conv = RECURSION_OF(macro->f_macro.m_flags&TPP_MACROFILE_MASK_FUNC_STARTCH);
+ assert(calling_conv >= 0 && calling_conv <= 3);
+ begin_token = paren_begin[calling_conv];
  /* Skip all whitespace while unwinding the #include
   * stack, trying to find the 'begin_token' character. */
  for (;;) {
@@ -6277,7 +6320,7 @@ at_next_non_whitespace:
  pushf();
  current.l_flags |= TPPLEXER_FLAG_NO_SEEK_ON_EOB;
  {
-  int paren_recursion[4],calling_conv;
+  int paren_recursion[4];
   struct argcache_t *argv,*arg_iter,*arg_last,*arg_end;
   size_t effective_argc = macro->f_macro.m_function.f_argc;
   size_t va_size = 0; uintptr_t text_offset;
@@ -6302,8 +6345,6 @@ at_next_non_whitespace:
    if unlikely(!argv) goto end0;
   }
   arg_last = (arg_iter = argv)+(effective_argc-1);
-  calling_conv = RECURSION_OF(macro->f_macro.m_flags&TPP_MACROFILE_MASK_FUNC_STARTCH);
-  assert(calling_conv >= 0 && calling_conv <= 3);
   memset(paren_recursion,0,sizeof(paren_recursion));
   paren_recursion[calling_conv] = 1;
   arg_iter->ac_offset_begin = (size_t)(token.t_begin-token.t_file->f_text->s_text);
@@ -6531,6 +6572,7 @@ done_args:
                      expand_file->f_text->s_size)) {
      TPPFile_Decref(expand_file);
      incback_restore(&popped_includes,arguments_file);
+     if (!TPPLexer_Warn(W_FUNCTION_MACRO_ALREADY_ONSTACK,macro)) goto end0;
      goto end2;
     }
     file_iter = file_iter->f_prev;
@@ -7772,6 +7814,7 @@ PUBLIC int TPPLexer_Warn(int wnum, ...) {
   case W_VA_KEYWORD_IN_REGULAR_MACRO     : WARNF("Variadic keyword '%s' used in regular macro",KWDNAME()); break;
   case W_DEFINED_IN_MACRO_BODY           : WARNF("'defined' found in macro body"); break;
   case W_KEYWORD_MACRO_ALREADY_ONSTACK   : WARNF("Keyword-style macro '%s' is already being expanded",FILENAME()); break;
+  case W_FUNCTION_MACRO_ALREADY_ONSTACK  : WARNF("Function-style macro '%s' is expanded to the same text",FILENAME()); break;
   case W_EOF_IN_MACRO_ARGUMENT_LIST      : WARNF("EOF in macro argument list"); break;
   case W_TOO_MANY_MACRO_ARGUMENTS        : WARNF("Too many arguments for '%s'",FILENAME()); break;
   case W_NOT_ENGOUH_MACRO_ARGUMENTS      : WARNF("Too enough arguments for '%s'",FILENAME()); break;

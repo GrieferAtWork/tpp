@@ -102,6 +102,7 @@
 // [__TPP_EVAL]          __TPP_EVAL(10+20)                           /*< Evaluate an expression as used by '#if'. This macro expands to the string/decimal representation of that expression's value. */
 // [__TPP_LOAD_FILE]     __TPP_LOAD_FILE(<stdlib.h>)                 /*< Expand to the string representation of the unmodified contents of the given file. (NOTE: The file's name is a regular #include-string) */
 // [__TPP_STR_DECOMPILE] __TPP_STR_DECOMPILE("foo bar foobar")       /*< Re-parse the given string, yielding all tokens contained within (The example would expand to [foo][ ][bar][ ][foobar]). */
+// [__TPP_COUNT_TOKENS]  __TPP_COUNT_TOKENS("->*")                   /*< Expand to the integral representation of the number of tokens within the given string (NOTE: tokens inside the string are not macro-expanded). */
 //
 //PRAGMA EXTENSIONS:
 // [once]              #pragma once                      /*< Mark a file that should only be #includ-ed once (same as defining and setting a unique #include-guard for that file). */
@@ -281,8 +282,8 @@ struct TPPTextFile {
 #define TPP_FUNOP_DEL      0x06 /*< [1] Delete ARG(0) characters (doesn't advance the text pointer). */
 #define TPP_FUNOP_VA_COMMA 0x07 /*< [1] Delete ARG(0) characters and insert a ',' if the variadic portion of the argument list is non-empty (NOTE: When inserting, the text-pointer is advanced). */
 #define TPP_FUNOP_VA_NARGS 0x08 /*< [1] Delete ARG(0) characters and insert a decimal representation of the variadic argument size (NOTE: When inserting, the text-pointer is advanced). */
-typedef uint8_t TPP(funop_t);
-typedef int64_t TPP(int_t);
+typedef uint8_t       TPP(funop_t);
+typedef int_least64_t TPP(int_t);
 
 struct TPP(arginfo_t) {
  TPP(tok_t) ai_id;       /*< Token ID associated with this argument name. */
@@ -913,10 +914,11 @@ TPP_LOCAL int TPPLexer_COLUMN(void) { struct TPPFile *f = TPPLexer_Textfile(); r
 #define TPPLEXER_EXTENSION_TPP_STR_SUBSTR    0x0000004000000000ull /*< [name("tpp-str-substr-macro")] Enable the '__TPP_STR_AT(...)' and '__TPP_STR_SUBSTR(...)' builtin macros. */
 #define TPPLEXER_EXTENSION_TPP_STR_PACK      0x0000008000000000ull /*< [name("tpp-str-pack-macro")] Enable the '__TPP_STR_PACK(...)' builtin macro. */
 #define TPPLEXER_EXTENSION_TPP_STR_SIZE      0x0000010000000000ull /*< [name("tpp-str-size-macro")] Enable the '__TPP_STR_SIZE(...)' builtin macro. */
-#define TPPLEXER_EXTENSION_DOLLAR_IS_ALPHA   0x0000020000000000ull /*< [name("dollars-in-identifiers")] Interpret '$' as an alphabetical character. */
-#define TPPLEXER_EXTENSION_ASSERTIONS        0x0000040000000000ull /*< [name("assertions")] Recognize #assert/#unassert directives, as well as #predicate(answer) expressions. */
-#define TPPLEXER_EXTENSION_CANONICAL_HEADERS 0x0000080000000000ull /*< [name("canonical-system-headers")] Fix paths to normalize '/' vs. '\\', in order to prevent problems with #pragma once. */
-#define TPPLEXER_EXTENSION_EXT_ARE_FEATURES  0x0000100000000000ull /*< [name("extensions-are-features")] extensions (__has_extension) are also considered features (__has_feature). */
+#define TPPLEXER_EXTENSION_TPP_COUNT_TOKENS  0x0000020000000000ull /*< [name("tpp-count-tokens-macro")] Enable the '__TPP_COUNT_TOKENS(...)' builtin macro. */
+#define TPPLEXER_EXTENSION_DOLLAR_IS_ALPHA   0x0000040000000000ull /*< [name("dollars-in-identifiers")] Interpret '$' as an alphabetical character. */
+#define TPPLEXER_EXTENSION_ASSERTIONS        0x0000080000000000ull /*< [name("assertions")] Recognize #assert/#unassert directives, as well as #predicate(answer) expressions. */
+#define TPPLEXER_EXTENSION_CANONICAL_HEADERS 0x0000100000000000ull /*< [name("canonical-system-headers")] Fix paths to normalize '/' vs. '\\', in order to prevent problems with #pragma once. */
+#define TPPLEXER_EXTENSION_EXT_ARE_FEATURES  0x0000200000000000ull /*< [name("extensions-are-features")] extensions (__has_extension) are also considered features (__has_feature). */
 #define TPPLEXER_EXTENSION_DEFAULT          (0xffffffffffffffffull&~(TPPLEXER_EXTENSION_TRIGRAPHS|TPPLEXER_EXTENSION_RECMAC)) /*< Enable (almost) all extensions. */
 
 struct TPPLexer {

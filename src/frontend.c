@@ -18,6 +18,7 @@
  */
 #define TPP(x) x /* Global namespace. */
 #define _CRT_SECURE_NO_WARNINGS
+#define _CRT_NONSTDC_NO_WARNINGS
 
 #if defined(_MSC_VER) && defined(_DEBUG)
 /* Make use of MSVC's builtin memory leak detector. */
