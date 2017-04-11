@@ -59,7 +59,7 @@
 // ['abc']        int x = 'abc';                /*< Recognize multi-character char-constants. */
 //
 //PREPROCESSOR DIRECTIVES:
-// [#]             #[LF]             /*< Ignore empty (NULL) directives. */
+// [#]             #[LF|EOF]         /*< Ignore empty (NULL) directives. */
 // [#!]            #!/bin/bash       /*< Ignore shebang-style script arguments. */
 // [#if]           #if foobar        /*< Recognize all types of STD-C conditional preprocessor blocks (#if,#ifdef,#ifndef,#elif,#else,#endif). */
 // [#pragma]       #pragma once      /*< Recognize #pragma preprocessor directives (unknown pragmas are re-emit). */
@@ -81,7 +81,7 @@
 // [,##args]      #define baz(fmt,args...) printf(fmt,##args)              /*< GCC va_comma. */
 // [__VA_COMMA__] #define liz(fmt,args...) printf(fmt __VA_COMMA__ args)   /*< TPP __VA_COMMA__. */
 // [__VA_NARGS__] #define sum(args...)     _sum##__VA_NARGS__(__VA_ARGS__) /*< Expands to an integral representation of the number of variadic arguments (_very_ useful for overloading macros by argument count). */
-// [#!noexp]      #define noexp(x)         #!x                             /*< Insert a macro argument without expansion (Don't say it doesn't work unless you _really_ understand what it's supposed to do!). */
+// [#!noexp]      #define noexp(x)         #!x                             /*< Insert a macro argument without expansion (Don't say it doesn't work unless you _really_ understand what it's supposed to do!) (Used for perfect forwarding of macro arguments). */
 // [<recursion>]  #define inc(x)           inc(x+1)                        /*< Recursively allow macros to expand themself (Must be enabled using pragmas; Inconjunction with __TPP_EVAL, very useful for creating loops). */
 //
 //BUILTIN MACROS:
@@ -92,16 +92,21 @@
 // [__BASE_FILE__]       printf("%s\n",__BASE_FILE__);               /*< Expand to the name of the original source file used to startup the preprocessor. */
 // [__INCLUDE_LEVEL__]   printf("%d\n",__INCLUDE_LEVEL__);           /*< Expand to the integral representation of how many files away the original source file is (this counter starts at '0'). */
 // [__COUNTER__]         printf("%d\n",__COUNTER__);                 /*< Expand to the integral representation an integral that increments by 1 every time it is expanded (starts at '0'). */
+// [__COLUMN__]          printf("%d\n",__COLUMN__);                  /*< In the spirit of __FILE__ and __LINE__, return the currently effective column number. */
 // [_Pragma]             _Pragma("once")                             /*< STD-C style pragma with a string as argument (unknown pragmas are re-emit). */
 // [__pragma]            __pragma(once)                              /*< MSVC style pragma with the argument not being a string (unknown pragmas are re-emit). */
 // [__TIME_*__]          printf("%d\n",__TIME_SEC__)                 /*< Expand to the integral representation of the current '__TIME_SEC__', '__TIME_MIN__' or '__TIME_HOUR__'. */
 // [__DATE_*__]          printf("%d\n",__DATE_DAY__)                 /*< Expand to the integral representation of the current '__DATE_DAY__', '__DATE_WDAY__', '__DATE_YDAY__', '__DATE_MONTH__' or '__DATE_YEAR__'. */
-// [__TPP_UNIQUE]        __TPP_UNIQUE(keyword)                       /*< A unique integral number associated with 'keyword'; new keywords have greater numbers. */
-// [__TPP_COUNTER]       __TPP_COUNTER(keyword)                      /*< Similar to __COUNTER__, but instead of global, the current index increments individually for different given keywords. */
-// [__TPP_RANDOM]        __TPP_RANDOM(count)|__TPP_RANDOM(begin,end) /*< Expand to a random integral between '0..count-1' or 'begin..end-1' (inclusive). */
 // [__TPP_EVAL]          __TPP_EVAL(10+20)                           /*< Evaluate an expression as used by '#if'. This macro expands to the string/decimal representation of that expression's value. */
 // [__TPP_LOAD_FILE]     __TPP_LOAD_FILE(<stdlib.h>)                 /*< Expand to the string representation of the unmodified contents of the given file. (NOTE: The file's name is a regular #include-string) */
+// [__TPP_COUNTER]       __TPP_COUNTER(keyword)                      /*< Similar to __COUNTER__, but instead of global, the current index increments individually for different given keywords. */
+// [__TPP_RANDOM]        __TPP_RANDOM(count)|__TPP_RANDOM(begin,end) /*< Expand to a random integral between '0..count-1' or 'begin..end-1' (inclusive). */
 // [__TPP_STR_DECOMPILE] __TPP_STR_DECOMPILE("foo bar foobar")       /*< Re-parse the given string, yielding all tokens contained within (The example would expand to [foo][ ][bar][ ][foobar]). */
+// [__TPP_STR_AT]        __TPP_STR_AT("foo",x,[y=1])                 /*< Returns 'y' characters from the given string, escaped and surrounded by '\'', starting at index 'x'. */
+// [__TPP_STR_SUBSTR]    __TPP_STR_SUBSTR("foo",x,[y=1])             /*< Returns 'y' characters from the given string, escaped and surrounded by '\"', starting at index 'x'. */
+// [__TPP_STR_PACK]      __TPP_STR_PACK(0x13 0x10 0x43)              /*< Returns a string consisting of the string of packed integral expressions, where each expression describes the next character (The example is equivalent to "\x13\x10\x43"; aka. "\r\nC"). */
+// [__TPP_STR_SIZE]      __TPP_STR_SIZE("foo")                       /*< Returns the integral representation for the length of the given string (equivalent to '__TPP_EVAL(#(str))' and only kept for backwards-compatibility). */
+// [__TPP_UNIQUE]        __TPP_UNIQUE(keyword)                       /*< A unique integral number associated with 'keyword'; new keywords have greater numbers. */
 // [__TPP_COUNT_TOKENS]  __TPP_COUNT_TOKENS("->*")                   /*< Expand to the integral representation of the number of tokens within the given string (NOTE: tokens inside the string are not macro-expanded). */
 //
 //PRAGMA EXTENSIONS:
@@ -608,8 +613,8 @@ struct TPPWarningStateEx { /* Extended state for a 11-warning. */
  wstate_t     wse_oldstate; /*< Old warning state to return to after suppression ends.
                              *  NOTE: Never 'WSTATE_SUPPRESS' */
 };
-#define TPP_WARNING_BITS          2 /*< One of WSTATE_*. */
-#define TPP_WARNING_TOTAL        (TPP(WG_COUNT)+TPP(W_COUNT))
+#define TPP_WARNING_BITS           2 /*< One of WSTATE_*. */
+#define TPP_WARNING_TOTAL         (TPP(WG_COUNT)+TPP(W_COUNT))
 #define TPP_WARNING_BITSETSIZE  (((TPP_WARNING_TOTAL*TPP_WARNING_BITS+7))/8)
 struct TPPWarningState {
  /* Bitset describing the current warning state.
