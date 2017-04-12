@@ -3924,9 +3924,27 @@ parse_multichar:
    if (*forward == (char)ch) {
     iter = ++forward;
     while (SKIP_WRAPLF(forward,end));
+    /* Check for tri-char: '<<<' / '>>>' */
+    if (*forward == ch) {
+     if (current.l_extokens&TPPLEXER_TOKEN_ANGLE3_EQUAL) {
+      char *forward2 = forward+1;
+      while (SKIP_WRAPLF(forward2,end));
+      if (*forward2 == '=') {
+       ch = (ch == '<' ? TOK_LANGLE3_EQUAL : TOK_RANGLE3_EQUAL);
+       iter = ++forward2;
+       goto settok;
+      }
+     }
+     if (current.l_extokens&TPPLEXER_TOKEN_ANGLE3) {
+      ch = (ch == '<' ? TOK_LANGLE3 : TOK_RANGLE3);
+      iter = ++forward;
+      goto settok;
+     }
+    }
+
     /* Check for tri-char: '<<=' / '>>=' */
-    if (*forward != '=') ch = (ch == '<' ? TOK_SHL : TOK_SHR);
-    else ch = (ch == '<' ? TOK_SHL_EQUAL : TOK_SHR_EQUAL),iter = ++forward;
+    if (*forward == '=') ch = (ch == '<' ? TOK_SHL_EQUAL : TOK_SHR_EQUAL),iter = ++forward;
+    else ch = (ch == '<' ? TOK_SHL : TOK_SHR);
     goto settok;
    }
    if (*forward == '=') { ch = (ch == '<' ? TOK_LOWER_EQUAL : TOK_GREATER_EQUAL); goto settok_forward1; }
@@ -6378,24 +6396,28 @@ at_next_non_whitespace:
                  !paren_recursion[RECURSION_BRACKET]
                   ) ++paren_recursion[RECURSION_BRACE];
               break;
-    case TOK_LOWER_EQUAL: /* '<=' */
-    case TOK_SHL_EQUAL: /* '<<=' */
+    case TOK_LOWER_EQUAL:   /* '<=' */
+    case TOK_SHL_EQUAL:     /* '<<=' */
+    case TOK_LANGLE3_EQUAL: /* '<<<=' */
      if (calling_conv >= RECURSION_ANGLE &&
         !paren_recursion[RECURSION_PAREN] &&
         !paren_recursion[RECURSION_BRACKET] &&
         !paren_recursion[RECURSION_BRACE]) {
-      paren_recursion[RECURSION_ANGLE] += TOK == TOK_SHL_EQUAL ? 2 : 1;
+      paren_recursion[RECURSION_ANGLE] += TOK == TOK_LANGLE3_EQUAL ? 3 :
+                                          TOK == TOK_SHL_EQUAL ? 2 : 1;
       arguments_file->f_pos = token.t_end-1;
       assert(*arguments_file->f_pos == '=');
      }
      break;
+    case TOK_LANGLE3:
     case TOK_SHL:
     case '<':
      if (calling_conv >= RECURSION_ANGLE &&
         !paren_recursion[RECURSION_PAREN] &&
         !paren_recursion[RECURSION_BRACKET] &&
         !paren_recursion[RECURSION_BRACE]) {
-      paren_recursion[RECURSION_ANGLE] += TOK == '<' ? 1 : 2;
+      paren_recursion[RECURSION_ANGLE] += TOK == TOK_LANGLE3 ? 3 :
+                                          TOK == TOK_SHL ? 2 : 1;
      }
      break;
 
@@ -6411,33 +6433,71 @@ at_next_non_whitespace:
      if (FALSE) { case TOK_SHR:
                   case TOK_SHR_EQUAL:
                   case TOK_GREATER_EQUAL:
+                  case TOK_RANGLE3:
+                  case TOK_RANGLE3_EQUAL:
                   case '>': if (calling_conv < RECURSION_ANGLE ||
                                 paren_recursion[RECURSION_BRACE] ||
                                 paren_recursion[RECURSION_BRACKET] ||
                                 paren_recursion[RECURSION_PAREN]) break;
                             assert(arguments_file->f_pos == token.t_end);
-                            if (TOK == '>') {
-                             --paren_recursion[RECURSION_ANGLE];
-                            } else if (TOK == TOK_GREATER_EQUAL) {
-                             --paren_recursion[RECURSION_ANGLE];
-                             --arguments_file->f_pos; /* Parse the '=' again. */
-                            } else if (paren_recursion[RECURSION_ANGLE] >= 2) {
-                             paren_recursion[RECURSION_ANGLE] -= 2;
-                             if (TOK == TOK_SHR_EQUAL) {
-                              assert(arguments_file->f_pos[-1] == '=');
+                            switch (TOK) {
+                             default: --paren_recursion[RECURSION_ANGLE]; break;
+                             case TOK_GREATER_EQUAL:
+                              --paren_recursion[RECURSION_ANGLE];
                               --arguments_file->f_pos; /* Parse the '=' again. */
-                             }
-                             ++token.t_begin;
-                            } else {
-                             --paren_recursion[RECURSION_ANGLE];
-                             if (TOK == TOK_SHR) {
-                              assert(arguments_file->f_pos[-1] == '>');
-                              --arguments_file->f_pos; /* Parse the second '>' again. */
-                             } else {
-                              assert(arguments_file->f_pos[-1] == '=');
-                              assert(token.t_begin[0] == '>');
-                              arguments_file->f_pos = token.t_begin+1; /* Parse everything after the first '>' again. */
-                             }
+                              break;
+                             case TOK_SHR:
+                             case TOK_SHR_EQUAL:
+                              if (paren_recursion[RECURSION_ANGLE] >= 2) {
+                               paren_recursion[RECURSION_ANGLE] -= 2;
+                               if (TOK == TOK_SHR_EQUAL) {
+                                assert(arguments_file->f_pos[-1] == '=');
+                                --arguments_file->f_pos; /* Parse the '=' again. */
+                               }
+                               ++token.t_begin;
+                              } else {
+                               --paren_recursion[RECURSION_ANGLE];
+                               if (TOK == TOK_SHR) {
+                                assert(arguments_file->f_pos[-1] == '>');
+                                --arguments_file->f_pos; /* Parse the second '>' again. */
+                               } else {
+                                assert(arguments_file->f_pos[-1] == '=');
+                                assert(token.t_begin[0] == '>');
+                                arguments_file->f_pos = token.t_begin+1; /* Parse everything after the first '>' again. */
+                               }
+                              }
+                              break;
+                             case TOK_RANGLE3:
+                             case TOK_RANGLE3_EQUAL:
+                              if (paren_recursion[RECURSION_ANGLE] >= 3) {
+                               paren_recursion[RECURSION_ANGLE] -= 3;
+                               if (TOK == TOK_RANGLE3_EQUAL) {
+                                assert(arguments_file->f_pos[-1] == '=');
+                                --arguments_file->f_pos; /* Parse the '=' again. */
+                               }
+                               ++token.t_begin;
+                               while (SKIP_WRAPLF(token.t_begin,token.t_end));
+                               assert(*token.t_begin == '>');
+                               ++token.t_begin;
+                              } else if (paren_recursion[RECURSION_ANGLE] >= 2) {
+                               paren_recursion[RECURSION_ANGLE] -= 2;
+                               if (TOK == TOK_RANGLE3_EQUAL) {
+                                assert(arguments_file->f_pos[-1] == '=');
+                                --arguments_file->f_pos; /* Parse the '=' again. */
+                                while (SKIP_WRAPLF_REV(arguments_file->f_pos,arguments_file->f_begin));
+                                assert(arguments_file->f_pos[-1] == '>');
+                                --arguments_file->f_pos; /* Parse the '>=' again. */
+                               } else {
+                                assert(arguments_file->f_pos[-1] == '>');
+                                --arguments_file->f_pos; /* Parse the '>' again. */
+                               }
+                               ++token.t_begin;
+                               assert(*token.t_begin == '>');
+                              } else {
+                               --paren_recursion[RECURSION_ANGLE];
+                               arguments_file->f_pos = token.t_begin+1; /* Parse the '>>' / '>>=' again. */
+                              }
+                              break;
                             }
      }
      /* Check if the select calling convention has dropped to zero. */

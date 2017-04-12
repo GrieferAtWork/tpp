@@ -110,12 +110,19 @@
 // [__TPP_COUNT_TOKENS]  __TPP_COUNT_TOKENS("->*")                   /*< Expand to the integral representation of the number of tokens within the given string (NOTE: tokens inside the string are not macro-expanded). */
 //
 //PRAGMA EXTENSIONS:
-// [once]              #pragma once                      /*< Mark a file that should only be #includ-ed once (same as defining and setting a unique #include-guard for that file). */
-// [push_macro]        #pragma push_macro("foo")         /*< Store the definition of a macro, later to-be restored. */
-// [pop_macro]         #pragma pop_macro("foo")          /*< Restore a previously stored definition of a macro. */
-// [{end}region]       #pragma {end}region my region     /*< Highlight named regions of code in IDEs (the preprocessor must, and does simply ignore this directive). */
-// [message]           #pragma message "Hello"           /*< Emit a message to 'stderr' from inside the preprocessor (NOTE: Also supports optional parenthesis surrounding the text). */
-// [deprecated]        #pragma deprecated("foobar")      /*< Declare a given identifier as deprecated, causing subsequent use to emit a deprecation warning. */
+// [once]                  #pragma once                             /*< Mark a file that should only be #includ-ed once (same as defining and setting a unique #include-guard for that file). */
+// [push_macro]            #pragma push_macro("foo")                /*< Store the definition of a macro, later to-be restored. */
+// [pop_macro]             #pragma pop_macro("foo")                 /*< Restore a previously stored definition of a macro. */
+// [{end}region]           #pragma {end}region my region            /*< Highlight named regions of code in IDEs (the preprocessor must, and does simply ignore this directive). */
+// [message]               #pragma message "Hello"                  /*< Emit a message to 'stderr' from inside the preprocessor (NOTE: Also supports optional parenthesis surrounding the text). */
+// [error]                 #pragma error("Oh no!")                  /*< Emit an error message (same as '#error Oh no!'). */
+// [deprecated]            #pragma deprecated("foobar")             /*< Declare a given identifier as deprecated, causing subsequent use to emit a deprecation warning. */
+// [tpp_exec]              #pragma tpp_exec("#define foo 7")        /*< Execute a string as preprocessor text, discarding output, but keeping changes to macros (can be used to by macros to re-/un-/define macros). */
+// [tpp_set_keyword_flags] #pragma tpp_set_keyword_flags("foo",0x2) /*< Set the flags associated with a keyword (A set of TPP_KEYWORDFLAG_* masking 'TPP_KEYWORDFLAG_USERMASK'). */
+// [warning]               #pragma warning(disable: 42)             /*< Configure warnings MSVC-style by ID, or by GCC name. */
+// [extension]             #pragma extension("-fmacro-recursion")   /*< Configure active TPP extensions by name. */
+// [GCC system_header]     #pragma GCC system_header                /*< Disable warnings within the current file. */
+// [GCC diagnostic]        #pragma GCC diagnostic push              /*< Configure warnings GCC-style by name. */
 
 
 #if defined(GUARD_TPP_C) && \
@@ -561,6 +568,10 @@ enum{
  TPP(TOK_ARROW_STAR),    /*< "->*". */
  TPP(TOK_DOT_STAR),      /*< ".*". */
  TPP(TOK_DOTDOT),        /*< "..". */
+ TPP(TOK_LANGLE3),       /*< "<<<". */
+ TPP(TOK_RANGLE3),       /*< ">>>". */
+ TPP(TOK_LANGLE3_EQUAL), /*< "<<<=". */
+ TPP(TOK_RANGLE3_EQUAL), /*< ">>>=". */
 
  /* Name aliases */
  TPP(TOK_POS)           = TPP(TOK_ADD),
@@ -864,6 +875,8 @@ TPP_LOCAL int TPPLexer_COLUMN(void) { struct TPPFile *f = TPPLexer_Textfile(); r
 #define TPPLEXER_TOKEN_ATEQUAL               0x00000200 /*< Enable recognition of '@=' tokens. */
 #define TPPLEXER_TOKEN_C_COMMENT             0x00000400 /*< Enable recognition of '/[]* comment *[]/' tokens. */
 #define TPPLEXER_TOKEN_CPP_COMMENT           0x00000800 /*< Enable recognition of '// comment' tokens. */
+#define TPPLEXER_TOKEN_ANGLE3                0x00001000 /*< Enable recognition of '<<<' and '>>>' tokens. */
+#define TPPLEXER_TOKEN_ANGLE3_EQUAL          0x00002000 /*< Enable recognition of '<<<=' and '>>>=' tokens. */
 #define TPPLEXER_TOKEN_DEFAULT               0xffffffff /*< Default set of extension tokens (enable all). */
 
 /* Predefined set of extension tokens for some languages.
