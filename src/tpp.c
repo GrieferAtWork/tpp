@@ -6409,9 +6409,9 @@ at_next_non_whitespace:
       assert(*arguments_file->f_pos == '=');
      }
      break;
-    case TOK_LANGLE3:
-    case TOK_SHL:
-    case '<':
+    case '<':         /* '<' */
+    case TOK_SHL:     /* '<<' */
+    case TOK_LANGLE3: /* '<<<' */
      if (calling_conv >= RECURSION_ANGLE &&
         !paren_recursion[RECURSION_PAREN] &&
         !paren_recursion[RECURSION_BRACKET] &&
