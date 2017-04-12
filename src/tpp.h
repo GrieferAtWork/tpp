@@ -207,6 +207,8 @@ typedef int           TPP(tok_t);      /*< Unique token id. */
 typedef size_t        TPP(hash_t);     /*< Hash-value of a string. */
 typedef unsigned char TPP(encoding_t); /*< File-encoding ID (One of 'TPP_ENCODING_*'). */
 typedef signed char   TPP(wgroup_t);   /*< Warning group ID. */
+typedef int           TPP(col_t);      /*< Column number. */
+typedef int           TPP(line_t);     /*< Line number. */
 typedef unsigned int  TPP(refcnt_t);   /*< Reference counter. */
 
 #define TPP_ENCODING_UTF8     0
@@ -251,7 +253,7 @@ struct TPPTextFile {
  /*ref*/struct TPPFile   *f_cacheentry;  /*< [0..1] Used when the copy of a file is loaded onto the #include-stack (points to the original version of the file)
                                           *   NOTE: When non-NULL, always a textfile and this pointer also owns a reference to the associated textfile's 'f_cacheinc' field. */
  /*ref*/struct TPPString *f_usedname;    /*< [0..1] When non-NULL, an override to the used filename (as set by '#line') */
- int                      f_lineoff;     /*< Offset of 'f_begin' from the original start of the file in lines. */
+ TPP(line_t)              f_lineoff;     /*< Offset of 'f_begin' from the original start of the file in lines. */
  TPP(stream_t)            f_stream;      /*< Stream handle for reading more data. */
  TPP(stream_t)            f_ownedstream; /*< Usually equal to 'f_stream', the stream that should be closed when it's EOF is reached (set of 'TPP_STREAM_INVALID' if TPP shouldn't close the stream). */
  /* NOTE: ':f_end' may not be equal to the end of ':f_text'.
@@ -332,7 +334,7 @@ struct TPPMacroFile {
 #define TPP_MACROFILE_KIND_EXPANDED        0x00000002 /*< Expanded version of a function macro. */
  uint32_t               m_flags;         /*< [const] Macro flags. */
  /*ref*/struct TPPFile *m_deffile;       /*< [const][0..1][(!= NULL) == (m_textref != NULL)] The file that originally defined this macro (or NULL if predefined, or from the commandline). */
- int                    m_defline;       /*< [const] Line in which this macro was defined (based on first character of the macro's name). */
+ TPP(line_t)            m_defline;       /*< [const] Line in which this macro was defined (based on first character of the macro's name). */
  /*ref*/struct TPPFile *m_pushprev;      /*< [0..1] Previous version of a pushed macro. */
  size_t                 m_pushcount;     /*< The amount of times this macro was pushed (used to handle multiple calls to 'push_macro'). */
  /* The following */
@@ -404,13 +406,13 @@ TPPFile_NewExplicitInherited(/*ref*/struct TPPString *__restrict inherited_text)
 // NOTE: The returned line index is always absolute to
 //       the original text file and continues to be valid
 //       even when the given file is a macro defined within.
-TPPFUN int
+TPPFUN TPP(line_t)
 TPPFile_LineAt(struct TPPFile const *__restrict self,
                char const *__restrict text_pointer);
 
 //////////////////////////////////////////////////////////////////////////
 // Similar to 'TPPFile_LineAt', but instead returns the column number.
-TPPFUN int
+TPPFUN TPP(col_t)
 TPPFile_ColumnAt(struct TPPFile const *__restrict self,
                  char const *__restrict text_pointer);
 
@@ -490,10 +492,9 @@ TPPFUN size_t TPP_SizeofUnescape(char const *data, size_t size);
 TPPFUN size_t TPP_SizeofEscape(char const *data, size_t size);
 TPPFUN size_t TPP_SizeofItos(TPP(int_t) i);
 
-
 enum{
  /* Special tokens. */
- TPP(TOK_EOF)       = '\0',
+ TPP(TOK_EOF)       = '\0', /*< END-OF-FILE (will always be ZERO) */
  TPP(TOK_CHAR)      = '\'', /*< 'f'. */
  TPP(TOK_STRING)    = '\"', /*< "foobar". */
  TPP(TOK_INT)       = '0',  /*< 42 */
@@ -501,7 +502,7 @@ enum{
  TPP(TOK_LF)        = '\n',
  TPP(TOK_SPACE)     = ' ',
  TPP(TOK_COMMENT)   = 'c',  /*< like this one! */
- TPP(TOK_ERR)       = (TPP(tok_t))-1,   /*< An error occurred. */
+ TPP(TOK_ERR)       = (TPP(tok_t))-1, /*< An error occurred (will always be negative). */
 
  /* Single-character tokens. */
  TPP(TOK_ADD)       = '+',
@@ -592,8 +593,15 @@ enum{
  TPP(TOK_RANGLE2_EQUAL) = TPP(TOK_SHR_EQUAL),
 };
 
+/* Check if token ID is OK (neither an error, nor EOF) */
+#define TPP_ISOK(id)          ((id) > 0)
+
+/* Check if a token ID is a keyword (when true, the token's 't_kwd' field is up-to-date). */
 #define TPP_ISKEYWORD(id)     ((id) >= TPP(TOK_KEYWORD_BEGIN))
 #define TPP_ISUSERKEYWORD(id) ((id) >= TPP(_KWD_BACK))
+
+/* Check if a given token ID is a builtin macro currently
+ * defined (which may depend on active extensions). */
 TPPFUN int TPP_ISBUILTINMACRO(TPP(tok_t) id);
 
 enum{
@@ -628,9 +636,9 @@ enum{
 };
 
 
-struct TPPWarningStateEx { /* Extended state for a 11-warning. */
+struct TPPWarningStateEx {  /* Extended state for a 11-warning (aka. 'WSTATE_SUPPRESS'). */
  int          wse_wid;      /*< Warning/group ID. */
- unsigned int wse_suppress; /*< Amount of remaining times this warning should be suppressed for.
+ unsigned int wse_suppress; /*< Amount of remaining times this warning should be suppressed.
                              *  NOTE: When ZERO(0), this slot is unused. */
  wstate_t     wse_oldstate; /*< Old warning state to return to after suppression ends.
                              *  NOTE: Never 'WSTATE_SUPPRESS' */
@@ -663,7 +671,7 @@ TPPFUN int TPPLexer_PopWarnings(void);
 
 //////////////////////////////////////////////////////////////////////////
 // Set the state of a given warning number.
-// NOTE: If the given state is 'TPP(WSTATE_SUPPRESS)', ONE(1)
+// NOTE: If the given state is 'WSTATE_SUPPRESS', ONE(1)
 //       will be added to the suppress recursion counter.
 // @return: 0: Not enough available memory.
 // @return: 1: Successfully set the given warning number.
@@ -674,20 +682,23 @@ TPPFUN int TPPLexer_SetWarning(int wnum, TPP(wstate_t) state);
 // Similar to 'TPPLexer_SetWarning', but set the state of all warnings from a given group.
 // NOTES:
 //   - Groups work independent of warning ids, meaning you can even
-//     specify 'TPP(WSTATE_SUPPRESS)' as state, with the next warning
-//     part of that state occurring simply consuming that suppression.
-//   - If you disable an entire warning group, no warning part of it will be emit.
+//     specify 'WSTATE_SUPPRESS' as state, with the next warning
+//     part of that group occurring simply consuming that suppression.
+//   - If you disable an entire warning group, no warning apart of it will be emit.
 //   - If a warning is invoked, that is both part of an error and a warning/disabled
 //     group it will always tend to do as little damage as possible:
 //     >> suppress >= disabled >= warning >= error
+//     With that in mind, both the warning itself, as well as all of its groups
+//     must be configured as 'WSTATE_ERROR' for the warning to actually result
+//     in an error.
 // @return: 0: Not enough available memory.
 // @return: 1: Successfully set the given warning number.
 // @return: 2: The given group name is unknown.
 TPPFUN int TPPLexer_SetWarnings(char const *__restrict group, TPP(wstate_t) state);
 
 //////////////////////////////////////////////////////////////////////////
-// Invoke a given warning number, returning one of 'TPP_WARNINGMODE_*'
-// NOTE: Unknown warnings will always result in 'TPP_WARNINGMODE_WARN'
+// Invoke a given warning number, returning one of 'TPP_WARNINGMODE_*'.
+// NOTE: Unknown warnings will always result in 'TPP_WARNINGMODE_WARN' being returned.
 TPPFUN int TPPLexer_InvokeWarning(int wnum);
 #define TPP_WARNINGMODE_ERROR  0 /*< Emit an error and call TPPLexer_SetErr(). */
 #define TPP_WARNINGMODE_WARN   1 /*< Emit a warning, but continue normally. */
@@ -699,7 +710,7 @@ struct TPPIfdefStackSlot {
 #define TPP_IFDEFMODE_TRUE  1 /*< FLAG: The block is enabled. */
 #define TPP_IFDEFMODE_ELSE  2 /*< FLAG: The block follows an #else. */
  int             iss_mode; /*< Slot mode (Used to differentiate between #if, #elif and #else regions). */
- int             iss_line; /*< ZERO-based line in which this slot was last updated (Used in warning messages). */
+ TPP(line_t)     iss_line; /*< ZERO-based line in which this slot was last updated (Used in warning messages). */
  struct TPPFile *iss_file; /*< [1..1] The file that owns this #ifdef slot
                             *   NOTE: This file _must_ be part of the #include stack!
                             *   WARNING: This is not a reference and relies on the file
@@ -831,8 +842,8 @@ TPPFUN struct TPPFile *TPPLexer_Basefile(void);
 
 #define TPPLexer_FILE(plength)     TPPFile_Filename(TPPLexer_Textfile(),plength)
 #define TPPLexer_BASEFILE(plength) TPPFile_Filename(TPPLexer_Basefile(),plength)
-TPP_LOCAL int TPPLexer_LINE(void) { struct TPPFile *f = TPPLexer_Textfile(); return TPPFile_LineAt(f,f->f_pos); }
-TPP_LOCAL int TPPLexer_COLUMN(void) { struct TPPFile *f = TPPLexer_Textfile(); return TPPFile_ColumnAt(f,f->f_pos); }
+TPP_LOCAL TPP(line_t) TPPLexer_LINE(void) { struct TPPFile *f = TPPLexer_Textfile(); return TPPFile_LineAt(f,f->f_pos); }
+TPP_LOCAL TPP(col_t) TPPLexer_COLUMN(void) { struct TPPFile *f = TPPLexer_Textfile(); return TPPFile_ColumnAt(f,f->f_pos); }
 
 
 /* Lexer state flags. */
@@ -867,6 +878,7 @@ TPP_LOCAL int TPPLexer_COLUMN(void) { struct TPPFile *f = TPPLexer_Textfile(); r
 #define TPPLEXER_FLAG_NO_WARNINGS            0x00800000 /*< Don't emit warnings. */
 #define TPPLEXER_FLAG_NO_ENCODING            0x01000000 /*< Don't try to detect file encodings (Everything is UTF-8 without BOM; aka. raw text). */
 #define TPPLEXER_FLAG_EAT_UNKNOWN_PRAGMA     0x02000000 /*< Don't re-emit unknown pragmas. */
+#define TPPLEXER_FLAG_CHAR_UNSIGNED          0x04000000 /*< When set, character-constants are unsigned. */
 #define TPPLEXER_FLAG_RANDOM_INITIALIZED     0x40000000 /*< Set when rand() has been initialized. */
 #define TPPLEXER_FLAG_ERROR                  0x80000000 /*< When set, the lexer is in an error-state in which calls to yield() will return TOK_ERR. */
 #define TPPLEXER_FLAG_MERGEMASK              0xf0000000 /*< A mask of flags that are merged (or'd together) during popf(). */
@@ -948,6 +960,7 @@ TPP_LOCAL int TPPLexer_COLUMN(void) { struct TPPFile *f = TPPLexer_Textfile(); r
 #define TPPLEXER_EXTENSION_ASSERTIONS        0x0000080000000000ull /*< [name("assertions")] Recognize #assert/#unassert directives, as well as #predicate(answer) expressions. */
 #define TPPLEXER_EXTENSION_CANONICAL_HEADERS 0x0000100000000000ull /*< [name("canonical-system-headers")] Fix paths to normalize '/' vs. '\\', in order to prevent problems with #pragma once. */
 #define TPPLEXER_EXTENSION_EXT_ARE_FEATURES  0x0000200000000000ull /*< [name("extensions-are-features")] extensions (__has_extension) are also considered features (__has_feature). */
+#define TPPLEXER_EXTENSION_MSVC_FIXED_INT    0x0000400000000000ull /*< [name("fixed-length-integrals")] Allow a 'i(8|16|32|64)' suffix in integrals. */
 #define TPPLEXER_EXTENSION_DEFAULT          (0xffffffffffffffffull&~(TPPLEXER_EXTENSION_TRIGRAPHS|TPPLEXER_EXTENSION_RECMAC)) /*< Enable (almost) all extensions. */
 
 struct TPPLexer {
@@ -1222,6 +1235,28 @@ TPPFUN int TPPLexer_ParsePragma(TPP(tok_t) endat);
 // @return: * :   A reference to the unescaped string that was parsed.
 // @return: NULL: A lexer error occurred (TPPLexer_SetErr() was set).
 TPPFUN /*ref*/struct TPPString *TPPLexer_ParseString(void);
+
+//////////////////////////////////////////////////////////////////////////
+// Transform the current token (which must either be 'TOK_INT' or 'TOK_CHAR')
+// into an integral value, storing that value in '*pint' and returning
+// a set of 'TPP_ATOI_*' flags, indicating typing and success.
+// NOTE: This function does _NOT_ yield the current token once finished.
+//       If intended, the caller is responsible for advancing it upon success.
+// @return: TPP_ATOI_ERR: Emiting a warning caused the lexer to error out (TPPLexer_SetErr() was set).
+// @return: * :           A set of 'TPP_ATOI_*' (see below)
+TPPFUN int TPP_Atoi(TPP(int_t) *__restrict pint);
+#define TPP_ATOI_ERR           0x00 /*< NOTE: Never used with any flags (indicates failure). */
+#define TPP_ATOI_OK            0x01 /*< Always set on success. */
+#define TPP_ATOI_UNSIGNED      0x02 /*< Unless set, the integral is signed. */
+#define TPP_ATOI_TYPE_MASK     0xf0 /*< Mask of the integral's typing (NOTE: The function already clamped the resulting value with this type's range). */
+#define TPP_ATOI_TYPE_INT      0x00 /*< 'int' (default typing without suffix/for chars). */
+#define TPP_ATOI_TYPE_LONG     0x10 /*< 'long'. */
+#define TPP_ATOI_TYPE_LONGLONG 0x20 /*< 'long long'. */
+#define TPP_ATOI_TYPE_INT8     0x30 /*< '__int8' (msvc-extension). */
+#define TPP_ATOI_TYPE_INT16    0x40 /*< '__int16' (msvc-extension). */
+#define TPP_ATOI_TYPE_INT32    0x50 /*< '__int32' (msvc-extension). */
+#define TPP_ATOI_TYPE_INT64    0x60 /*< '__int64' (msvc-extension). */
+
 
 
 #if TPP_CONFIG_ONELEXER

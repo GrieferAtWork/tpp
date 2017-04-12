@@ -211,6 +211,7 @@ memrchr(void const *p, int c, size_t n) {
 
 #undef assert
 #if TPP_CONFIG_DEBUG
+PRIVATE
 #ifdef __GNUC__
 __attribute__((__noreturn__))
 #endif
@@ -474,6 +475,7 @@ do{ tok_t              _old_tok_id    = token.t_id;\
 #define HAVE_EXTENSION_ASSERTIONS        (current.l_extensions&TPPLEXER_EXTENSION_ASSERTIONS)
 #define HAVE_EXTENSION_CANONICAL_HEADERS (current.l_extensions&TPPLEXER_EXTENSION_CANONICAL_HEADERS)
 #define HAVE_EXTENSION_EXT_ARE_FEATURES  (current.l_extensions&TPPLEXER_EXTENSION_EXT_ARE_FEATURES)
+#define HAVE_EXTENSION_MSVC_FIXED_INT    (current.l_extensions&TPPLEXER_EXTENSION_MSVC_FIXED_INT)
 
 
 
@@ -847,7 +849,7 @@ TPPFile_Destroy(struct TPPFile *__restrict self) {
      assert(origin->f_kind == TPPFILE_KIND_MACRO);
      assert((origin->f_macro.m_flags&TPP_MACROFILE_KIND) == TPP_MACROFILE_KIND_FUNCTION);
      assert(origin->f_macro.m_function.f_expansions);
-     /* Decrement the onstack counter. */
+     /* Decrement the on-stack counter. */
      --origin->f_macro.m_function.f_expansions;
      TPPFile_Decref(origin);
     } break;
@@ -1002,7 +1004,7 @@ string_count_lf(char *iter, size_t length) {
 
 
 PUBLIC /*ref*/struct TPPFile *
-TPPFile_OpenStream(TPP(stream_t) stream, char const *name) {
+TPPFile_OpenStream(stream_t stream, char const *name) {
  struct TPPFile *result;
  result = (struct TPPFile *)malloc(TPPFILE_SIZEOF_TEXT);
  if unlikely(!result) return NULL;
@@ -1038,13 +1040,13 @@ err_r:
  return NULL;
 }
 
-PUBLIC int
+PUBLIC line_t
 TPPFile_LineAt(struct TPPFile const *__restrict self,
                char const *__restrict text_pointer) {
- int result;
+ line_t result;
  assert(self);
  assert(text_pointer >= self->f_begin && text_pointer <= self->f_end);
- result = (int)string_count_lf(self->f_begin,(size_t)(text_pointer-self->f_begin));
+ result = (line_t)string_count_lf(self->f_begin,(size_t)(text_pointer-self->f_begin));
  switch (self->f_kind) {
   case TPPFILE_KIND_TEXT:
    result += self->f_textfile.f_lineoff;
@@ -1063,7 +1065,7 @@ TPPFile_LineAt(struct TPPFile const *__restrict self,
  return result;
 }
 
-PUBLIC int
+PUBLIC col_t
 TPPFile_ColumnAt(struct TPPFile const *__restrict self,
                  char const *__restrict text_pointer) {
  char const *begin,*iter;
@@ -1845,7 +1847,6 @@ TPP_SizeofItos(int_t i) {
 }
 
 
-
 LOCAL size_t
 wraplf_memlen(char const *iter, size_t n) {
  char const *end = iter+n;
@@ -2537,7 +2538,7 @@ keyword_clrassert(struct TPPKeyword *__restrict self) {
 
 
 PUBLIC int
-TPP_ISBUILTINMACRO(TPP(tok_t) id) {
+TPP_ISBUILTINMACRO(tok_t id) {
  int result = 0;
  switch (id) {
 #define MACRO(name,if) case name: result = !!(if); break;
@@ -3121,6 +3122,7 @@ PRIVATE struct tpp_extension const tpp_extensions[] = {
  EXTENSION("assertions",TPPLEXER_EXTENSION_ASSERTIONS),
  EXTENSION("canonical-system-headers",TPPLEXER_EXTENSION_CANONICAL_HEADERS),
  EXTENSION("extensions-are-features",TPPLEXER_EXTENSION_EXT_ARE_FEATURES),
+ EXTENSION("fixed-length-integrals",TPPLEXER_EXTENSION_MSVC_FIXED_INT),
 #undef EXTENSION
  {NULL,0,0},
 };
@@ -3307,7 +3309,7 @@ TPPLexer_LookupKeyword(char const *name, size_t namelen,
  return *bucket = kwd_entry;
 }
 PUBLIC struct TPPKeyword *
-TPPLexer_LookupKeywordID(TPP(tok_t) id) {
+TPPLexer_LookupKeywordID(tok_t id) {
  struct TPPKeyword **bucket_iter,**bucket_end,*iter;
  assert(TPPLexer_Current);
  if (!TPP_ISKEYWORD(id)) return NULL;
@@ -6753,67 +6755,136 @@ err:
  return NULL;
 }
 
-PRIVATE void EVAL_CALL eval_unary(struct TPPConst *result) {
- switch (TOK) {
-
-  {
-   char old_ch;
-   char *numbegin,*numend;
-   long long resval;
-   int numsys;
-  case TOK_INT:
-   if (result) {
-    old_ch = *token.t_end;
-    *token.t_end = '\0';
-    numbegin = token.t_begin;
-    if (*numbegin == '0') {
-     ++numbegin;
-          if (*numbegin == 'b' && HAVE_EXTENSION_BININTEGRAL) ++numbegin,numsys = 2;
-     else if (*numbegin == 'x' || *numbegin == 'X') ++numbegin,numsys = 16;
-     else numsys = 8;
-    } else numsys = 10;
-    resval = strtoll(numbegin,&numend,numsys);
-    for (;;) {
-     if (*numend == 'u' || *numend == 'U') { ++numend; continue; }
-     if (*numend == 'l' || *numend == 'L') { ++numend; continue; }
-     break;
-    }
-    *token.t_end = old_ch; /* Restore the old  */
-    assert(numend <= token.t_end);
-    result->c_kind       = TPP_CONST_INTEGRAL;
-    result->c_data.c_int = (int_t)resval;
-    if (numend != token.t_end) {
-     TPPLexer_Warn(W_INVALID_INTEGER_SUFFIX,
-                   numend,token.t_end-numend);
-    }
-   }
-   yield_fetch();
-  } break;
-
-  {
-   char buf[sizeof(int_t)];
-   char *begin; size_t size,esc_size;
-  case TOK_CHAR:
-   if (result) {
-    begin    = token.t_begin+1;
-    size     = (size_t)(token.t_end-begin);
-    if (size && begin[size-1] == '\'') --size;
-    esc_size = TPP_SizeofUnescape(begin,size);
-    if (esc_size > sizeof(buf)) {
-     if unlikely(!TPPLexer_Warn(W_CHARACTER_TOO_LONG)) return;
-     do --size; while (TPP_SizeofUnescape(begin,size) > sizeof(buf));
-    }
-
-    *(int_t *)buf = 0;
-    size = TPP_Unescape(buf,begin,size)-buf;
+PUBLIC int TPP_Atoi(int_t *__restrict pint) {
+ char ch,*begin,*end; int_t intval,new_intval,more;
+ int numsys,result = TPP_ATOI_OK|TPP_ATOI_TYPE_INT;
+ assert(pint);
+ assert(TPPLexer_Current);
+ assert(TOK == TOK_INT || TOK == TOK_CHAR);
+ begin = token.t_begin,end = token.t_end;
+ assert(begin <= end);
+ if (TOK == TOK_CHAR) {
+  size_t esc_size,size;
+  if likely(begin != end && *begin == '\'') ++begin;
+  if likely(begin != end && end[-1] == '\'') --end;
+  size = (size_t)(end-begin);
+  esc_size = TPP_SizeofUnescape(begin,size);
+  if (esc_size > sizeof(int_t)) {
+   if unlikely(!TPPLexer_Warn(W_CHARACTER_TOO_LONG)) return TPP_ATOI_ERR;
+   do assert(size),--size;
+   while (TPP_SizeofUnescape(begin,size) > sizeof(int_t));
+  }
+  *pint = 0;
+  size = TPP_Unescape((char *)pint,begin,size)-(char *)pint;
 #if TPP_BYTEORDER == 4321
-    /* Adjust for big endian. */
-    *(int_t *)buf >>= (sizeof(int_t)-size)*8;
+  /* Adjust for big endian. */
+  *pint >>= (sizeof(int_t)-size)*8;
 #elif TPP_BYTEORDER != 1234
 #   error FIXME
 #endif
-    result->c_kind       = TPP_CONST_INTEGRAL;
-    result->c_data.c_int = *(int_t *)buf;
+  if (current.l_flags&TPPLEXER_FLAG_CHAR_UNSIGNED) result |= TPP_ATOI_UNSIGNED;
+  return result;
+ }
+ /* Regular integral. */
+ intval = 0;
+ if (begin == end) goto done;
+ if (*begin != '0') numsys = 10;
+ else {
+  ++begin;
+  if (begin != end) while (SKIP_WRAPLF(begin,end));
+  if (begin == end) goto done;
+  ch = *begin,ch = tolower(ch);
+       if (ch == 'x') ++begin,numsys = 16;
+  else if (ch == 'b' && HAVE_EXTENSION_BININTEGRAL) ++begin,numsys = 2;
+  else numsys = 8;
+ }
+ while (begin != end) {
+  while (SKIP_WRAPLF(begin,end));
+  ch = *begin;
+       if (ch >= '0' && ch <= '9') more = (int_t)(ch-'0');
+  else if (ch >= 'A' && ch <= 'F') more = (int_t)(10+(ch-'A'));
+  else if (ch >= 'a' && ch <= 'f') more = (int_t)(10+(ch-'a'));
+  else break;
+  if unlikely(more >= numsys) break;
+  /* TODO: Check for overflow in the following line. */
+  new_intval = intval*numsys+more;
+  intval = new_intval;
+  ++begin;
+ }
+ /* Parse a suffix. */
+ while (begin != end) {
+  while (SKIP_WRAPLF(begin,end));
+  ch = *begin,ch = tolower(ch);
+       if (ch == 'u' && !(result&TPP_ATOI_UNSIGNED)) result |= TPP_ATOI_UNSIGNED;
+  else if (ch == 'l' && !(result&TPP_ATOI_TYPE_LONGLONG)) {
+   if (result&TPP_ATOI_TYPE_LONG)
+    result &= ~(TPP_ATOI_TYPE_LONG),
+    result |= TPP_ATOI_TYPE_LONGLONG;
+   else result |= TPP_ATOI_TYPE_LONG;
+  } else break;
+  ++begin;
+ }
+ if (begin != end) {
+  if (HAVE_EXTENSION_MSVC_FIXED_INT &&
+     (result&TPP_ATOI_TYPE_MASK) == TPP_ATOI_TYPE_INT) {
+   /* MSVC-style fixed-length integer suffix. */
+   ch = *begin,ch = tolower(ch);
+   if (ch == 'i') {
+    char *forward = begin+1;
+    if (forward != end) while (SKIP_WRAPLF(forward,end));
+    if (forward == end) goto wrong_suffix;
+    ch = *forward++;
+         if (ch == '8') begin = forward,result |= TPP_ATOI_TYPE_INT8;
+    else if (ch == '1' || ch == '3' || ch == '6') {
+     char ch2;
+     if (forward != end) while (SKIP_WRAPLF(forward,end));
+     if (forward == end) goto wrong_suffix;
+     ch2 = *forward++;
+          if (ch == '1' && ch2 == '6') begin = forward,result |= TPP_ATOI_TYPE_INT16;
+     else if (ch == '3' && ch2 == '2') begin = forward,result |= TPP_ATOI_TYPE_INT32;
+     else if (ch == '6' && ch2 == '4') begin = forward,result |= TPP_ATOI_TYPE_INT64;
+    }
+   }
+  }
+wrong_suffix:
+  if (begin != end) {
+   /* Warning: Unknown suffix. */
+   if (!TPPLexer_Warn(W_INVALID_INTEGER_SUFFIX,
+                      begin,(size_t)(end-begin))
+       ) return TPP_ATOI_ERR;
+  }
+ }
+ /* Clamp 'intval' with the determined type. */
+ switch (result&TPP_ATOI_TYPE_MASK) {
+#define T_MASK(T) (int_t)(~(T)0)
+  default                    : new_intval = intval&T_MASK(int); break;
+  case TPP_ATOI_TYPE_LONG    : new_intval = intval&T_MASK(long); break;
+  case TPP_ATOI_TYPE_LONGLONG: new_intval = intval&T_MASK(long long); break;
+  case TPP_ATOI_TYPE_INT8    : new_intval = intval&T_MASK(int8_t); break;
+  case TPP_ATOI_TYPE_INT16   : new_intval = intval&T_MASK(int16_t); break;
+  case TPP_ATOI_TYPE_INT32   : new_intval = intval&T_MASK(int32_t); break;
+  case TPP_ATOI_TYPE_INT64   : new_intval = intval&T_MASK(int64_t); break;
+#undef T_MASK
+ }
+ if (new_intval != intval) {
+  /* TODO: Warn about clamped integral. */
+ }
+ intval = new_intval;
+done:
+ *pint = intval;
+ return result;
+}
+
+
+PRIVATE void EVAL_CALL eval_unary(struct TPPConst *result) {
+ switch (TOK) {
+
+  { /* Parse an integer/character. */
+  case TOK_INT:
+  case TOK_CHAR:
+   if (result) {
+    result->c_kind = TPP_CONST_INTEGRAL;
+    TPP_Atoi(&result->c_data.c_int);
    }
    yield_fetch();
   } break;
