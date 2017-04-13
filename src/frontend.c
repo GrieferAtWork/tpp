@@ -237,7 +237,10 @@ void usage(char *appname, char *subject) {
                 "\t" "-P                          Disable emission of #line adjustment directives (Default: on).\n"
                 "\t" "-M                          Instead of emitting preprocessor output, emit a make-style list of dependencies.\n"
                 "\t" "-MM                         Similar to '-M', but don't include system headers.\n"
-                "\t" "-MG                         Similar to '-M', but include missing files as dependencies, assuming generated files.\n"
+                "\t" "-MD                         Like '-M', but don't disable preprocessing.\n"
+                "\t" "-MMD                        Like '-MD', but don't disable preprocessing.\n"
+                "\t" "-MG                         Similar to '-MD', but include missing files as dependencies, assuming generated files.\n"
+                "\t" "-MP                         Emit dummy targets for every dependency.\n"
                 "\t" "-MF <file>                  Enable dependency tracking and emit its output to <file>, but also preprocess regularly.\n"
                 "\t" "-trigraphs                  Enable recognition of trigraph character sequences.\n"
                 "\t" "-undef                      Disable all builtin macros.\n"
@@ -372,19 +375,66 @@ static void pp_normal(void) {
 
 static stream_t dep_outfile = TPP_STREAM_INVALID;
 static int dep_nonsystem_only = 0;
+static int dep_emit_dummy = 0;
 static void pp_depprint(char *filename, size_t filename_size) {
  if (dep_outfile == TPP_STREAM_INVALID) return;
  write(dep_outfile," \\\n\t",4*sizeof(char));
  write(dep_outfile,filename,filename_size*sizeof(char));
 }
+static char **dep_filenamev = NULL;
+static size_t dep_filenamec = 0;
+static size_t dep_filenamea = 0;
+static int pp_add_dep_filename(char const *filename, size_t filename_size) {
+ char *filename_copy,**new_vec;
+ if (!dep_emit_dummy || dep_outfile == TPP_STREAM_INVALID) return 1;
+ filename_copy = (char *)malloc((filename_size+1)*sizeof(char));
+ if (!filename_copy) return 0;
+ memcpy(filename_copy,filename,filename_size*sizeof(char));
+ filename_copy[filename_size] = '\0';
+ new_vec = dep_filenamev;
+ if (dep_filenamea == dep_filenamec) {
+  size_t new_alloc = dep_filenamea ? dep_filenamea*2 : 2;
+  new_vec = (char **)realloc(new_vec,new_alloc*sizeof(char *));
+  if (!new_vec) { free(filename_copy); return 0; }
+  dep_filenamev = new_vec;
+  dep_filenamea = new_alloc;
+ }
+ new_vec[dep_filenamec++] = filename_copy;
+ return 1;
+}
+static void pp_emit_dummy_targets(void) {
+ char **iter,**end,*filename;
+ end = (iter = dep_filenamev)+dep_filenamec;
+ if (dep_outfile == TPP_STREAM_INVALID) dep_emit_dummy = 0;
+ for (; iter != end; ++iter) {
+  filename = *iter;
+  if (dep_emit_dummy) {
+   write(dep_outfile,"\n\n",2*sizeof(char));
+   write(dep_outfile,filename,strlen(filename)*sizeof(char));
+   write(dep_outfile,":",sizeof(char));
+  }
+  free(filename);
+ }
+ free(dep_filenamev);
+ dep_filenamev = NULL;
+ dep_filenamec = 0;
+ dep_filenamea = 0;
+ if (dep_outfile != TPP_STREAM_INVALID) {
+  write(dep_outfile,"\n",1*sizeof(char));
+ }
+}
+
+
 static int pp_depcallback(struct TPPFile *file, int is_system_header) {
  /* Don't emit entries for system header if we're not supposed to. */
  if (is_system_header && dep_nonsystem_only) return 1;
+ if (!pp_add_dep_filename(file->f_name,file->f_namesize)) return 0;
  pp_depprint(file->f_name,file->f_namesize);
  return 1;
 }
 static struct TPPFile *
 pp_depunknown(char *filename, size_t filename_size) {
+ if (!pp_add_dep_filename(filename,filename_size)) TPPLexer_SetErr();
  pp_depprint(filename,filename_size);
  return NULL;
 }
@@ -406,14 +456,14 @@ static int pp_depfirst(struct TPPFile *file) {
  write(dep_outfile,":",1*sizeof(char));
  filename_extension[1] = old;
  if (used_filename != file->f_name) free(used_filename);
- return pp_depcallback(file,0);
+ pp_depprint(file->f_name,file->f_namesize);
+ return 1;
 }
 static void pp_deponly(void) {
  /* fallback: Use stdout as output file for dependencies if no other file was set.
-  * HINT: stdout may have previously been redireced with the '-o' option. */
+  * HINT: stdout may have previously been redirected with the '-o' option. */
  if (dep_outfile == TPP_STREAM_INVALID) dep_outfile = stdout_handle;
  while (TPPLexer_Yield() > 0);
- write(dep_outfile,"\n",1*sizeof(char));
 }
 
 #ifdef _WIN32
@@ -485,12 +535,16 @@ int main(int argc, char *argv[]) {
 #endif /* TPP_CONFIG_MINMACRO */
   else if (!strcmp(arg,"P")) no_line_directives = 0;
   else if (!strcmp(arg,"M") || 
-           !strcmp(arg,"MM")) pp_mode = PPMODE_DEPENDENCY, /* Skip to dependency-only mode. */
+           !strcmp(arg,"MM")) pp_mode = PPMODE_DEPENDENCY, /* Switch to dependency-only mode. */
                              (dep_outfile == TPP_STREAM_INVALID) ? dep_outfile = stdout_handle : 0, /* Change the output file to stdout. */
                               dep_nonsystem_only = !strcmp(arg,"MM"); /* Check if we're supposed to include system-headeres. */
+  else if (!strcmp(arg,"MD") || 
+           !strcmp(arg,"MMD")) (dep_outfile == TPP_STREAM_INVALID) ? dep_outfile = stdout_handle : 0, /* Change the output file to stdout. */
+                                dep_nonsystem_only = !strcmp(arg,"MMD"); /* Check if we're supposed to include system-headeres. */
   else if (!strcmp(arg,"MG")) TPPLexer_Current->l_callbacks.c_unknown_file = &pp_depunknown, /* Setup an unknown-file handler, assuming generated headers. */
                               TPPLexer_SetWarning(W_FILE_NOT_FOUND,WSTATE_DISABLE), /* Disable file-not-found warnings (We're assuming generated headers). */
                               pp_mode = PPMODE_DEPENDENCY; /* Switch to dependency-only mode. */
+  else if (!strcmp(arg,"MP")) dep_emit_dummy = 1; /* Emit a dummy target for every dependecy. */
   else if (!strcmp(arg,"MF")) argc > 1 ? ((dep_outfile != TPP_STREAM_INVALID && dep_outfile != stdout_handle)
                                            ? close_stream(dep_outfile) : 0, /* Close a previously opened dependecy output stream. */
                                            dep_outfile = open_out_file(argv[1]),++argv,--argc) : 0;
@@ -556,7 +610,6 @@ noopt:
   dup2(STDOUT_FILENO,newout);
 #endif
  }
-
  if (argc && strcmp(argv[0],"-") != 0) {
   infile = TPPLexer_OpenFile(TPPLEXER_OPENFILE_MODE_NORMAL|
                              TPPLEXER_OPENFILE_FLAG_NOCASEWARN,
@@ -585,6 +638,7 @@ use_infile:
   case PPMODE_DEPENDENCY: pp_deponly(); break;
   default               : pp_normal(); break;
  }
+ pp_emit_dummy_targets();
 end:
  TPP_FINALIZE();
 #ifdef _CRTDBG_MAP_ALLOC
