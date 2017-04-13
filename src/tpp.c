@@ -1402,6 +1402,8 @@ TPPFile_NextChunk(struct TPPFile *__restrict self, int flags) {
      self->f_textfile.f_stream == TPP_STREAM_INVALID) return 0;
  /* Load a new chunk from the associated stream. */
  for (;;) {
+  assert(!self->f_end || !*self->f_end ||
+         *self->f_end == self->f_textfile.f_prefixdel);
   end_offset = (size_t)(self->f_end-self->f_text->s_text);
   if (flags&TPPFILE_NEXTCHUNK_FLAG_EXTEND) {
    /* Extend the existing chunk (not dropping existing
@@ -1533,7 +1535,7 @@ search_suitable_end_again:
    int mode = 0,termstring_onlf;
    /* Special case: If we managed to read something, but
     * the suitable end didn't increase, just read some more! */
-   if (end_offset == (size_t)(self->f_end-self->f_text->s_text)) continue;
+   if (end_offset == (size_t)(self->f_end-self->f_text->s_text)) goto extend_more;
 #define MODE_INSTRING  0x01
 #define MODE_INCHAR    0x02
 #define MODE_INCOMMENT 0x04
@@ -1596,8 +1598,13 @@ search_suitable_end_again:
    }
   }
   /* Check if the data that was read contains a suitable end. */
+extend_more:
   flags |= TPPFILE_NEXTCHUNK_FLAG_EXTEND; /* Extend the data some more... */
+  assert(self->f_text->s_size);
   self->f_end = self->f_text->s_text+self->f_text->s_size;
+  self->f_textfile.f_prefixdel = newchunk->s_text[0];
+  assert(!self->f_end || !*self->f_end ||
+         *self->f_end == self->f_textfile.f_prefixdel);
  }
  assert(self->f_pos   >= self->f_begin);
  assert(self->f_pos   <= self->f_end);
@@ -4057,7 +4064,9 @@ parse_multichar:
    if (*forward == '*' &&
       (current.l_extokens&TPPLEXER_TOKEN_STARSTAR)) { ch = TOK_POW; goto settok_forward1; }
    if (*forward == '=') { ch = TOK_MUL_EQUAL; goto settok_forward1; }
-   if (*forward == '/') { if (!TPPLexer_Warn(W_STARSLASH_OUTSIDE_OF_COMMENT,iter-1)) goto err; }
+   if (*forward == '/') {
+    if (!TPPLexer_Warn(W_STARSLASH_OUTSIDE_OF_COMMENT,iter-1)) goto err;
+   }
    goto settok;
 
   case '/':
@@ -5796,7 +5805,9 @@ err_substr:  TPPString_Decref(basestring);
 #define BUILTIN_MACRO(name,value) case name:\
 { static struct { refcnt_t a; size_t b; char c[COMPILER_STRLEN0(value)]; }\
   text##name = {0x80000000,COMPILER_STRLEN(value),value};\
-  static struct TPPExplicitFile predef##name = {0x80000000,TPPFILE_KIND_EXPLICIT,NULL,"",0,EMPTY_STRING_HASH,(struct TPPString *)&text##name,text##name.c,text##name.c+COMPILER_STRLEN(value),NULL};\
+  static struct TPPExplicitFile predef##name = {\
+   0x80000000,TPPFILE_KIND_EXPLICIT,NULL,"",0,EMPTY_STRING_HASH,\
+   (struct TPPString *)&text##name,text##name.c,text##name.c+COMPILER_STRLEN(value),NULL};\
   predefined_macro = &predef##name;\
   goto predef_macro;\
 }
