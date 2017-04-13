@@ -3162,6 +3162,7 @@ PRIVATE struct tpp_extension const tpp_extensions[] = {
  EXTENSION("canonical-system-headers",TPPLEXER_EXTENSION_CANONICAL_HEADERS),
  EXTENSION("extensions-are-features",TPPLEXER_EXTENSION_EXT_ARE_FEATURES),
  EXTENSION("fixed-length-integrals",TPPLEXER_EXTENSION_MSVC_FIXED_INT),
+ EXTENSION("dont-expand-defined",TPPLEXER_EXTENSION_NO_EXPAND_DEFINED),
 #undef EXTENSION
  {NULL,0,0},
 };
