@@ -54,6 +54,16 @@
 #define DEF_M(name)         KWD(KWD_##name,#name) MACRO(KWD_##name,1)
 #define DEF_M_IF(name,expr) KWD(KWD_##name,#name) MACRO(KWD_##name,expr)
 
+#define DEF_FEATURE_IF(name,if)   KWD(KWD_##name,#name) KWD_FLAGS(KWD_##name,(if) ? TPP_KEYWORDFLAG_HAS_FEATURE : 0)
+#define DEF_EXTENSION_IF(name,if) KWD(KWD_##name,#name) KWD_FLAGS(KWD_##name,(if) ? TPP_KEYWORDFLAG_HAS_EXTENSION : 0)
+
+#define PREDEFINED_KWDMACRO(name,str,value)       KWD(name,str) MACRO(name,1) BUILTIN_MACRO(name,value)
+#define PREDEFINED_KWDMACRO_IF(name,str,if,value) KWD(name,str) MACRO(name,if) BUILTIN_MACRO(name,value)
+#define PREDEFINED_MACRO(name,value)              PREDEFINED_KWDMACRO(KWD_##name,#name,value)
+#define PREDEFINED_MACRO_IF(name,if,value)        PREDEFINED_KWDMACRO_IF(KWD_##name,#name,if,value)
+#define TPP_PP_STR2(x) #x
+#define TPP_PP_STR(x)  TPP_PP_STR2(x)
+
 /* Keywords for known preprocessor directives. */
 DEF_K(if)           /*< #if defined(FOO) && FOO == 10. */
 DEF_K(ifdef)        /*< #ifdef FOOBAR. */
@@ -172,9 +182,6 @@ DEF_M_IF(__TIME_MIN__,  HAS_EXTENSION(TPPLEXER_EXTENSION_TIMEUTILS))
 DEF_M_IF(__TIME_HOUR__, HAS_EXTENSION(TPPLEXER_EXTENSION_TIMEUTILS))
 
 
-#define DEF_FEATURE_IF(name,if)   KWD(KWD_##name,#name) KWD_FLAGS(KWD_##name,(if) ? TPP_KEYWORDFLAG_HAS_FEATURE : 0)
-#define DEF_EXTENSION_IF(name,if) KWD(KWD_##name,#name) KWD_FLAGS(KWD_##name,(if) ? TPP_KEYWORDFLAG_HAS_EXTENSION : 0)
-
 DEF_EXTENSION_IF(tpp_dollar_is_alpha,             HAS_EXTENSION(TPPLEXER_EXTENSION_DOLLAR_IS_ALPHA))
 DEF_EXTENSION_IF(tpp_va_args,                     HAS_EXTENSION(TPPLEXER_EXTENSION_VA_ARGS))
 DEF_EXTENSION_IF(tpp_named_va_args,               HAS_EXTENSION(TPPLEXER_EXTENSION_GCC_VA_ARGS))
@@ -213,29 +220,16 @@ DEF_EXTENSION_IF(tpp_emit_lf_after_directive,     (TPPLexer_Current->l_flags&TPP
 DEF_EXTENSION_IF(tpp_if_cond_expression,          0) /* TODO: (Re-)add support for this. ('__TPP_EVAL(if (foo) 42 else 10)') */
 DEF_EXTENSION_IF(tpp_debug,                       TPP_CONFIG_DEBUG)
 
-#undef DEF_EXTENSION_IF
-#undef DEF_FEATURE_IF
-#undef DEF_M_IF
-#undef DEF_M
-#undef DEF_K
-
-#define PREDEFINED_MACRO(name,value) \
-  KWD(KWD_##name,#name) \
-  MACRO(KWD_##name,1) \
-  BUILTIN_MACRO(KWD_##name,value)
-
-#define TPP_PP_STR2(x) #x
-#define TPP_PP_STR(x)  TPP_PP_STR2(x)
-
 /* Predefined macros and their values.
  * NOTE: These behave like other predefined macros, allowing
  *       the user to redefine them, but returning when they
  *       #undef their versions again. */
 PREDEFINED_MACRO(__TPP_VERSION__,TPP_PP_STR(TPP_PREPROCESSOR_VERSION))
 
-#undef TPP_PP_STR
-#undef TPP_PP_STR2
-
+#if !TPP_CONFIG_MINMACRO
+/* Pull in GCC-specific definitions. */
+#include "tpp-gcc-defs.inl"
+#endif /* !TPP_CONFIG_MINMACRO */
 
 
 WGROUP(WG_COMMENT,             "comment",             WSTATE_ERROR)
@@ -369,6 +363,18 @@ WARNING(W_CANT_POP_EXTENSIONS,             (WG_VALUE),   WSTATE_WARN)    /*< . *
 WARNING(W_CONSIDER_PAREN_AROUND_LAND,      (WG_QUALITY), WSTATE_WARN)    /*< . */
 WARNING(W_INTEGRAL_OVERFLOW,               (WG_VALUE),   WSTATE_WARN)    /*< [int_t,int_t]. */
 WARNING(W_INTEGRAL_CLAMPED,                (WG_VALUE),   WSTATE_WARN)    /*< [int_t,int_t]. */
+
+#undef TPP_PP_STR
+#undef TPP_PP_STR2
+#undef PREDEFINED_MACRO_IF
+#undef PREDEFINED_MACRO
+#undef PREDEFINED_KWDMACRO_IF
+#undef PREDEFINED_KWDMACRO
+#undef DEF_EXTENSION_IF
+#undef DEF_FEATURE_IF
+#undef DEF_M_IF
+#undef DEF_M
+#undef DEF_K
 
 #ifdef TPP_DEFS_DEFINES_BUILTIN_MACRO
 #undef TPP_DEFS_DEFINES_BUILTIN_MACRO

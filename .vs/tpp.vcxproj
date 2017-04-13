@@ -20,6 +20,7 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="..\src\tpp-defs.inl" />
+    <None Include="..\src\tpp-gcc-defs.inl" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <ProjectGuid>{86D226C5-EF62-4562-AC06-E6A753DFA7CF}</ProjectGuid>

@@ -28,7 +28,14 @@
 #endif
 #endif
 #ifndef TPP_CONFIG_ONELEXER
-#define TPP_CONFIG_ONELEXER   1 /* Globally provide only one lexer (faster, but more restrictive). */
+/* Globally provide only one lexer (faster, but more restrictive). */
+#define TPP_CONFIG_ONELEXER   1
+#endif
+#ifndef TPP_CONFIG_MINMACRO
+/* When configured to non-zero, don't define builtin macro
+ * describing the host platform, cpu or standard c-types.
+ * >> Basically, disable 'TPPLEXER_EXTENSION_*_MACROS' extensions. */
+#define TPP_CONFIG_MINMACRO   0
 #endif
 
 #define TPP_PREPROCESSOR_VERSION 200 /* Preprocessor version. */
@@ -167,22 +174,51 @@
 #   define TPP_OFFSETOF(m,s)    ((size_t)(&((m *)0)->s))
 #endif
 #   define TPP_OFFSETAFTER(m,s) ((size_t)(&((m *)0)->s+1))
+#if (defined(_MSC_VER) && (defined(_MSC_EXTENSIONS) || _MSC_VER >= 1400)) || \
+    (defined(__clang__)) || \
+    (defined(__GNUC__) && !defined(__DARWIN_NO_LONG_LONG)) || \
+    (defined(__BORLANDC__) && __BORLANDC__ >= 0x561 && !defined(__NO_LONG_LONG))
+#   define TPP_HAVE_LONGLONG  1
+#else
+#   define TPP_HAVE_LONGLONG  0
+#endif
 #if defined(_MSC_VER)
-#   define TPP_UNNAMED_UNION  1
+#   define TPP_HAVE_UNNAMED_UNION  1
 #   pragma warning(disable: 4201)
 #elif (defined(__GNUC__) && \
       /* Anonymous unions support starts with gcc 2.96/g++ 2.95 */\
       (__GNUC__ < 2 || (__GNUC__ == 2 && (__GNUC_MINOR__ < 95 ||\
       (__GNUC_MINOR__ == 95 && !defined(__cplusplus)))))) || \
       defined(__SUNPRO_C) || defined(__SUNPRO_CC)
-#   define TPP_UNNAMED_UNION  0
+#   define TPP_HAVE_UNNAMED_UNION  0
 #else
-#   define TPP_UNNAMED_UNION  1
+#   define TPP_HAVE_UNNAMED_UNION  1
 #endif
-#if TPP_UNNAMED_UNION
+#if TPP_HAVE_UNNAMED_UNION
 #   define TPP_UNNAMED_UNION_DEF(name) /* nothing */
 #else
 #   define TPP_UNNAMED_UNION_DEF(name) name
+#endif
+//#if !defined(_WIN64) && defined(WIN64)
+//#   define _WIN64 WIN64
+//#endif
+//#if !defined(_WIN32) && defined(WIN32)
+//#   define _WIN32 WIN32
+//#endif
+//#if !defined(_WIN32) && defined(__WIN32__)
+//#   define _WIN32 __WIN32__
+//#endif
+#ifndef __SIZEOF_POINTER__
+#if defined(_WIN64) || defined(__LP64__) || defined(_LP64)
+#   define __SIZEOF_POINTER__ 8
+#elif defined(_WIN32)
+#   define __SIZEOF_POINTER__ 4
+#else
+#   error FIXME
+#endif
+#endif
+#ifndef __SIZEOF_SIZE_T__
+#   define __SIZEOF_SIZE_T__ __SIZEOF_POINTER__
 #endif
 
 #ifdef __cplusplus
@@ -962,7 +998,12 @@ TPP_LOCAL TPP(col_t) TPPLexer_COLUMN(void) { struct TPPFile *f = TPPLexer_Textfi
 #define TPPLEXER_EXTENSION_EXT_ARE_FEATURES  0x0000200000000000ull /*< [name("extensions-are-features")] extensions (__has_extension) are also considered features (__has_feature). */
 #define TPPLEXER_EXTENSION_MSVC_FIXED_INT    0x0000400000000000ull /*< [name("fixed-length-integrals")] Allow a 'i(8|16|32|64)' suffix in integrals. */
 #define TPPLEXER_EXTENSION_NO_EXPAND_DEFINED 0x0000800000000000ull /*< [name("dont-expand-defined")] Within a function-style macro, placing an argument 'ARG' in 'defined(ARG)' will generate a code equivalent to 'defined(#!ARG)' (MANDELLA!). */
-#define TPPLEXER_EXTENSION_DEFAULT          (0xffffffffffffffffull&~(TPPLEXER_EXTENSION_TRIGRAPHS|TPPLEXER_EXTENSION_RECMAC)) /*< Enable (almost) all extensions. */
+#if !TPP_CONFIG_MINMACRO
+#define TPPLEXER_EXTENSION_CPU_MACROS        0x2000000000000000ull /*< [name("define-cpu-macros")] Define macros describing the host CPU (e.g.: '-D__i386__=1') */
+#define TPPLEXER_EXTENSION_SYSTEM_MACROS     0x4000000000000000ull /*< [name("define-system-macros")] Define macros describing the host platform (e.g.: '-D_WIN32=1') */
+#define TPPLEXER_EXTENSION_UTILITY_MACROS    0x8000000000000000ull /*< [name("define-utility-macros")] Define (c-specific) utility macros (e.g.: '-D__SIZEOF_INT__=4') */
+#endif /* !TPP_CONFIG_MINMACRO */
+#define TPPLEXER_EXTENSION_DEFAULT           (0xffffffffffffffffull&~(TPPLEXER_EXTENSION_TRIGRAPHS|TPPLEXER_EXTENSION_RECMAC)) /*< Enable (almost) all extensions. */
 
 struct TPPLexer {
  struct TPPToken       l_token;      /*< The current token. */
@@ -1278,7 +1319,7 @@ TPPFUN int TPP_Atoi(TPP(int_t) *__restrict pint);
 
 
 /* Fix unnamed union/struct members. */
-#if !TPP_UNNAMED_UNION
+#if !TPP_HAVE_UNNAMED_UNION
 #define m_function     m_specific.m_function
 #define m_expand       m_specific.m_expand
 #define f_textfile     f_specific.f_textfile

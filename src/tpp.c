@@ -41,28 +41,6 @@
 #ifndef __has_builtin
 #   define __has_builtin(x) 0
 #endif
-#ifndef _WIN64
-#ifdef WIN64
-#   define _WIN64 WIN64
-#endif
-#endif
-#ifndef _WIN32
-#ifdef WIN32
-#   define _WIN32 WIN32
-#endif
-#endif
-#ifndef __SIZEOF_POINTER__
-#ifdef _WIN64
-#   define __SIZEOF_POINTER__ 8
-#elif defined(_WIN32)
-#   define __SIZEOF_POINTER__ 4
-#else
-#    error FIXME
-#endif
-#endif
-#ifndef __SIZEOF_SIZE_T__
-#    define __SIZEOF_SIZE_T__ __SIZEOF_POINTER__
-#endif
 #ifndef __GNUC__
 #    define __attribute__(x) /* nothing */
 #endif
@@ -110,6 +88,7 @@
 #include <stdlib.h>
 #include <stdarg.h>
 #include <stdio.h>
+#include <stdint.h>
 #include <errno.h>
 #include <time.h>
 
@@ -477,6 +456,11 @@ do{ tok_t              _old_tok_id    = token.t_id;\
 #define HAVE_EXTENSION_EXT_ARE_FEATURES  (current.l_extensions&TPPLEXER_EXTENSION_EXT_ARE_FEATURES)
 #define HAVE_EXTENSION_MSVC_FIXED_INT    (current.l_extensions&TPPLEXER_EXTENSION_MSVC_FIXED_INT)
 #define HAVE_EXTENSION_NO_EXPAND_DEFINED (current.l_extensions&TPPLEXER_EXTENSION_NO_EXPAND_DEFINED)
+#if !TPP_CONFIG_MINMACRO
+#define HAVE_EXTENSION_CPU_MACROS        (current.l_extensions&TPPLEXER_EXTENSION_CPU_MACROS)
+#define HAVE_EXTENSION_SYSTEM_MACROS     (current.l_extensions&TPPLEXER_EXTENSION_SYSTEM_MACROS)
+#define HAVE_EXTENSION_UTILITY_MACROS    (current.l_extensions&TPPLEXER_EXTENSION_UTILITY_MACROS)
+#endif /* !TPP_CONFIG_MINMACRO */
 
 
 
@@ -3056,6 +3040,19 @@ PUBLIC int TPPLexer_Init(struct TPPLexer *__restrict self) {
  assert(TPPFile_Empty.f_namehash ==
         hashof(TPPFile_Empty.f_name,
                TPPFile_Empty.f_namesize));
+#if !TPP_CONFIG_MINMACRO
+ assert(sizeof(void *) == __SIZEOF_POINTER__);
+ assert(sizeof(wchar_t) == __SIZEOF_WCHAR_T__);
+ assert(sizeof(short) == __SIZEOF_SHORT__);
+ assert(sizeof(int) == __SIZEOF_INT__);
+ assert(sizeof(long) == __SIZEOF_LONG__);
+#if TPP_HAVE_LONGLONG
+ assert(sizeof(long long) == __SIZEOF_LONG_LONG__);
+#endif /* TPP_HAVE_LONGLONG */
+ assert(sizeof(float) == __SIZEOF_FLOAT__);
+ assert(sizeof(double) == __SIZEOF_DOUBLE__);
+ assert(sizeof(long double) == __SIZEOF_LONG_DOUBLE__);
+#endif /* !TPP_CONFIG_MINMACRO */
  return 1;
 }
 PUBLIC void TPPLexer_Quit(struct TPPLexer *__restrict self) {
@@ -3163,6 +3160,11 @@ PRIVATE struct tpp_extension const tpp_extensions[] = {
  EXTENSION("extensions-are-features",TPPLEXER_EXTENSION_EXT_ARE_FEATURES),
  EXTENSION("fixed-length-integrals",TPPLEXER_EXTENSION_MSVC_FIXED_INT),
  EXTENSION("dont-expand-defined",TPPLEXER_EXTENSION_NO_EXPAND_DEFINED),
+#if !TPP_CONFIG_MINMACRO
+ EXTENSION("dont-expand-defined",TPPLEXER_EXTENSION_CPU_MACROS),
+ EXTENSION("dont-expand-defined",TPPLEXER_EXTENSION_SYSTEM_MACROS),
+ EXTENSION("dont-expand-defined",TPPLEXER_EXTENSION_UTILITY_MACROS),
+#endif /* !TPP_CONFIG_MINMACRO */
 #undef EXTENSION
  {NULL,0,0},
 };
@@ -5005,6 +5007,38 @@ PRIVATE char const date_month_names[12][4] = {
 PRIVATE char const date_wday_names[7][4] = {
  "Sun","Mon","Tue","Wed","Thu","Fri","Sat"};
 
+#if !TPP_CONFIG_MINMACRO
+static char const *const intc_suffix[] = {
+ /* __INT8_C    */"i8\0",
+ /* __INT16_C   */"i16\0",
+#if __SIZEOF_INT__ != 4
+ /* __INT32_C   */"i32\0l",
+#else
+ /* __INT32_C   */"i32\0",
+#endif
+#if __SIZEOF_LONG__ == 8
+ /* __INT64_C   */"i64\0l",
+#else
+ /* __INT64_C   */"i64\0ll",
+#endif
+ /* __UINT8_C   */"ui8\0",
+ /* __UINT16_C  */"ui16\0",
+#if __SIZEOF_INT__ != 4
+ /* __INT32_C   */"ui32\0ul",
+#else
+ /* __INT32_C   */"ui32\0u",
+#endif
+#if __SIZEOF_LONG__ == 8
+ /* __INT64_C   */"ui64\0ul",
+#else
+ /* __INT64_C   */"ui64\0ull",
+#endif
+ /* __INTMAX_C  */"i64\0ll",
+ /* __UINTMAX_C */"ui64\0ull",
+};
+#endif /* !TPP_CONFIG_MINMACRO */
+
+
 PUBLIC tok_t TPPLexer_Yield(void) {
  struct TPPFile *macro;
  struct TPPString *string_text;
@@ -5778,6 +5812,48 @@ predef_macro:
     goto again;
    } break;
 
+#if !TPP_CONFIG_MINMACRO
+   { /* Builtin macro functions for generating integral constants. */
+    char const *suffix;
+    struct TPPString *argstring;
+    struct TPPFile *argfile;
+    size_t argsize,suffix_size;
+   case KWD___INT8_C:   case KWD___UINT8_C:
+   case KWD___INT16_C:  case KWD___UINT16_C:
+   case KWD___INT32_C:  case KWD___UINT32_C:
+   case KWD___INT64_C:  case KWD___UINT64_C:
+   case KWD___INTMAX_C: case KWD___UINTMAX_C:
+    if (!HAVE_EXTENSION_UTILITY_MACROS) break;
+    suffix = intc_suffix[TOK-KWD___INT8_C];
+    if (!(current.l_extensions&TPPLEXER_EXTENSION_MSVC_FIXED_INT)) suffix += strlen(suffix)+1;
+    pushf();
+    current.l_flags &= ~(TPPLEXER_FLAG_WANTCOMMENTS|
+                         TPPLEXER_FLAG_WANTSPACE|
+                         TPPLEXER_FLAG_WANTLF);
+    yield_fetch();
+    if (TOK != '(') TPPLexer_Warn(W_EXPECTED_LPAREN);
+    else yield_fetch();
+    suffix_size = strlen(suffix);
+    argsize     = (size_t)(token.t_end-token.t_begin);
+    if (TOK == ')') argsize = 0;
+    argstring   = (struct TPPString *)malloc(TPP_OFFSETOF(struct TPPString,s_text)+
+                                            (argsize+suffix_size+1)*sizeof(char));
+    if unlikely(!argstring) { breakf(); goto seterr; }
+    memcpy(argstring->s_text,token.t_begin,argsize*sizeof(char));
+    memcpy(argstring->s_text+argsize,suffix,suffix_size*sizeof(char));
+    argstring->s_refcnt = 1;
+    argstring->s_size = argsize+suffix_size;
+    argstring->s_text[argstring->s_size] = '\0';
+    if (TOK != ')') yield_fetch();
+    if (TOK != ')') TPPLexer_Warn(W_EXPECTED_RPAREN);
+    popf();
+    argfile = TPPFile_NewExplicitInherited(argstring);
+    if unlikely(!argfile) { TPPString_Decref(argstring); goto seterr; }
+    pushfile_inherited(argfile);
+    goto again;
+   } break;
+#endif /* !TPP_CONFIG_MINMACRO */
+
    default: break;
   }
  }
@@ -5794,7 +5870,7 @@ struct argcache_t {
  char  *ac_expand_begin; /*< [?..1][owned] Dynamically allocated buffer for the expanded version of the text. */
  size_t ac_expand_size;
 };
-#if !TPP_UNNAMED_UNION
+#if !TPP_HAVE_UNNAMED_UNION
 #define ac_begin         ac_specific_begin.ac_begin
 #define ac_end           ac_specific_end.ac_end
 #define ac_offset_begin  ac_specific_begin.ac_offset_begin
@@ -6902,10 +6978,13 @@ wrong_suffix:
 #define T_MASK(T) (int_t)(~(T)0)
   default                    : new_intval = intval&T_MASK(int); break;
   case TPP_ATOI_TYPE_LONG    : new_intval = intval&T_MASK(long); break;
-  case TPP_ATOI_TYPE_LONGLONG: new_intval = intval&T_MASK(long long); break;
   case TPP_ATOI_TYPE_INT8    : new_intval = intval&T_MASK(int8_t); break;
   case TPP_ATOI_TYPE_INT16   : new_intval = intval&T_MASK(int16_t); break;
   case TPP_ATOI_TYPE_INT32   : new_intval = intval&T_MASK(int32_t); break;
+  case TPP_ATOI_TYPE_LONGLONG: /* If 'long long' doesn't exist, assume it's supposed to be 64-bit. */
+#if TPP_HAVE_LONGLONG
+                               new_intval = intval&T_MASK(long long); break;
+#endif /* TPP_HAVE_LONGLONG */
   case TPP_ATOI_TYPE_INT64   : new_intval = intval&T_MASK(int64_t); break;
 #undef T_MASK
  }
@@ -8048,7 +8127,11 @@ PUBLIC int TPPLexer_Warn(int wnum, ...) {
     if (!memcmp(wname,"no-",3)) wname += 3;
     WARNF("Invalid warning '%s' (Did you mean '%s')",wname,find_most_likely_warning(wname));
    } else {
+#if TPP_HAVE_LONGLONG
     WARNF("Invalid warning '%lld'",(long long)c->c_data.c_int);
+#else
+    WARNF("Invalid warning '%ld'",(long)c->c_data.c_int);
+#endif
    }
   } break;
   case W_CANT_POP_WARNINGS               : WARNF("Can't pop warnings"); break;
