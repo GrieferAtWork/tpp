@@ -3038,7 +3038,7 @@ PUBLIC int TPPLexer_Init(struct TPPLexer *__restrict self) {
         sizeof(default_warnings_state) <= TPP_OFFSETAFTER(struct TPPWarningState,ws_padding));
  memcpy(self->l_warnings.w_basestate.ws_state,
         &default_warnings_state,TPP_WARNING_BITSETSIZE);
-
+ memset(&self->l_callbacks,0,sizeof(struct TPPCallbacks));
  assert(hashof("",0) == EMPTY_STRING_HASH);
 #if __SIZEOF_SIZE_T__ == 4
  assert(hashof("<commandline>",13) == 3330511802ul);
@@ -3868,7 +3868,12 @@ PUBLIC tok_t TPPLexer_YieldRaw(void) {
  char *iter,*end,*forward; tok_t ch;
  assert(TPPLexer_Current);
  /* Refuse parsing more data if an error occurred. */
- if (current.l_flags&TPPLEXER_FLAG_ERROR) return TOK_ERR;
+ if (current.l_flags&(TPPLEXER_FLAG_ERROR|TPPLEXER_FLAG_EOF_ON_PAREN)) {
+  if (current.l_flags&TPPLEXER_FLAG_ERROR) return TOK_ERR;
+  /* Refuse to return anything other than EOF when eof-on-paren is
+   * turned on an the parenthesis recursion has dropped to ZERO(0). */
+  if (!current.l_eof_paren) { return TOK = TOK_EOF; }
+ }
  file = token.t_file;
 again:
  assert(file);
@@ -4188,6 +4193,16 @@ set_comment:
       (current.l_extokens&TPPLEXER_TOKEN_ATEQUAL)) { ch = TOK_AT_EQUAL; goto settok_forward1; }
    goto settok;
 
+  case '(':
+  case ')':
+   if (current.l_flags&TPPLEXER_FLAG_EOF_ON_PAREN) {
+    /* Handle EOF parenthesis recursion. */
+    assert(current.l_eof_paren); /* Already checked above. */
+    ch == '(' ? ++current.l_eof_paren
+              : --current.l_eof_paren;
+   }
+   goto settok;
+
   case '$':
    if (!HAVE_EXTENSION_DOLLAR_IS_ALPHA) goto settok;
   default:
@@ -4481,6 +4496,7 @@ def_skip_until_lf:
 
    { /* Compiler/Preprocessor-specific pragma. */
     int pragma_error;
+    char *old_eof,*new_eof,oldch;
    case KWD_pragma:
     TPPLexer_YieldRaw();
     /* Surprise, surprise! Microsoft and GCC work differently here:
@@ -4517,7 +4533,15 @@ def_skip_until_lf:
     current.l_flags |= (TPPLEXER_FLAG_NO_MACROS|
                         TPPLEXER_FLAG_NO_DIRECTIVES|
                         TPPLEXER_FLAG_NO_BUILTIN_MACROS);
-    pragma_error = TPPLexer_ParsePragma('\n');
+    old_eof = token.t_file->f_end;
+    /* Fake the file pointer to force an EOF where the pragma ends. */
+    new_eof = string_find_eol_after_comments(token.t_file->f_pos,old_eof);
+    oldch = *new_eof,*new_eof = '\0';
+    token.t_file->f_end = new_eof;
+    pragma_error = TPPLexer_ParsePragma();
+    assert(token.t_file->f_end == new_eof);
+    token.t_file->f_end = old_eof;
+    *new_eof = oldch;
     if (!pragma_error && (current.l_flags&TPPLEXER_FLAG_EAT_UNKNOWN_PRAGMA)) pragma_error = 1;
     while (token.t_file != current.l_eob_file) popfile();
     assert(hash_begin >= token.t_file->f_begin);
@@ -5133,7 +5157,7 @@ again:
                          TPPLEXER_FLAG_NO_DIRECTIVES|
                          TPPLEXER_FLAG_NO_BUILTIN_MACROS);
      pusheof();
-     pragma_error = TPPLexer_ParsePragma(0);
+     pragma_error = TPPLexer_ParsePragma();
      if (!pragma_error && (current.l_flags&TPPLEXER_FLAG_EAT_UNKNOWN_PRAGMA)) pragma_error = 1;
      while (token.t_file != current.l_eof_file) popfile();
      popeof();
@@ -5448,7 +5472,7 @@ create_int_file:
 
    { /* MSVC-style pragma. */
     char *old_filepos;
-    int pragma_error;
+    int pragma_error; size_t old_eofparen;
    case KWD___pragma:
     if (!HAVE_EXTENSION_MSVC_PRAGMA) break;
     pushf();
@@ -5465,7 +5489,12 @@ create_int_file:
     else TPPLexer_Warn(W_EXPECTED_LPAREN);
     /* WARNING: We leave macros turned on for this, because (perhaps surprisingly),
      *          visual studio _does_ expand macros inside its __pragma helper. */
-    pragma_error = TPPLexer_ParsePragma(')');
+    current.l_flags    |= TPPLEXER_FLAG_EOF_ON_PAREN;
+    old_eofparen        = current.l_eof_paren;
+    current.l_eof_paren = 1; /* Use EOF-on-paren recursion here. */
+    pragma_error        = TPPLexer_ParsePragma();
+    current.l_eof_paren = old_eofparen;
+    current.l_flags    |= (_oldflags&TPPLEXER_FLAG_EOF_ON_PAREN);
     if (!pragma_error && (current.l_flags&TPPLEXER_FLAG_EAT_UNKNOWN_PRAGMA)) pragma_error = 1;
     while (token.t_file != current.l_eof_file) popfile();
     if (pragma_error) {
@@ -5476,13 +5505,13 @@ create_int_file:
       TPPLexer_Yield();
      }
      if (TOK == ')') TPPLexer_Yield();
-     else TPPLexer_Warn(W_EXPECTED_RPAREN);
+     else TPPLexer_Warn(W_EXPECTED_RPAREN),TOK = 0; /* NOTE: Set TOK to 0 to force a reload below. */
     }
     if (!pragma_error) token.t_file->f_pos = old_filepos; /* Restore the old file pointer. */
     popeof();
     popf();
-    if (!pragma_error || !TOK) goto again;
-    /* If we managed to parse the pragma, continue parsing afterwards. */
+    if (!pragma_error) TPPLexer_YieldPP(); /* Don't parse pragmas again to prevent infinite recursion. */
+    else if (!TOK) goto again; /* If we managed to parse the pragma, continue parsing afterwards. */
     result = TOK;
    } break;
 
@@ -7552,8 +7581,16 @@ TPPLexer_Eval(struct TPPConst *result) {
 }
 
 PUBLIC int
-TPPLexer_ParsePragma(tok_t endat) {
- (void)endat;
+TPPLexer_ParsePragma(void) {
+ int result = TPPLexer_ParseBuiltinPragma();
+ if (!result && !(current.l_flags&TPPLEXER_FLAG_ERROR) &&
+     current.l_callbacks.c_parse_pragma) {
+  result = (*current.l_callbacks.c_parse_pragma)();
+ }
+ return result;
+}
+PUBLIC int
+TPPLexer_ParseBuiltinPragma(void) {
  switch (TOK) {
 
   { /* Setup a #include guard for the current source file. */
@@ -8100,6 +8137,7 @@ PUBLIC int TPPLexer_Warn(int wnum, ...) {
   case W_UNKNOWN_TOKEN_IN_EXPR_IS_ZERO   : WARNF("Unrecognized token " TOK_S " is replaced with '0' in expression",TOK_A); break;
   case W_EXPECTED_RPAREN_IN_EXPRESSION   : WARNF("Expected ')' in expression, but got " TOK_S,TOK_A); break;
   case W_EXPECTED_RBRACKET_IN_EXPRESSION : WARNF("Expected ']' in expression, but got " TOK_S,TOK_A); break;
+  case W_EXPECTED_COLLON_AFTER_WARNING   : WARNF("Expected ':' after #pragma warning, but got " TOK_S,TOK_A); break;
   case W_EXPECTED_KEYWORD_AFTER_IFDEF    : WARNF("Expected keyword after #ifdef, but got " TOK_S,TOK_A); break;
   case W_EXPECTED_KEYWORD_AFTER_DEFINED  : WARNF("Expected keyword after 'defined', but got " TOK_S,TOK_A); break;
   case W_EXPECTED_RPAREN_AFTER_DEFINED   : WARNF("Expected ')' after 'defined', but got " TOK_S,TOK_A); break;

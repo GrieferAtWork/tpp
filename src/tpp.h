@@ -679,6 +679,28 @@ enum{
 };
 
 
+struct TPPCallbacks {
+ /* Optional user-hooks for implementing special preprocessor behavior.
+  * NOTE: Any function pointer in here may be specified as NULL. */
+ //////////////////////////////////////////////////////////////////////////
+ // Handle an unknown pragma.
+ //  - The lexer currently points to the pragma's first token
+ //    and is configured not to continue yielding tokens once
+ //    the pragma's effective end is reached, as well as
+ //    to ignore comment, space and LF tokens:
+ //    >> #pragma foo bar   // [foo][bar][EOF]
+ //    >> _Pragma("baz(2)") // [baz][(][2][)][EOF]
+ //    >> __pragma(x*y)     // [x][*][y][EOF]
+ // @return: 0: Unknown/errorous pragma.
+ // @return: 1: Successfully parsed the given pragma.
+ int (*c_parse_pragma)(void);
+ //////////////////////////////////////////////////////////////////////////
+ // Insert the given text into the ".comment" section of the current object file.
+ // @return: 0: Error occurred (Set a lexer error if not already set)
+ // @return: 1: Successfully inserted the given text.
+ int (*c_ins_comment)(struct TPPString *__restrict comment);
+};
+
 struct TPPWarningStateEx {  /* Extended state for a 11-warning (aka. 'WSTATE_SUPPRESS'). */
  int          wse_wid;      /*< Warning/group ID. */
  unsigned int wse_suppress; /*< Amount of remaining times this warning should be suppressed.
@@ -922,6 +944,7 @@ TPP_LOCAL TPP(col_t) TPPLexer_COLUMN(void) { struct TPPFile *f = TPPLexer_Textfi
 #define TPPLEXER_FLAG_NO_ENCODING            0x01000000 /*< Don't try to detect file encodings (Everything is UTF-8 without BOM; aka. raw text). */
 #define TPPLEXER_FLAG_EAT_UNKNOWN_PRAGMA     0x02000000 /*< Don't re-emit unknown pragmas. */
 #define TPPLEXER_FLAG_CHAR_UNSIGNED          0x04000000 /*< When set, character-constants are unsigned. */
+#define TPPLEXER_FLAG_EOF_ON_PAREN           0x08000000 /*< When set, recursively track '('...')' pairs and yield EOF when 'l_eof_paren' reaches ZERO(0). */
 #define TPPLEXER_FLAG_RANDOM_INITIALIZED     0x40000000 /*< Set when rand() has been initialized. */
 #define TPPLEXER_FLAG_ERROR                  0x80000000 /*< When set, the lexer is in an error-state in which calls to yield() will return TOK_ERR. */
 #define TPPLEXER_FLAG_MERGEMASK              0xf0000000 /*< A mask of flags that are merged (or'd together) during popf(). */
@@ -1026,11 +1049,13 @@ struct TPPLexer {
  struct TPPIncludeList l_syspaths;   /*< List of paths searched when looking for system #include files. */
  size_t                l_limit_mrec; /*< Limit for how often a macro may recursively expand into itself. */
  size_t                l_limit_incl; /*< Limit for how often the same text file may exist on the #include stack. */
+ size_t                l_eof_paren;  /*< Recursion counter used by the 'TPPLEXER_FLAG_EOF_ON_PAREN' flag. */
  tok_t                 l_noerror;    /*< Old token ID before 'TPPLEXER_FLAG_ERROR' was set. */
  int_t                 l_counter;    /*< Value returned the next time '__COUNTER__' is expanded (Initialized to ZERO(0)). */
  struct TPPIfdefStack  l_ifdef;      /*< #ifdef stack. */
  struct TPPWarnings    l_warnings;   /*< Current user-configured warnings state. */
  struct TPPExtStack    l_extstack;   /*< Extension stack (used for '#pragma extension(push)') */
+ struct TPPCallbacks   l_callbacks;  /*< User-defined lexer callbacks. */
 };
 #define TPPLEXER_DEFAULT_LIMIT_MREC 512 /* Even when generated text differs from previous version, don't allow more self-recursion per macro than this. */
 #define TPPLEXER_DEFAULT_LIMIT_INCL 64  /* User attempts to #include a file more often that file will fail with an error message. */
@@ -1269,11 +1294,14 @@ TPPFUN int TPPLexer_Eval(struct TPPConst *result);
 
 //////////////////////////////////////////////////////////////////////////
 // Parse the data block of a pragma.
-// @param: endat: The id of a token that symbolically represents the end
-//                of the token (usually either ')', '\n' or '\0')
+// NOTE: 'TPPLexer_ParseBuiltinPragma' behaves similar to
+//       'TPPLexer_ParsePragma', but will not invoke a
+//       user-provided pragma handler in the even of an
+//       unknown one.
 // @return: 0: Unknown/errorous pragma.
 // @return: 1: Successfully parsed the given pragma.
-TPPFUN int TPPLexer_ParsePragma(TPP(tok_t) endat);
+TPPFUN int TPPLexer_ParsePragma(void);
+TPPFUN int TPPLexer_ParseBuiltinPragma(void);
 
 
 //////////////////////////////////////////////////////////////////////////
