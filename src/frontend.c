@@ -16,7 +16,7 @@
  *    misrepresented as being the original software.                          *
  * 3. This notice may not be removed or altered from any source distribution. *
  */
-#define TPP(x) x /* Global namespace. */
+#define TPP(x) TPP_##x /* Global namespace. */
 #define _CRT_SECURE_NO_WARNINGS
 #define _CRT_NONSTDC_NO_WARNINGS
 
@@ -74,7 +74,7 @@ static int no_magic_tokens    = 1; /*< Disable ~magic~ tokens for small line-shi
 static int no_line_directives = 0; /*< Disable #line directives being emit. */
 
 #ifdef _WIN32
-static stream_t stdout_handle;
+static TPP(stream_t) stdout_handle;
 #define write(fd,p,s) (void)WriteFile(fd,p,s,NULL,NULL)
 #else
 #define stdout_handle  STDOUT_FILENO
@@ -129,7 +129,7 @@ void put_line(void) {
  if (!is_at_linefeed) out_write("\n",sizeof(char));
  current_line = line;
  out_write("#line ",6*sizeof(char));
- out_write(buffer,(TPP_Itos(buffer,(int_t)(line+1))-buffer)*sizeof(char));
+ out_write(buffer,(TPP_Itos(buffer,(TPP(int_t))(line+1))-buffer)*sizeof(char));
  if (last_filename != filename_text) {
   char *quote_buffer;
   size_t quote_size;
@@ -201,7 +201,7 @@ struct tpp_extension {
  uint64_t    e_flag;
 };
 extern struct tpp_extension const tpp_extensions[];
-extern char const *const wgroup_names[WG_COUNT+1];
+extern char const *const wgroup_names[TPP(WG_COUNT)+1];
 
 void usage(char *appname, char *subject) {
  if (subject) {
@@ -213,10 +213,10 @@ void usage(char *appname, char *subject) {
   } else if (!strcmp(subject,"warnings")) {
    char const *const *iter;
 #define getstate(wid) \
- (wstate_t)((TPPLexer_Current->l_warnings.w_curstate->ws_state[(wid)/(8/TPP_WARNING_BITS)] \
-        >> (((wid)%(8/TPP_WARNING_BITS))*TPP_WARNING_BITS)) & 3)
+ (TPP(wstate_t))((TPPLexer_Current->l_warnings.w_curstate->ws_state[(wid)/(8/TPP_WARNING_BITS)] \
+             >> (((wid)%(8/TPP_WARNING_BITS))*TPP_WARNING_BITS)) & 3)
    for (iter = wgroup_names; *iter; ++iter) {
-    fprintf(stderr,"-W%s%s\n",getstate(iter-wgroup_names) == WSTATE_DISABLE ? "no-" : "",*iter);
+    fprintf(stderr,"-W%s%s\n",getstate(iter-wgroup_names) == TPP(WSTATE_DISABLE) ? "no-" : "",*iter);
    }
 #undef getstate
   } else {
@@ -375,14 +375,14 @@ static void pp_normal(void) {
  }
 }
 
-static stream_t dep_outfile = TPP_STREAM_INVALID;
+static TPP(stream_t) dep_outfile = TPP_STREAM_INVALID;
 static int dep_nonsystem_only = 0;
 static int dep_emit_dummy = 0;
-static void write_filename(stream_t fd, char const *p, size_t s) {
+static void write_filename(TPP(stream_t) fd, char const *p, size_t s) {
  /* TODO: Escape special characters, such as ' ' or '\\' */
  write(fd,p,s*sizeof(char));
 }
-static void write_filename_makeescape(stream_t fd, char const *p, size_t s) {
+static void write_filename_makeescape(TPP(stream_t) fd, char const *p, size_t s) {
  /* TODO: Escape special characters, such as '$' */
  write_filename(fd,p,s);
 }
@@ -497,8 +497,8 @@ static void pp_deponly(void) {
 #else
 #define close_stream  close
 #endif
-static stream_t open_out_file(char const *filename) {
- stream_t result;
+static TPP(stream_t) open_out_file(char const *filename) {
+ TPP(stream_t) result;
  if (!strcmp(filename,"-")) return stdout_handle;
 #ifdef _WIN32
  result = CreateFileA(filename,GENERIC_WRITE,
@@ -568,7 +568,7 @@ int main(int argc, char *argv[]) {
            !strcmp(arg,"MMD")) (dep_outfile == TPP_STREAM_INVALID) ? dep_outfile = stdout_handle : 0, /* Change the output file to stdout. */
                                 dep_nonsystem_only = !strcmp(arg,"MMD"); /* Check if we're supposed to include system-headeres. */
   else if (!strcmp(arg,"MG")) TPPLexer_Current->l_callbacks.c_unknown_file = &pp_depunknown, /* Setup an unknown-file handler, assuming generated headers. */
-                              TPPLexer_SetWarning(W_FILE_NOT_FOUND,WSTATE_DISABLE), /* Disable file-not-found warnings (We're assuming generated headers). */
+                              TPPLexer_SetWarning(TPP(W_FILE_NOT_FOUND),TPP(WSTATE_DISABLE)), /* Disable file-not-found warnings (We're assuming generated headers). */
                               pp_mode = PPMODE_DEPENDENCY; /* Switch to dependency-only mode. */
   else if (!strcmp(arg,"MP")) dep_emit_dummy = 1; /* Emit a dummy target for every dependecy. */
   else if (!strcmp(arg,"MF")) argc > 1 ? ((dep_outfile != TPP_STREAM_INVALID && dep_outfile != stdout_handle)
@@ -613,8 +613,8 @@ int main(int argc, char *argv[]) {
   else if (*arg == 'f') { int enable = 1; ++arg; /* Set an extension. */
                           if (!memcmp(arg,"no-",3)) arg += 3,enable = 0;
                           if (!TPPLexer_SetExtension(arg,enable)) goto noopt; }
-  else if (*arg == 'W') { wstate_t state = WSTATE_ERROR; ++arg; /* Set an extension. */
-                          if (!memcmp(arg,"no-",3)) arg += 3,state = WSTATE_DISABLE;
+  else if (*arg == 'W') { TPP(wstate_t) state = TPP(WSTATE_ERROR); ++arg; /* Set an extension. */
+                          if (!memcmp(arg,"no-",3)) arg += 3,state = TPP(WSTATE_DISABLE);
                           if (!TPPLexer_SetWarnings(arg,state)) goto noopt; }
 #if 1 /* Backwards-compatibility with old TPP */
   else if (!strcmp(arg,"no-line")) no_line_directives = 1;
@@ -631,7 +631,7 @@ noopt:
   --argc,++argv;
  }
  if (output_filename && strcmp(output_filename,"-")) {
-  stream_t newout = open_out_file(output_filename);
+  TPP(stream_t) newout = open_out_file(output_filename);
   if (dep_outfile == stdout_handle) dep_outfile = newout;
 #ifdef _WIN32
   stdout_handle = newout;

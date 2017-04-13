@@ -116,17 +116,17 @@ DEF_M_IF(__has_include_next,      HAS_EXTENSION(TPPLEXER_EXTENSION_HAS_INCLUDE))
 
 /* Helper keywords used to implement variadic macros & extensions.
  * HINT: '__VA_NARGS__' is something new I added when I began reviving TPP:
- *     >> #define _sum0()       0
- *     >> #define _sum1(a)      a
- *     >> #define _sum2(a,b)    a+b
- *     >> #define _sum3(a,b,c)  a+b+c
- *     >> #define sum(args...)  _sum##__VA_NARGS__(args)
- *     >>
- *     >> // Overloading macros by argument count was never this easy!
- *     >> sum()       // []
- *     >> sum( )      // [ ]
- *     >> sum(42)     // [42]
- *     >> sum(42,16)  // [42][+][16]
+ *    >> #define _sum0()       0
+ *    >> #define _sum1(a)      a
+ *    >> #define _sum2(a,b)    a+b
+ *    >> #define _sum3(a,b,c)  a+b+c
+ *    >> #define sum(args...)  _sum##__VA_NARGS__(args)
+ *    >>
+ *    >> // Overloading macros by argument count was never this easy!
+ *    >> sum()       // []
+ *    >> sum( )      // [ ] (or '[]' depending on 'TPPLEXER_FLAG_KEEP_ARG_WHITESPACE')
+ *    >> sum(42)     // [42]
+ *    >> sum(42,16)  // [42][+][16]
  */
 KWD(KWD___VA_ARGS__, "__VA_ARGS__")
 KWD(KWD___VA_COMMA__,"__VA_COMMA__")

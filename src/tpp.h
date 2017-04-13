@@ -716,12 +716,12 @@ struct TPPCallbacks {
  struct TPPFile *(*c_unknown_file)(char *filename, size_t filename_size);
 };
 
-struct TPPWarningStateEx {  /* Extended state for a 11-warning (aka. 'WSTATE_SUPPRESS'). */
- int          wse_wid;      /*< Warning/group ID. */
- unsigned int wse_suppress; /*< Amount of remaining times this warning should be suppressed.
-                             *  NOTE: When ZERO(0), this slot is unused. */
- wstate_t     wse_oldstate; /*< Old warning state to return to after suppression ends.
-                             *  NOTE: Never 'WSTATE_SUPPRESS' */
+struct TPPWarningStateEx {   /* Extended state for a 11-warning (aka. 'WSTATE_SUPPRESS'). */
+ int           wse_wid;      /*< Warning/group ID. */
+ unsigned int  wse_suppress; /*< Amount of remaining times this warning should be suppressed.
+                              *  NOTE: When ZERO(0), this slot is unused. */
+ TPP(wstate_t) wse_oldstate; /*< Old warning state to return to after suppression ends.
+                              *  NOTE: Never 'WSTATE_SUPPRESS' */
 };
 #define TPP_WARNING_BITS           2 /*< One of WSTATE_*. */
 #define TPP_WARNING_TOTAL         (TPP(WG_COUNT)+TPP(W_COUNT))
@@ -1086,8 +1086,8 @@ struct TPPLexer {
  size_t                l_limit_mrec; /*< Limit for how often a macro may recursively expand into itself. */
  size_t                l_limit_incl; /*< Limit for how often the same text file may exist on the #include stack. */
  size_t                l_eof_paren;  /*< Recursion counter used by the 'TPPLEXER_FLAG_EOF_ON_PAREN' flag. */
- tok_t                 l_noerror;    /*< Old token ID before 'TPPLEXER_FLAG_ERROR' was set. */
- int_t                 l_counter;    /*< Value returned the next time '__COUNTER__' is expanded (Initialized to ZERO(0)). */
+ TPP(tok_t)            l_noerror;    /*< Old token ID before 'TPPLEXER_FLAG_ERROR' was set. */
+ TPP(int_t)            l_counter;    /*< Value returned the next time '__COUNTER__' is expanded (Initialized to ZERO(0)). */
  struct TPPIfdefStack  l_ifdef;      /*< #ifdef stack. */
  struct TPPWarnings    l_warnings;   /*< Current user-configured warnings state. */
  struct TPPExtStack    l_extstack;   /*< Extension stack (used for '#pragma extension(push)') */
@@ -1203,17 +1203,17 @@ TPPFUN int TPPLexer_DelAssert(char const *__restrict predicate, size_t predicate
 //////////////////////////////////////////////////////////////////////////
 // Similar to 'TPPLexer_Yield' and used to implement it, but
 // doesn't expand macros or execute preprocessor directives.
-TPPFUN tok_t TPPLexer_YieldRaw(void);
+TPPFUN TPP(tok_t) TPPLexer_YieldRaw(void);
 
 //////////////////////////////////////////////////////////////////////////
 // Similar to 'TPPLexer_Yield' and used to implement it, but
 // doesn't expand macros.
-TPPFUN tok_t TPPLexer_YieldPP(void);
+TPPFUN TPP(tok_t) TPPLexer_YieldPP(void);
 
 //////////////////////////////////////////////////////////////////////////
 // Advance the selected lexer by one token and return the id of the new one.
 // HINT: Returns ZERO(0) if the true EOF was reached.
-TPPFUN tok_t TPPLexer_Yield(void);
+TPPFUN TPP(tok_t) TPPLexer_Yield(void);
 
 //////////////////////////////////////////////////////////////////////////
 // Emit a given warning.
