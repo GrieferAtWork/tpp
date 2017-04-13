@@ -8054,7 +8054,22 @@ PUBLIC int TPPLexer_Warn(int wnum, ...) {
   case W_SLASHSTAR_INSIDE_OF_COMMENT     : WARNF("'/" "*' repeated inside of comment"); break;
   case W_LINE_COMMENT_CONTINUED          : WARNF("Line-comment continued"); break;
   case W_ENCOUNTERED_TRIGRAPH            : WARNF("Encountered trigraph character sequence '%.3s'",ARG(char *)); break;
-  case W_REDEFINING_MACRO                : WARNF("Redefining macro '%s'",KWDNAME()); break;
+  case W_REDEFINING_MACRO                : {
+   kwd = ARG(struct TPPKeyword *);
+   WARNF("Redefining macro '%s'\n",kwd->k_name); 
+   assert(kwd->k_macro);
+   assert(kwd->k_macro->f_kind == TPPFILE_KIND_MACRO);
+   assert((kwd->k_macro->f_macro.m_flags&TPP_MACROFILE_KIND) != TPP_MACROFILE_KIND_EXPANDED);
+   textfile = kwd->k_macro->f_macro.m_deffile;
+   assert(textfile);
+   assert(textfile->f_kind == TPPFILE_KIND_TEXT);
+   WARNF(current.l_flags&TPPLEXER_FLAG_MSVC_MESSAGEFORMAT
+         ? "%s(%d) : " : "%s:%d: "
+         , textfile->f_textfile.f_usedname
+         ? textfile->f_textfile.f_usedname->s_text
+         : textfile->f_name,kwd->k_macro->f_macro.m_defline+1);
+   WARNF("See reference to previous definition"); 
+  } break;
   case W_REDEFINING_BUILTIN_KEYWORD      : WARNF("Redefining builtin macro '%s'",KWDNAME()); break;
   case W_SPECIAL_ARGUMENT_NAME           : WARNF("Special keyword '%s' used as argument name",KWDNAME()); break;
   case W_VA_KEYWORD_IN_REGULAR_MACRO     : WARNF("Variadic keyword '%s' used in regular macro",KWDNAME()); break;
