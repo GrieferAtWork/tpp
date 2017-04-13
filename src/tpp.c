@@ -5796,11 +5796,7 @@ err_substr:  TPPString_Decref(basestring);
 #define BUILTIN_MACRO(name,value) case name:\
 { static struct { refcnt_t a; size_t b; char c[COMPILER_STRLEN0(value)]; }\
   text##name = {0x80000000,COMPILER_STRLEN(value),value};\
-  static struct TPPExplicitFile predef##name = \
-  {0x80000000,TPPFILE_KIND_EXPLICIT,NULL,"",0,EMPTY_STRING_HASH,\
-  (struct TPPString *)&text##name,text##name.c,\
-  text##name.c+COMPILER_STRLEN(value),NULL\
-  };\
+  static struct TPPExplicitFile predef##name = {0x80000000,TPPFILE_KIND_EXPLICIT,NULL,"",0,EMPTY_STRING_HASH,(struct TPPString *)&text##name,text##name.c,text##name.c+COMPILER_STRLEN(value),NULL};\
   predefined_macro = &predef##name;\
   goto predef_macro;\
 }
