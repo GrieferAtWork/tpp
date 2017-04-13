@@ -961,6 +961,7 @@ TPP_LOCAL TPP(col_t) TPPLexer_COLUMN(void) { struct TPPFile *f = TPPLexer_Textfi
 #define TPPLEXER_EXTENSION_CANONICAL_HEADERS 0x0000100000000000ull /*< [name("canonical-system-headers")] Fix paths to normalize '/' vs. '\\', in order to prevent problems with #pragma once. */
 #define TPPLEXER_EXTENSION_EXT_ARE_FEATURES  0x0000200000000000ull /*< [name("extensions-are-features")] extensions (__has_extension) are also considered features (__has_feature). */
 #define TPPLEXER_EXTENSION_MSVC_FIXED_INT    0x0000400000000000ull /*< [name("fixed-length-integrals")] Allow a 'i(8|16|32|64)' suffix in integrals. */
+#define TPPLEXER_EXTENSION_NO_EXPAND_DEFINED 0x0000800000000000ull /*< [name("dont-expand-defined")] Within a function-style macro, placing an argument 'ARG' in 'defined(ARG)' will generate a code equivalent to 'defined(#!ARG)' (MANDELLA!). */
 #define TPPLEXER_EXTENSION_DEFAULT          (0xffffffffffffffffull&~(TPPLEXER_EXTENSION_TRIGRAPHS|TPPLEXER_EXTENSION_RECMAC)) /*< Enable (almost) all extensions. */
 
 struct TPPLexer {

@@ -476,6 +476,7 @@ do{ tok_t              _old_tok_id    = token.t_id;\
 #define HAVE_EXTENSION_CANONICAL_HEADERS (current.l_extensions&TPPLEXER_EXTENSION_CANONICAL_HEADERS)
 #define HAVE_EXTENSION_EXT_ARE_FEATURES  (current.l_extensions&TPPLEXER_EXTENSION_EXT_ARE_FEATURES)
 #define HAVE_EXTENSION_MSVC_FIXED_INT    (current.l_extensions&TPPLEXER_EXTENSION_MSVC_FIXED_INT)
+#define HAVE_EXTENSION_NO_EXPAND_DEFINED (current.l_extensions&TPPLEXER_EXTENSION_NO_EXPAND_DEFINED)
 
 
 
@@ -1929,6 +1930,7 @@ macro_function_scan_block(struct TPPFile *self) {
  struct arginfo_t *iter,*begin,*end;
  char const *last_text_pointer,*preglue_end,*preglue_begin;
  int last_was_glue = 0,result = 1;
+ char *strop_begin; funop_t strop;
  tok_t preglue_tok;
  assert(self);
  assert(self->f_kind == TPPFILE_KIND_MACRO);
@@ -1957,8 +1959,7 @@ next:
   assert(token.t_file  == self->f_macro.m_deffile);
   assert(token.t_begin >= last_text_pointer);
   if (TOK == '#') {
-   funop_t strop;
-   char *strop_begin = token.t_begin;
+   strop_begin = token.t_begin;
    /* Check for special operations such as "#arg", "#@arg" or "#!arg"
     * NOTE: "#!" prevents expansion of the argument. */
    TPPLexer_YieldRaw();
@@ -2059,13 +2060,50 @@ strop_normal:
     }
    } else if (TOK == KWD_defined) {
     if unlikely(!TPPLexer_Warn(W_DEFINED_IN_MACRO_BODY)) goto err;
-    /* TODO: GCC has an extension that prevents expansion of arguments after 'defined' in a macro body.
+    /* ----: GCC has an extension that prevents expansion of arguments after 'defined' in a macro body.
      *       Similar to our '#!' operator, gcc implicitly compiles:
      *    >> #define is_defined(x)  defined(x)
      *       as the TPP equivalent for:
      *    >> #define is_defined(x)  defined(#!x)
      *       With that in mind, implement that extension here.
+     * NOTE: I thought GCC did this and think I even remember seeing something use it (may the linux kernel?)
+     *       Anyways... ' guess that's Mandella for ya (And I'm from a parallel reality where GCC did do this!)
+     *    >> I still implemented this as an extension though,
+     *       simply because it feels like a good idea, that may
+     *       potentially further confuse people not understanding
+     *       the difference between this (huehuehue...):
+     *    >> #define STR1(x) #x
+     *    >> #define STR2(x) STR1(x)
+     *    >> #define STR3(x) STR1(#!x)
+     *    >> #define STR4(x) STR1(defined(x))
+     *    >> #define FOO 42
+     *    >> STR1(FOO) // "FOO"
+     *    >> STR2(FOO) // "42"
+     *    >> STR3(FOO) // "FOO" ??? (extensions!)
+     *    >> STR4(FOO) // "defined(FOO)" << this extension!
      */
+    if (HAVE_EXTENSION_NO_EXPAND_DEFINED && !last_was_glue) {
+     preglue_begin = token.t_begin;
+     preglue_end = token.t_end;
+     preglue_tok = TOK;
+     TPPLexer_YieldRaw();
+     if unlikely(TOK == TOK_GLUE) goto begin_glue;
+     if (TOK == '(') {
+      preglue_begin = token.t_begin;
+      preglue_end   = token.t_end;
+      preglue_tok   = TOK;
+      TPPLexer_YieldRaw();
+      if unlikely(TOK == TOK_GLUE) goto begin_glue;
+     }
+     if (TPP_ISKEYWORD(TOK)) {
+      /* If this token describes the name of an argument, don't expand it! */
+      strop       = TPP_FUNOP_INS;
+      strop_begin = token.t_begin;
+      goto strop_normal;
+     }
+     /* Since we already did a yield, we must head for the next loop now. */
+     goto next;
+    }
    }
   }
   preglue_begin = token.t_begin;
@@ -2074,6 +2112,7 @@ strop_normal:
   TPPLexer_YieldRaw();
   last_was_glue = 0;
   if (TOK == TOK_GLUE) {
+begin_glue:
    last_was_glue = 1;
    TPPLexer_YieldRaw();
    if (preglue_tok == ',' &&
@@ -6770,7 +6809,7 @@ PUBLIC int TPP_Atoi(int_t *__restrict pint) {
   size = (size_t)(end-begin);
   esc_size = TPP_SizeofUnescape(begin,size);
   if (esc_size > sizeof(int_t)) {
-   if unlikely(!TPPLexer_Warn(W_CHARACTER_TOO_LONG)) return TPP_ATOI_ERR;
+   if unlikely(!TPPLexer_Warn(W_CHARACTER_TOO_LONG)) goto err;
    do assert(size),--size;
    while (TPP_SizeofUnescape(begin,size) > sizeof(int_t));
   }
@@ -6806,8 +6845,11 @@ PUBLIC int TPP_Atoi(int_t *__restrict pint) {
   else if (ch >= 'a' && ch <= 'f') more = (int_t)(10+(ch-'a'));
   else break;
   if unlikely(more >= numsys) break;
-  /* TODO: Check for overflow in the following line. */
   new_intval = intval*numsys+more;
+  if unlikely(new_intval < intval) {
+   /* Warn about overflow: */
+   if unlikely(!TPPLexer_Warn(W_INTEGRAL_OVERFLOW,intval,new_intval)) goto err;
+  }
   intval = new_intval;
   ++begin;
  }
@@ -6849,9 +6891,9 @@ PUBLIC int TPP_Atoi(int_t *__restrict pint) {
 wrong_suffix:
   if (begin != end) {
    /* Warning: Unknown suffix. */
-   if (!TPPLexer_Warn(W_INVALID_INTEGER_SUFFIX,
-                      begin,(size_t)(end-begin))
-       ) return TPP_ATOI_ERR;
+   if unlikely(!TPPLexer_Warn(W_INVALID_INTEGER_SUFFIX,
+                              begin,(size_t)(end-begin))
+               ) goto err;
   }
  }
  /* Clamp 'intval' with the determined type. */
@@ -6866,13 +6908,14 @@ wrong_suffix:
   case TPP_ATOI_TYPE_INT64   : new_intval = intval&T_MASK(int64_t); break;
 #undef T_MASK
  }
- if (new_intval != intval) {
-  /* TODO: Warn about clamped integral. */
+ if unlikely(new_intval != intval) {
+  /* Warn about clamped integral. */
+  if unlikely(!TPPLexer_Warn(W_INTEGRAL_CLAMPED,intval,new_intval)) goto err;
  }
  intval = new_intval;
-done:
- *pint = intval;
- return result;
+done: *pint = intval;
+end:   return result;
+err:   result = TPP_ATOI_ERR; goto end;
 }
 
 
@@ -8037,6 +8080,8 @@ PUBLIC int TPPLexer_Warn(int wnum, ...) {
   case W_EXPECTED_KEYWORD_AFTER_EXPR_PRED: WARNF("Expected keyword after predicate '%s' in expression, but got " TOK_S,KWDNAME(),TOK_A); break;
   case W_UNKNOWN_ASSERTION               : temp = KWDNAME(),WARNF("Assertion '%s' does not contain a predicate '%s'",temp,KWDNAME()); break;
   case W_CONSIDER_PAREN_AROUND_LAND      : WARNF("Consider adding parenthesis around '&&' to prevent confusion with '||'"); break;
+  case W_INTEGRAL_OVERFLOW               : WARNF("Integral constant overflow"); break;
+  case W_INTEGRAL_CLAMPED                : WARNF("Integral constant clamped to fit"); break;
   default: WARNF("? %d",wnum); break;
  }
  if (temp_string) TPPString_Decref(temp_string);
