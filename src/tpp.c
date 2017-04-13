@@ -778,7 +778,7 @@ err:
 PUBLIC /*ref*/struct TPPString *
 TPPString_New(char const *text, size_t size) {
  struct TPPString *result;
- if (!size) {
+ if unlikely(!size) {
   /* Special case: Can return the empty string. */
   TPPString_Incref(empty_string);
   return empty_string;
@@ -790,6 +790,21 @@ TPPString_New(char const *text, size_t size) {
  result->s_size   = size;
  result->s_text[size] = '\0';
  memcpy(result->s_text,text,size*sizeof(char));
+ return result;
+}
+PUBLIC /*ref*/struct TPPString *
+TPPString_NewSized(size_t size) {
+ struct TPPString *result;
+ if unlikely(!size) {
+  TPPString_Incref(empty_string);
+  return empty_string;
+ }
+ result = (struct TPPString *)malloc(TPP_OFFSETOF(struct TPPString,s_text)+
+                                    (size+1)*sizeof(char));
+ if unlikely(!result) return NULL;
+ result->s_refcnt = 1;
+ result->s_size   = size;
+ result->s_text[size] = '\0';
  return result;
 }
 
@@ -886,6 +901,7 @@ TPPFile_NewExplicitInherited(/*ref*/struct TPPString *__restrict inherited_text)
  struct TPPFile *result;
  assert(inherited_text);
  assert(inherited_text->s_refcnt);
+ assert(!inherited_text->s_text[inherited_text->s_size]);
  result = (struct TPPFile *)malloc(TPPFILE_SIZEOF_EXPLICIT);
  if unlikely(!result) return NULL;
  result->f_refcnt   = 1;
@@ -1327,14 +1343,10 @@ convert_encoding(/*ref*/struct TPPString *data,
 #  error FIXME
 #endif
    req_size = TPP_SizeofDecodeUtf16((uint16_t *)data_start,data_size/2);
-   new_data = (struct TPPString *)malloc(TPP_OFFSETOF(struct TPPString,s_text)+
-                                        (size_used+req_size+1)*sizeof(char));;
+   new_data = TPPString_NewSized(size_used+req_size);
    if unlikely(!new_data) return NULL;
    memcpy(new_data->s_text,data->s_text,size_used*sizeof(char));
    TPP_DecodeUtf16(new_data->s_text+size_used,(uint16_t *)data_start,data_size/2);
-   new_data->s_size = size_used+req_size;
-   new_data->s_text[new_data->s_size] = '\0';
-   new_data->s_refcnt = 1;
    TPPString_Decref(data);
    data = new_data;
    break;
@@ -1350,14 +1362,10 @@ convert_encoding(/*ref*/struct TPPString *data,
 #  error FIXME
 #endif
    req_size = TPP_SizeofDecodeUtf32((uint32_t *)data_start,data_size/4);
-   new_data = (struct TPPString *)malloc(TPP_OFFSETOF(struct TPPString,s_text)+
-                                        (size_used+req_size)*sizeof(char));;
+   new_data = TPPString_NewSized(size_used+req_size);
    if unlikely(!new_data) return NULL;
    memcpy(new_data->s_text,data->s_text,size_used*sizeof(char));
    TPP_DecodeUtf32(new_data->s_text+size_used,(uint32_t *)data_start,data_size/4);
-   new_data->s_size = size_used+req_size;
-   new_data->s_text[new_data->s_size] = '\0';
-   new_data->s_refcnt = 1;
    TPPString_Decref(data);
    data = new_data;
    break;
@@ -4973,14 +4981,10 @@ escape_entire_file(struct TPPFile *infile) {
   return empty_string;
  }
  insize = (size_t)(infile->f_end-infile->f_begin);
- reqsize = TPP_SizeofEscape(infile->f_begin,insize)+2;
- result = (struct TPPString *)malloc(TPP_OFFSETOF(struct TPPString,s_text)+
-                                    (reqsize+1)*sizeof(char));
- if unlikely(!result) return NULL;
+ allocsize = reqsize = TPP_SizeofEscape(infile->f_begin,insize)+2;
  assert(reqsize);
- result->s_refcnt = 1;
- result->s_size = allocsize = reqsize;
- result->s_text[0] = '\"';
+ result = TPPString_NewSized(reqsize);
+ if unlikely(!result) return NULL;
  TPP_Escape(result->s_text+1,infile->f_begin,insize);
  while (TPPFile_NextChunk(infile,TPPFILE_NEXTCHUNK_FLAG_BINARY)) {
   /* Escape and append this chunk. */
@@ -5154,16 +5158,12 @@ again:
     name = TPPLexer_FILE(&size);
 put_filename:
     quoted_size = 2+TPP_SizeofEscape(name,size);
-    string_text = (struct TPPString *)malloc(TPP_OFFSETOF(struct TPPString,s_text)+
-                                            (quoted_size+1)*sizeof(char));
+    string_text = TPPString_NewSized(quoted_size);
     if unlikely(!string_text) goto seterr;
-    string_text->s_size   = quoted_size;
     string_text->s_text[0]             = '\"';
     TPP_Escape(string_text->s_text+1,name,size);
     string_text->s_text[quoted_size-1] = '\"';
-    string_text->s_text[quoted_size]   = '\0';
 create_string_file:
-    string_text->s_refcnt = 1;
     string_file = TPPFile_NewExplicitInherited(string_text);
     if unlikely(!string_file) { TPPString_Decref(string_text); goto seterr; }
     pushfile_inherited(string_file);
@@ -5177,10 +5177,8 @@ create_string_file:
    { /* STD-C Date/Time strings. */
     time_t timenow; struct tm *tmnow;
    case KWD___TIME__:
-    string_text = (struct TPPString *)malloc(TPP_OFFSETOF(struct TPPString,s_text)+
-                                            (10+1)*sizeof(char));
+    string_text = TPPString_NewSized(10);
     if unlikely(!string_text) goto seterr;
-    string_text->s_size = 10;
     timenow = time(NULL);
     tmnow = localtime(&timenow);
     if (!tmnow) strcpy(string_text->s_text,"\"??:??:??\"");
@@ -5188,10 +5186,8 @@ create_string_file:
                  tmnow->tm_hour,tmnow->tm_min,tmnow->tm_sec);
     goto create_string_file;
    case KWD___DATE__:
-    string_text = (struct TPPString *)malloc(TPP_OFFSETOF(struct TPPString,s_text)+
-                                            (13+1)*sizeof(char));
+    string_text = TPPString_NewSized(13);
     if unlikely(!string_text) goto seterr;
-    string_text->s_size = 13;
     timenow = time(NULL);
     tmnow = localtime(&timenow);
     if (!tmnow) strcpy(string_text->s_text,"\"??" "? ?? ??" "??\"");
@@ -5201,10 +5197,8 @@ create_string_file:
     goto create_string_file;
    case KWD___TIMESTAMP__:
     if (!HAVE_EXTENSION_TIMESTAMP) break;
-    string_text = (struct TPPString *)malloc(TPP_OFFSETOF(struct TPPString,s_text)+
-                                            (26+1)*sizeof(char));
+    string_text = TPPString_NewSized(26);
     if unlikely(!string_text) goto seterr;
-    string_text->s_size = 26;
     timenow = time(NULL);
     tmnow = localtime(&timenow);
     if (!tmnow) strcpy(string_text->s_text,"\"??? ??? ?? ??:??:?? ????\"");
@@ -5219,23 +5213,14 @@ create_string_file:
    { /* Generate an integral constant representing
       * the 1-based index of the current source-line. */
     size_t intsize;
-    struct TPPString *int_text;
-    struct TPPFile   *int_file;
    case KWD___LINE__:
     intval = (int_t)TPPLexer_LINE()+1;
 create_int_file:
     intsize = TPP_SizeofItos(intval);
-    int_text = (struct TPPString *)malloc(TPP_OFFSETOF(struct TPPString,s_text)+
-                                          (intsize+1)*sizeof(char));
-    if unlikely(!int_text) goto seterr;
-    int_text->s_refcnt = 1;
-    int_text->s_size   = intsize;
-    TPP_Itos(int_text->s_text,intval);
-    int_text->s_text[intsize] = '\0';
-    int_file = TPPFile_NewExplicitInherited(int_text);
-    if unlikely(!int_file) { TPPString_Decref(int_text); goto seterr; }
-    pushfile_inherited(int_file);
-    goto again;
+    string_text = TPPString_NewSized(intsize);
+    if unlikely(!string_text) goto seterr;
+    TPP_Itos(string_text->s_text,intval);
+    goto create_string_file;
    }
 
    { /* Expand into an integral constant representing the current column number. */
@@ -5686,17 +5671,18 @@ create_int_file:
      cursize = reqsize;
     }
     popf();
-    if (!string_text) {
+    if (string_text) {
+     string_text->s_refcnt = 1;
+     string_text->s_size = cursize+2;
+     string_text->s_text[cursize+2] = '\0';
+    } else {
      assert(!cursize);
-     string_text = (struct TPPString *)malloc(TPP_OFFSETOF(struct TPPString,s_text)+3*sizeof(char));
+     string_text = TPPString_NewSized(2);
      if unlikely(!string_text) goto seterr;
     }
     /* Fill in common text data. */
-    string_text->s_refcnt = 1;
-    string_text->s_size = cursize+2;
-    string_text->s_text[0] = '\"';
+    string_text->s_text[0]         = '\"';
     string_text->s_text[cursize+1] = '\"';
-    string_text->s_text[cursize+2] = '\0';
     goto create_string_file;
    } break;
 
@@ -5762,15 +5748,11 @@ err_substr:  TPPString_Decref(basestring);
     assert(sub_begin >= basestring->s_text);
     assert(sub_end <= basestring->s_text+basestring->s_size);
     escape_size = TPP_SizeofEscape(sub_begin,(size_t)(sub_end-sub_begin));
-    string_text = (struct TPPString *)malloc(TPP_OFFSETOF(struct TPPString,s_text)+
-                                            (escape_size+3)*sizeof(char));
+    string_text = TPPString_NewSized(escape_size+2);
     if unlikely(!string_text) goto err_substr;
-    string_text->s_refcnt = 1;
-    string_text->s_size = escape_size+2;
     string_text->s_text[0] = escape_char;
     TPP_Escape(string_text->s_text+1,sub_begin,(size_t)(sub_end-sub_begin));
     string_text->s_text[escape_size+1] = escape_char;
-    string_text->s_text[escape_size+2] = '\0';
     TPPString_Decref(basestring);
     goto create_string_file;
    } break;
@@ -5844,14 +5826,10 @@ predef_macro:
     suffix_size = strlen(suffix);
     argsize     = (size_t)(token.t_end-token.t_begin);
     if (TOK == ')') argsize = 0;
-    argstring   = (struct TPPString *)malloc(TPP_OFFSETOF(struct TPPString,s_text)+
-                                            (argsize+suffix_size+1)*sizeof(char));
+    argstring   = TPPString_NewSized(argsize+suffix_size);
     if unlikely(!argstring) { breakf(); goto seterr; }
     memcpy(argstring->s_text,token.t_begin,argsize*sizeof(char));
     memcpy(argstring->s_text+argsize,suffix,suffix_size*sizeof(char));
-    argstring->s_refcnt = 1;
-    argstring->s_size = argsize+suffix_size;
-    argstring->s_text[argstring->s_size] = '\0';
     if (TOK != ')') yield_fetch();
     if (TOK != ')') TPPLexer_Warn(W_EXPECTED_RPAREN);
     popf();
@@ -6035,14 +6013,10 @@ expand_function_macro_impl(struct TPPFile *__restrict macro,
  }
 
  /* Allocate the actual text-buffer of the resulting expanded macro text. */
- result_text = (struct TPPString *)malloc(TPP_OFFSETOF(struct TPPString,s_text)+
-                                         (expanded_text_size+1)*sizeof(char));
+ result_text = TPPString_NewSized(expanded_text_size);
  if unlikely(!result_text) goto err_argcache_full;
- result_text->s_refcnt = 1;
- result_text->s_size   = expanded_text_size;
  dest_iter   = result_text->s_text;
  dest_end    = dest_iter+expanded_text_size;
- *dest_end   = '\0';
  source_iter = macro->f_begin;
  source_end  = macro->f_end;
 #define ARGC           (macro->f_macro.m_function.f_argc)
@@ -6787,8 +6761,7 @@ TPPConst_ToString(struct TPPConst const *__restrict self) {
   assert(self->c_data.c_string);
   result_size = 2+TPP_SizeofEscape(self->c_data.c_string->s_text,
                                    self->c_data.c_string->s_size);
-  result = (struct TPPString *)malloc(TPP_OFFSETOF(struct TPPString,s_text)+
-                                     (result_size+1)*sizeof(char));
+  result = TPPString_NewSized(result_size);
   if unlikely(!result) return NULL;
   result->s_text[0]             = '\"';
   result->s_text[result_size-1] = '\"';
@@ -6797,14 +6770,10 @@ TPPConst_ToString(struct TPPConst const *__restrict self) {
              self->c_data.c_string->s_size);
  } else {
   result_size = TPP_SizeofItos(self->c_data.c_int);
-  result = (struct TPPString *)malloc(TPP_OFFSETOF(struct TPPString,s_text)+
-                                     (result_size+1)*sizeof(char));
+  result = TPPString_NewSized(result_size);
   if unlikely(!result) return NULL;
   TPP_Itos(result->s_text,self->c_data.c_int);
  }
- result->s_refcnt = 1;
- result->s_size   = result_size;
- result->s_text[result_size] = '\0';
  return result;
 }
 

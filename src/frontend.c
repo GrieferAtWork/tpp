@@ -47,15 +47,15 @@ extern "C" {
 #define STR(x) STR2(x)
 #if defined(_MSC_FULL_VER) && defined(__cplusplus)
 #   define TPP_COMPILER "VC++ " STR(_MSC_FULL_VER)
-#elif defined(_MSC_FULL_VER) && !defined(__cplusplus)
+#elif defined(_MSC_FULL_VER)
 #   define TPP_COMPILER "VC " STR(_MSC_FULL_VER)
 #elif defined(__clang__) && defined(__cplusplus)
 #   define TPP_COMPILER "clang++ " STR(__clang__)
-#elif defined(__clang__) && !defined(__cplusplus)
+#elif defined(__clang__)
 #   define TPP_COMPILER "clang " STR(__clang__)
 #elif defined(__GNUC__) && defined(__cplusplus)
 #   define TPP_COMPILER "g++ " STR(__GNUC__) "." STR(__GNUC_MINOR__) "." STR(__GNUC_PATCHLEVEL__)
-#elif defined(__GNUC__) && !defined(__cplusplus)
+#elif defined(__GNUC__)
 #   define TPP_COMPILER "gcc " STR(__GNUC__) "." STR(__GNUC_MINOR__) "." STR(__GNUC_PATCHLEVEL__)
 #elif defined(__TINYC__)
 #   define TPP_COMPILER "tcc " STR(__TINYC__)
@@ -237,6 +237,7 @@ void usage(char *appname, char *subject) {
                 "\t" "-A-pred[=answer]            Delete 'answer' or all assertions previously made about 'pred'\n"
                 "\t" "-P                          Disable emission of #line adjustment directives (Default: on).\n"
                 "\t" "-trigraphs                  Enable recognition of trigraph character sequences.\n"
+                "\t" "-undef                      Disable all builtin macros.\n"
                 "\t" "--tok                       Outline all tokens using the [...] notation (Default: off).\n"
                 "\t" "--pp                        Enable preprocess-mode, which emits all tokens separated by '\\0'-bytes.\n"
                 "\t" "-f[no-]spc                  Configure emission of SPACE tokens (Default: on).\n"
@@ -272,11 +273,8 @@ merge_argv_str(int argc, char **argv) {
  total_size = argc-1; /* All arguments are separated by ' '. */
  end = (iter = argv)+argc;
  for (; iter != end; ++iter) total_size += strlen(*iter);
- result = (struct TPPString *)malloc(TPP_OFFSETOF(struct TPPString,s_text)+
-                                    (total_size+1)*sizeof(char));
+ result = TPPString_NewSized(total_size);
  if (!result) return NULL;
- result->s_refcnt = 1;
- result->s_size = total_size;
  dest = result->s_text;
  for (iter = argv; iter != end; ++iter) {
   size_t len = strlen(*iter);
@@ -284,7 +282,6 @@ merge_argv_str(int argc, char **argv) {
   dest += len;
   *dest++ = ' ';
  }
- result->s_text[total_size] = '\0';
  return result;
 }
 
@@ -302,7 +299,7 @@ merge_argv(int argc, char **argv) {
  result->f_name                   = strdup("<commandline>");
  if (!result->f_name) goto err_r;
  result->f_namesize               = 13;
-#if defined(_WIN64) || (defined(__SIZEOF_POINTER__) && __SIZEOF_POINTER__ == 8)
+#if __SIZEOF_POINTER__ == 8
  result->f_namehash = 12182544704004658106ull;
 #else
  result->f_namehash = 3330511802ul;
@@ -362,6 +359,13 @@ int main(int argc, char *argv[]) {
   else if (!strcmp(arg,"flongstring")) TPPLexer_Current->l_flags &= ~(TPPLEXER_FLAG_TERMINATE_STRING_LF);
   else if (!strcmp(arg,"fno-longstring")) TPPLexer_Current->l_flags |= TPPLEXER_FLAG_TERMINATE_STRING_LF;
   else if (!strcmp(arg,"trigraphs")) TPPLexer_Current->l_extensions |= TPPLEXER_EXTENSION_TRIGRAPHS;
+#if !TPP_CONFIG_MINMACRO
+  else if (!strcmp(arg,"undef")) TPPLexer_Current->l_extensions &= ~(TPPLEXER_EXTENSION_CPU_MACROS|
+                                                                     TPPLEXER_EXTENSION_SYSTEM_MACROS|
+                                                                     TPPLEXER_EXTENSION_UTILITY_MACROS);
+#else /* !TPP_CONFIG_MINMACRO */
+  else if (!strcmp(arg,"undef"));
+#endif /* TPP_CONFIG_MINMACRO */
   else if (!strcmp(arg,"P")) no_line_directives = 0;
   else if (!strcmp(arg,"o")) argc > 1 ? (output_filename = argv[1],++argv,--argc) : 0;
   else if (!strcmp(arg,"-name")) argc > 1 ? (firstname = argv[1],++argv,--argc) : 0;

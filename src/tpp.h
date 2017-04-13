@@ -115,6 +115,9 @@
 // [__TPP_STR_SIZE]      __TPP_STR_SIZE("foo")                       /*< Returns the integral representation for the length of the given string (equivalent to '__TPP_EVAL(#(str))' and only kept for backwards-compatibility). */
 // [__TPP_UNIQUE]        __TPP_UNIQUE(keyword)                       /*< A unique integral number associated with 'keyword'; new keywords have greater numbers. */
 // [__TPP_COUNT_TOKENS]  __TPP_COUNT_TOKENS("->*")                   /*< Expand to the integral representation of the number of tokens within the given string (NOTE: tokens inside the string are not macro-expanded). */
+// [...]                 Various cpu-specific macros, such as '__i386__' or '__arm__'
+// [...]                 Various system-specific macros, such as '_WIN32' or '__unix__'
+// [...]                 Various GCC-style macros, such as '__SIZEOF_POINTER__' or '__INT32_C'
 //
 //PRAGMA EXTENSIONS:
 // [once]                  #pragma once                             /*< Mark a file that should only be #includ-ed once (same as defining and setting a unique #include-guard for that file). */
@@ -209,10 +212,14 @@
 //#   define _WIN32 __WIN32__
 //#endif
 #ifndef __SIZEOF_POINTER__
-#if defined(_WIN64) || defined(__LP64__) || defined(_LP64)
+#if defined(_WIN64) || defined(__LP64__) || \
+    defined(_LP64) || defined(__x86_64__)
 #   define __SIZEOF_POINTER__ 8
-#elif defined(_WIN32)
+#elif defined(_WIN32) || defined(__i386__) || \
+      defined(__i386) || defined(i386)
 #   define __SIZEOF_POINTER__ 4
+#elif defined(_WIN16)
+#   define __SIZEOF_POINTER__ 2
 #else
 #   error FIXME
 #endif
@@ -276,8 +283,8 @@ TPPString_Cat(/*ref*/struct TPPString *lhs,
 // Returns a new string from the given text.
 // @return: * :   A reference to a string containing the given text.
 // @return: NULL: Not enough available memory.
-TPPFUN /*ref*/struct TPPString *
-TPPString_New(char const *text, size_t size);
+TPPFUN /*ref*/struct TPPString *TPPString_New(char const *text, size_t size);
+TPPFUN /*ref*/struct TPPString *TPPString_NewSized(size_t size);
 
 
 struct TPPTextFile {
