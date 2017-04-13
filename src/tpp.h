@@ -699,6 +699,20 @@ struct TPPCallbacks {
  // @return: 0: Error occurred (Set a lexer error if not already set)
  // @return: 1: Successfully inserted the given text.
  int (*c_ins_comment)(struct TPPString *__restrict comment);
+ //////////////////////////////////////////////////////////////////////////
+ // Event-callback invoked when a textfile is included the first time.
+ // >> Very useful for generating dependecy trees.
+ // NOTE: This function will only ever be called once
+ //       for any given file within the same lexer.
+ // @return: 0: Error occurred (Set a lexer error if not already set)
+ // @return: 1: Continue parsing (same as not filling in this member).
+ int (*c_new_textfile)(struct TPPFile *__restrict file, int is_system_header);
+ //////////////////////////////////////////////////////////////////////////
+ // Called when a given filename could not be found, allowing this
+ // function to attempt more voodoo-magic in an attempt to locate it.
+ // @return: NULL: Still failed to find the file (unless a lexer error was set, only emit a warning)
+ // @return: * :   The file we now managed to successfully open.
+ struct TPPFile *(*c_unknown_file)(char *filename, size_t filename_size);
 };
 
 struct TPPWarningStateEx {  /* Extended state for a 11-warning (aka. 'WSTATE_SUPPRESS'). */
@@ -1104,12 +1118,13 @@ TPPFUN int TPPLexer_SetExtension(char const *__restrict name, int enabled);
 // @return: NULL: File not found.
 TPPFUN struct TPPFile *TPPLexer_OpenFile(int mode, char *filename, size_t filename_size,
                                          struct TPPKeyword **pkeyword_entry);
-#define TPPLEXER_OPENFILE_MODE_NORMAL     0 /* Normal open (simply pass the given filename to TPPFile_Open, but still sanitize and cache the filename) */
-#define TPPLEXER_OPENFILE_MODE_RELATIVE   1 /* #include "foo.h" (Search for the file relative to the path of every text file on the #include-stack in reverse. - If this fails, search in system folders). */
-#define TPPLEXER_OPENFILE_MODE_SYSTEM     2 /* #include <stdlib.h> (Search through system folders usually specified with '-I' on the commandline). */
-#define TPPLEXER_OPENFILE_FLAG_NEXT       4 /* FLAG: Only open a file not already part of the #include-stack
-                                             * WARNING: May not be used for 'TPPLEXER_OPENFILE_MODE_NORMAL'! */
-#define TPPLEXER_OPENFILE_FLAG_NOCASEWARN 8 /* FLAG: Don't warn about filename casing on windows. */
+#define TPPLEXER_OPENFILE_MODE_NORMAL      0 /* Normal open (simply pass the given filename to TPPFile_Open, but still sanitize and cache the filename) */
+#define TPPLEXER_OPENFILE_MODE_RELATIVE    1 /* #include "foo.h" (Search for the file relative to the path of every text file on the #include-stack in reverse. - If this fails, search in system folders). */
+#define TPPLEXER_OPENFILE_MODE_SYSTEM      2 /* #include <stdlib.h> (Search through system folders usually specified with '-I' on the commandline). */
+#define TPPLEXER_OPENFILE_FLAG_NEXT        4 /* FLAG: Only open a file not already part of the #include-stack
+                                              * WARNING: May not be used for 'TPPLEXER_OPENFILE_MODE_NORMAL'! */
+#define TPPLEXER_OPENFILE_FLAG_NOCASEWARN  8 /* FLAG: Don't warn about filename casing on windows. */
+#define TPPLEXER_OPENFILE_FLAG_NOCALLBACK 16 /* FLAG: Don't invoke the unknown-file callback when set. */
 
 //////////////////////////////////////////////////////////////////////////
 // Push a given file into the #include-stack of the current lexer.

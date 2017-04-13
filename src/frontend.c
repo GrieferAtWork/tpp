@@ -74,19 +74,18 @@ static int no_magic_tokens    = 1; /*< Disable ~magic~ tokens for small line-shi
 static int no_line_directives = 0; /*< Disable #line directives being emit. */
 
 #ifdef _WIN32
-static HANDLE stdout_handle;
+static stream_t stdout_handle;
+#define write(fd,p,s) (void)WriteFile(fd,p,s,NULL,NULL)
+#else
+#define stdout_handle  STDOUT_FILENO
+#endif
 /* We prefer using unbuffered I/O to not create
  * bottlenecks when running in immediate mode.
  * Also: Window's libc does some weird $h1t to linefeeds,
  *       inserting a magic '\r' character before every '\n'...
  *      (You can probably turn that off, but I'm not even gonna bother)
  */
-static void out_write(void const *p, size_t s) {
- WriteFile(stdout_handle,p,s,NULL,NULL);
-}
-#else
-#define out_write(p,s) write(STDOUT_FILENO,p,s)
-#endif
+#define out_write(p,s) write(stdout_handle,p,s)
 
 static int is_at_linefeed;
 static int current_line;
@@ -236,6 +235,10 @@ void usage(char *appname, char *subject) {
                 "\t" "-Apred=answer               Define an assertion 'pred' as 'answer'\n"
                 "\t" "-A-pred[=answer]            Delete 'answer' or all assertions previously made about 'pred'\n"
                 "\t" "-P                          Disable emission of #line adjustment directives (Default: on).\n"
+                "\t" "-M                          Instead of emitting preprocessor output, emit a make-style list of dependencies.\n"
+                "\t" "-MM                         Similar to '-M', but don't include system headers.\n"
+                "\t" "-MG                         Similar to '-M', but include missing files as dependencies, assuming generated files.\n"
+                "\t" "-MF <file>                  Enable dependency tracking and emit its output to <file>, but also preprocess regularly.\n"
                 "\t" "-trigraphs                  Enable recognition of trigraph character sequences.\n"
                 "\t" "-undef                      Disable all builtin macros.\n"
                 "\t" "--tok                       Outline all tokens using the [...] notation (Default: off).\n"
@@ -325,11 +328,125 @@ err_argv_string: TPPString_Decref(argv_string);
  return NULL;
 }
 
+static void pp_normal(void) {
+ struct TPPFile *last_token_file;
+ char *last_token_end; size_t file_offset;
+ /* Initial values to simulate the last token
+  * ending where the first file starts. */
+ last_token_file = NULL; // infile; /* Force a line directive at the first token. */
+ last_token_end  = TPPLexer_Current->l_token.t_file->f_begin;
+ file_offset     = 0;
+ current_line    = 0;
+ is_at_linefeed  = 1;
+ while (TPPLexer_Yield() > 0) {
+  if (last_token_file != TPPLexer_Current->l_token.t_file ||
+     (last_token_end != TPPLexer_Current->l_token.t_begin &&
+      file_offset != get_file_offset(TPPLexer_Current->l_token.t_begin))) {
+   /* The file changed, or there is a difference in the in-file position
+    * between the end of the last token and the start of this one.
+    * >> In any case, we must update the #line offset. */
+   put_line();
+  }
+  last_token_file = TPPLexer_Current->l_token.t_file;
+  last_token_end  = TPPLexer_Current->l_token.t_end;
+  file_offset     = get_file_offset(last_token_end);
+  if (outline_tokens == OUTLINE_MODE_TOK) out_write("[",sizeof(char));
+  out_write(TPPLexer_Current->l_token.t_begin,
+           (size_t)(TPPLexer_Current->l_token.t_end-
+                    TPPLexer_Current->l_token.t_begin)*
+            sizeof(char));
+  /* Track what we expect the current line number to be,
+   * which is them compared to the actual line number. */
+  current_line += count_linefeeds(TPPLexer_Current->l_token.t_begin,
+                                  TPPLexer_Current->l_token.t_end);
+  switch (outline_tokens) {
+   case OUTLINE_MODE_ZERO: out_write("\0",sizeof(char)); is_at_linefeed = 1; break;
+   case OUTLINE_MODE_TOK:  out_write("]",sizeof(char)); is_at_linefeed = 0; break;
+   default: 
+    is_at_linefeed = last_token_end[-1] == '\n' ||
+                     last_token_end[-1] == '\r';
+    break;
+  }
+ }
+}
 
+static stream_t dep_outfile = TPP_STREAM_INVALID;
+static int dep_nonsystem_only = 0;
+static void pp_depprint(char *filename, size_t filename_size) {
+ if (dep_outfile == TPP_STREAM_INVALID) return;
+ write(dep_outfile," \\\n\t",4*sizeof(char));
+ write(dep_outfile,filename,filename_size*sizeof(char));
+}
+static int pp_depcallback(struct TPPFile *file, int is_system_header) {
+ /* Don't emit entries for system header if we're not supposed to. */
+ if (is_system_header && dep_nonsystem_only) return 1;
+ pp_depprint(file->f_name,file->f_namesize);
+ return 1;
+}
+static struct TPPFile *
+pp_depunknown(char *filename, size_t filename_size) {
+ pp_depprint(filename,filename_size);
+ return NULL;
+}
+static int pp_depfirst(struct TPPFile *file) {
+ char *used_filename,*filename_extension,old;
+ if (dep_outfile == TPP_STREAM_INVALID) return 1;
+ used_filename = file->f_name;
+ filename_extension = strrchr(used_filename,'.');
+ if (!filename_extension) {
+  size_t filename_size = file->f_namesize;
+  used_filename = (char *)malloc((filename_size+2)*sizeof(char));
+  if (!used_filename) return 0;
+  memcpy(used_filename,file->f_name,filename_size*sizeof(char));
+  filename_extension = used_filename+filename_size;
+  *filename_extension = '.';
+ }
+ old = filename_extension[1],filename_extension[1] = 'o';
+ write(dep_outfile,used_filename,((filename_extension-used_filename)+2)*sizeof(char));
+ write(dep_outfile,":",1*sizeof(char));
+ filename_extension[1] = old;
+ if (used_filename != file->f_name) free(used_filename);
+ return pp_depcallback(file,0);
+}
+static void pp_deponly(void) {
+ /* fallback: Use stdout as output file for dependencies if no other file was set.
+  * HINT: stdout may have previously been redireced with the '-o' option. */
+ if (dep_outfile == TPP_STREAM_INVALID) dep_outfile = stdout_handle;
+ while (TPPLexer_Yield() > 0);
+ write(dep_outfile,"\n",1*sizeof(char));
+}
+
+#ifdef _WIN32
+#define close_stream  CloseHandle
+#else
+#define close_stream  close
+#endif
+static stream_t open_out_file(char const *filename) {
+ stream_t result;
+ if (!strcmp(filename,"-")) return stdout_handle;
+#ifdef _WIN32
+ result = CreateFileA(filename,GENERIC_WRITE,
+                      FILE_SHARE_READ|FILE_SHARE_WRITE|FILE_SHARE_DELETE,
+                      NULL,CREATE_ALWAYS,FILE_ATTRIBUTE_NORMAL,NULL);
+ if (!result) result = TPP_STREAM_INVALID;
+#else
+ result = open(output_filename,O_CREAT|O_WRONLY,0644);
+#endif
+ if (result == TPP_STREAM_INVALID) {
+  fprintf(stderr,"Failed to create output file: \"%s\"\n",filename);
+  fflush(stderr);
+  _exit(1);
+ }
+ return result;
+}
+
+
+#define PPMODE_NORMAL     0
+#define PPMODE_DEPENDENCY 1
 int main(int argc, char *argv[]) {
- struct TPPFile *infile,*last_token_file;
- int result = 0; char *last_token_end;
- size_t file_offset; char *output_filename = NULL,*appname,*firstname = NULL;
+ struct TPPFile *infile; int result = 0;
+ int pp_mode = PPMODE_NORMAL;
+ char *output_filename = NULL,*appname,*firstname = NULL;
 #ifdef _WIN32
  stdout_handle = GetStdHandle(STD_OUTPUT_HANDLE);
 #endif
@@ -367,6 +484,16 @@ int main(int argc, char *argv[]) {
   else if (!strcmp(arg,"undef"));
 #endif /* TPP_CONFIG_MINMACRO */
   else if (!strcmp(arg,"P")) no_line_directives = 0;
+  else if (!strcmp(arg,"M") || 
+           !strcmp(arg,"MM")) pp_mode = PPMODE_DEPENDENCY, /* Skip to dependency-only mode. */
+                             (dep_outfile == TPP_STREAM_INVALID) ? dep_outfile = stdout_handle : 0, /* Change the output file to stdout. */
+                              dep_nonsystem_only = !strcmp(arg,"MM"); /* Check if we're supposed to include system-headeres. */
+  else if (!strcmp(arg,"MG")) TPPLexer_Current->l_callbacks.c_unknown_file = &pp_depunknown, /* Setup an unknown-file handler, assuming generated headers. */
+                              TPPLexer_SetWarning(W_FILE_NOT_FOUND,WSTATE_DISABLE), /* Disable file-not-found warnings (We're assuming generated headers). */
+                              pp_mode = PPMODE_DEPENDENCY; /* Switch to dependency-only mode. */
+  else if (!strcmp(arg,"MF")) argc > 1 ? ((dep_outfile != TPP_STREAM_INVALID && dep_outfile != stdout_handle)
+                                           ? close_stream(dep_outfile) : 0, /* Close a previously opened dependecy output stream. */
+                                           dep_outfile = open_out_file(argv[1]),++argv,--argc) : 0;
   else if (!strcmp(arg,"o")) argc > 1 ? (output_filename = argv[1],++argv,--argc) : 0;
   else if (!strcmp(arg,"-name")) argc > 1 ? (firstname = argv[1],++argv,--argc) : 0;
   else if (!strcmp(arg,"-message-format=gcc")) TPPLexer_Current->l_flags &= ~(TPPLEXER_FLAG_MSVC_MESSAGEFORMAT);
@@ -421,20 +548,13 @@ noopt:
   --argc,++argv;
  }
  if (output_filename && strcmp(output_filename,"-")) {
+  stream_t newout = open_out_file(output_filename);
+  if (dep_outfile == stdout_handle) dep_outfile = newout;
 #ifdef _WIN32
-  stdout_handle = CreateFileA(output_filename,GENERIC_WRITE,
-                              FILE_SHARE_READ|FILE_SHARE_WRITE|FILE_SHARE_DELETE,
-                              NULL,CREATE_ALWAYS,FILE_ATTRIBUTE_NORMAL,NULL);
-  if (!stdout_handle || stdout_handle == INVALID_HANDLE_VALUE)
+  stdout_handle = newout;
 #else
-  int newhandle = open(output_filename,O_CREAT|O_WRONLY,0644);
-  if (newhandle != -1) newhandle = dup2(STDOUT_FILENO,newhandle);
-  if (newhandle == -1)
+  dup2(STDOUT_FILENO,newout);
 #endif
-  {
-   fprintf(stderr,"Failed to create output file: \"%s\"\n",output_filename);
-   _exit(1);
-  }
  }
 
  if (argc && strcmp(argv[0],"-") != 0) {
@@ -457,44 +577,13 @@ noopt:
 #endif
  }
 use_infile:
- if (!infile) { result = 1; goto end; }
+ if (!infile) goto err1;
  TPPLexer_PushFileInherited(infile);
- /* Initial values to simulate the last token
-  * ending where the first file starts. */
- last_token_file = NULL; // infile; /* Force a line directive at the first token. */
- last_token_end  = infile->f_begin;
- file_offset     = 0;
- current_line    = 0;
- is_at_linefeed  = 1;
- while (TPPLexer_Yield() > 0) {
-  if (last_token_file != TPPLexer_Current->l_token.t_file ||
-     (last_token_end != TPPLexer_Current->l_token.t_begin &&
-      file_offset != get_file_offset(TPPLexer_Current->l_token.t_begin))) {
-   /* The file changed, or there is a difference in the in-file position
-    * between the end of the last token and the start of this one.
-    * >> In any case, we must update the #line offset. */
-   put_line();
-  }
-  last_token_file = TPPLexer_Current->l_token.t_file;
-  last_token_end  = TPPLexer_Current->l_token.t_end;
-  file_offset     = get_file_offset(last_token_end);
-  if (outline_tokens == OUTLINE_MODE_TOK) out_write("[",sizeof(char));
-  out_write(TPPLexer_Current->l_token.t_begin,
-           (size_t)(TPPLexer_Current->l_token.t_end-
-                    TPPLexer_Current->l_token.t_begin)*
-            sizeof(char));
-  /* Track what we expect the current line number to be,
-   * which is them compared to the actual line number. */
-  current_line += count_linefeeds(TPPLexer_Current->l_token.t_begin,
-                                  TPPLexer_Current->l_token.t_end);
-  switch (outline_tokens) {
-   case OUTLINE_MODE_ZERO: out_write("\0",sizeof(char)); is_at_linefeed = 1; break;
-   case OUTLINE_MODE_TOK:  out_write("]",sizeof(char)); is_at_linefeed = 0; break;
-   default: 
-    is_at_linefeed = last_token_end[-1] == '\n' ||
-                     last_token_end[-1] == '\r';
-    break;
-  }
+ TPPLexer_Current->l_callbacks.c_new_textfile = &pp_depcallback;
+ if (!pp_depfirst(infile)) goto err1;
+ switch (pp_mode) {
+  case PPMODE_DEPENDENCY: pp_deponly(); break;
+  default               : pp_normal(); break;
  }
 end:
  TPP_FINALIZE();
@@ -502,6 +591,7 @@ end:
  _CrtDumpMemoryLeaks();
 #endif
  return result;
+err1: result = 1; goto end;
 }
 
 #ifdef __cplusplus

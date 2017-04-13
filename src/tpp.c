@@ -2376,10 +2376,7 @@ keyword_pushmacro(struct TPPKeyword *self) {
  assert(self);
  if (!self->k_macro) return 1;
  assert(self->k_macro->f_kind == TPPFILE_KIND_MACRO);
- if (!self->k_rare &&
-     (self->k_rare = (struct TPPRareKeyword *)calloc(1,
-               sizeof(struct TPPRareKeyword))) == NULL
-     ) return 0;
+ if (!TPPKeyword_MAKERARE(self)) return 0;
  macro = self->k_macro;
  if (macro == self->k_rare->kr_oldmacro) {
   /* Special case: The macro was already pushed.
@@ -3607,7 +3604,8 @@ check_path_spelling(char *filename, size_t filename_size) {
 
 PRIVATE struct TPPFile *
 open_normal_file(char *filename, size_t filename_size,
-                 struct TPPKeyword **pkeyword_entry) {
+                 struct TPPKeyword **pkeyword_entry,
+                 int is_system_header) {
  struct TPPFile *result; struct TPPKeyword *kwd_entry;
  /* Find and cache a regular, old file. */
  kwd_entry = TPPLexer_LookupKeyword(filename,filename_size,0);
@@ -3621,11 +3619,15 @@ open_normal_file(char *filename, size_t filename_size,
   if unlikely(!result) return NULL;
   kwd_entry = TPPLexer_LookupKeyword(filename,filename_size,1);
   if unlikely(!kwd_entry) goto err_r;
-  if (!kwd_entry->k_rare) {
-   kwd_entry->k_rare = (struct TPPRareKeyword *)calloc(1,sizeof(struct TPPRareKeyword));
-   if unlikely(!kwd_entry->k_rare) goto err_r;
-  }
-  kwd_entry->k_rare->kr_file = result; /*< Inherit reference. */
+ }
+ if (!TPPKeyword_MAKERARE(kwd_entry)) goto err_r;
+ assert(!kwd_entry->k_rare->kr_file);
+ kwd_entry->k_rare->kr_file = result; /*< Inherit reference. */
+ /* Run the callback to notify of a new text file. */
+ if ( current.l_callbacks.c_new_textfile &&
+   !(*current.l_callbacks.c_new_textfile)(result,is_system_header)) {
+  kwd_entry->k_rare->kr_file = NULL;
+  goto err_r;
  }
 end:
  if (pkeyword_entry) *pkeyword_entry = kwd_entry;
@@ -3638,22 +3640,21 @@ struct TPPFile *
 TPPLexer_OpenFile(int mode, char *filename, size_t filename_size,
                   struct TPPKeyword **pkeyword_entry) {
  struct TPPFile *result;
- char *buffer,*newbuffer;
+ char *buffer = NULL,*newbuffer;
  int checked_empty_path = 0;
  size_t buffersize,newbuffersize;
  assert(mode != (TPPLEXER_OPENFILE_MODE_NORMAL|TPPLEXER_OPENFILE_FLAG_NEXT));
  /* Fix broken/distorted filenames to prevent ambiguity. */
  if (HAVE_EXTENSION_CANONICAL_HEADERS) fix_filename(filename,&filename_size);
  if ((mode&3) == TPPLEXER_OPENFILE_MODE_NORMAL) {
+  result = open_normal_file(filename,filename_size,pkeyword_entry,0);
+  if unlikely(!result) goto check_unknown_file;
 #ifdef HAVE_INSENSITIVE_PATHS
-  result = open_normal_file(filename,filename_size,pkeyword_entry);
-  if (result && !(mode&TPPLEXER_OPENFILE_FLAG_NOCASEWARN) &&
-     !check_path_spelling(filename,filename_size)
-      ) {err_r: TPPFile_Decref(result); result = NULL; }
-  return result;
-#else
-  return open_normal_file(filename,filename_size,pkeyword_entry);
+  if (!(mode&TPPLEXER_OPENFILE_FLAG_NOCASEWARN) &&
+      !check_path_spelling(filename,filename_size)
+       ) {err_r: TPPFile_Decref(result); result = NULL; }
 #endif
+  return result;
  }
  buffer = NULL,buffersize = 0;
  if (mode&TPPLEXER_OPENFILE_MODE_RELATIVE) {
@@ -3689,7 +3690,10 @@ TPPLexer_OpenFile(int mode, char *filename, size_t filename_size,
     memcpy(buffer+pathsize,filename,filename_size*sizeof(char));
     used_filename = buffer;
    }
-   result = open_normal_file(used_filename,newbuffersize,pkeyword_entry);
+   /* TODO: The is-system-header flag must depend on the
+    *       path of the file we're using as basis. */
+   result = open_normal_file(used_filename,newbuffersize,
+                             pkeyword_entry,0);
    if (result) { /* Goti! */
 #ifdef HAVE_INSENSITIVE_PATHS
     /* TODO: No need to check inherited path portion:
@@ -3723,7 +3727,7 @@ next_syspath:
     /* Special case: CWD path. */
     if (checked_empty_path) goto next_syspath;
     checked_empty_path = 1;
-    result = open_normal_file(filename,filename_size,pkeyword_entry);
+    result = open_normal_file(filename,filename_size,pkeyword_entry,1);
    } else {
     newbuffersize = (iter->ip_size+filename_size+1);
     if (newbuffersize > buffersize) {
@@ -3736,7 +3740,7 @@ next_syspath:
     buffer[iter->ip_size] = '/';
     memcpy(buffer+iter->ip_size+1,filename,filename_size*sizeof(char));
     buffer[newbuffersize] = '\0';
-    result = open_normal_file(buffer,newbuffersize,pkeyword_entry);
+    result = open_normal_file(buffer,newbuffersize,pkeyword_entry,1);
    }
    if (result) { /* Got one! */
     /* When running in include_next-mode, make sure
@@ -3759,7 +3763,13 @@ next_syspath:
    }
   }
  }
+check_unknown_file:
  result = NULL;
+ if (!(mode&TPPLEXER_OPENFILE_FLAG_NOCALLBACK) &&
+      (current.l_callbacks.c_unknown_file)) {
+  /* Invoke the unknown-file callback. */
+  result = (*current.l_callbacks.c_unknown_file)(filename,filename_size);
+ }
 end_buffer: free(buffer);
  return result;
 err_buffer: result = NULL; goto end_buffer;
