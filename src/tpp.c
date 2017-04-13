@@ -7160,7 +7160,22 @@ PRIVATE void EVAL_CALL eval_unary(struct TPPConst *result) {
    if (result) {
     TPPLexer_Warn(W_UNKNOWN_TOKEN_IN_EXPR_IS_ZERO);
    }
-   if (TPP_ISKEYWORD(TOK)) yield_fetch();
+   if (TPP_ISKEYWORD(TOK)) {
+    yield_fetch();
+#if 1 /* Recursively skip paren-style arguments to an imaginary function. */
+    while (TOK == '(') {
+     unsigned int recursion = 1;
+     while (TOK > 0) {
+      yield_fetch();
+           if (TOK == '(') ++recursion;
+      else if (TOK == ')' && !--recursion) {
+       yield_fetch();
+       break;
+      }
+     }
+    }
+#endif
+   }
    if (result) TPPConst_ZERO(result);
    break;
  }

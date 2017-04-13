@@ -602,25 +602,25 @@ PREDEFINED_MACRO_IF(__KOS__,HAS_EXTENSION(TPPLEXER_EXTENSION_SYSTEM_MACROS),TPP_
 #define __INT8_TYPE__   TPP_MSCV_OR_GCC(__int8,signed char)
 #endif
 #ifndef __UINT8_TYPE__
-#define __UINT8_TYPE__  TPP_MSCV_OR_GCC(unsigned __int8,unsigned char)
+#define __UINT8_TYPE__  unsigned TPP_MSCV_OR_GCC(__int8,char)
 #endif
 #ifndef __INT16_TYPE__
 #define __INT16_TYPE__  TPP_MSCV_OR_GCC(__int16,short)
 #endif
 #ifndef __UINT16_TYPE__
-#define __UINT16_TYPE__ TPP_MSCV_OR_GCC(unsigned __int16,unsigned short)
+#define __UINT16_TYPE__ unsigned TPP_MSCV_OR_GCC(__int16,short)
 #endif
 #ifndef __INT32_TYPE__
 #define __INT32_TYPE__  TPP_MSCV_OR_GCC(__int32,int)
 #endif
 #ifndef __UINT32_TYPE__
-#define __UINT32_TYPE__ TPP_MSCV_OR_GCC(unsigned __int32,unsigned int)
+#define __UINT32_TYPE__ unsigned TPP_MSCV_OR_GCC(__int32,int)
 #endif
 #ifndef __INT64_TYPE__
 #define __INT64_TYPE__  TPP_MSCV_OR_GCC(__int64,long long)
 #endif
 #ifndef __UINT64_TYPE__
-#define __UINT64_TYPE__ TPP_MSCV_OR_GCC(unsigned __int64,unsigned long long)
+#define __UINT64_TYPE__ unsigned TPP_MSCV_OR_GCC(__int64,long long)
 #endif
 #define TPP_MUL8_1  8
 #define TPP_MUL8_2  16
