@@ -242,6 +242,8 @@ void usage(char *appname, char *subject) {
                 "\t" "-MG                         Similar to '-MD', but include missing files as dependencies, assuming generated files.\n"
                 "\t" "-MP                         Emit dummy targets for every dependency.\n"
                 "\t" "-MF <file>                  Enable dependency tracking and emit its output to <file>, but also preprocess regularly.\n"
+                "\t" "-MT <target>                Specify the target object name used within the generated make dependency.\n"
+                "\t" "-MQ <target>                Same as '-MT', but escape characters special to make, such as '$'.\n"
                 "\t" "-trigraphs                  Enable recognition of trigraph character sequences.\n"
                 "\t" "-undef                      Disable all builtin macros.\n"
                 "\t" "--tok                       Outline all tokens using the [...] notation (Default: off).\n"
@@ -376,10 +378,18 @@ static void pp_normal(void) {
 static stream_t dep_outfile = TPP_STREAM_INVALID;
 static int dep_nonsystem_only = 0;
 static int dep_emit_dummy = 0;
+static void write_filename(stream_t fd, char const *p, size_t s) {
+ /* TODO: Escape special characters, such as ' ' or '\\' */
+ write(fd,p,s*sizeof(char));
+}
+static void write_filename_makeescape(stream_t fd, char const *p, size_t s) {
+ /* TODO: Escape special characters, such as '$' */
+ write_filename(fd,p,s);
+}
 static void pp_depprint(char *filename, size_t filename_size) {
  if (dep_outfile == TPP_STREAM_INVALID) return;
  write(dep_outfile," \\\n\t",4*sizeof(char));
- write(dep_outfile,filename,filename_size*sizeof(char));
+ write_filename(dep_outfile,filename,filename_size);
 }
 static char **dep_filenamev = NULL;
 static size_t dep_filenamec = 0;
@@ -410,7 +420,7 @@ static void pp_emit_dummy_targets(void) {
   filename = *iter;
   if (dep_emit_dummy) {
    write(dep_outfile,"\n\n",2*sizeof(char));
-   write(dep_outfile,filename,strlen(filename)*sizeof(char));
+   write_filename(dep_outfile,filename,strlen(filename));
    write(dep_outfile,":",sizeof(char));
   }
   free(filename);
@@ -438,24 +448,32 @@ pp_depunknown(char *filename, size_t filename_size) {
  pp_depprint(filename,filename_size);
  return NULL;
 }
+static int dep_escapetarget = 0; /* Escape characters special to make from 'dep_targetname'. */
+static char *dep_targetname = NULL;
 static int pp_depfirst(struct TPPFile *file) {
  char *used_filename,*filename_extension,old;
  if (dep_outfile == TPP_STREAM_INVALID) return 1;
  used_filename = file->f_name;
- filename_extension = strrchr(used_filename,'.');
- if (!filename_extension) {
-  size_t filename_size = file->f_namesize;
-  used_filename = (char *)malloc((filename_size+2)*sizeof(char));
-  if (!used_filename) return 0;
-  memcpy(used_filename,file->f_name,filename_size*sizeof(char));
-  filename_extension = used_filename+filename_size;
-  *filename_extension = '.';
+ if (dep_targetname) {
+  dep_escapetarget
+   ? write_filename_makeescape(dep_outfile,dep_targetname,strlen(dep_targetname))
+   : write_filename           (dep_outfile,dep_targetname,strlen(dep_targetname));
+ } else {
+  filename_extension = strrchr(used_filename,'.');
+  if (!filename_extension) {
+   size_t filename_size = file->f_namesize;
+   used_filename = (char *)malloc((filename_size+2)*sizeof(char));
+   if (!used_filename) return 0;
+   memcpy(used_filename,file->f_name,filename_size*sizeof(char));
+   filename_extension = used_filename+filename_size;
+   *filename_extension = '.';
+  }
+  old = filename_extension[1],filename_extension[1] = 'o';
+  write_filename_makeescape(dep_outfile,used_filename,((filename_extension-used_filename)+2));
+  filename_extension[1] = old;
+  if (used_filename != file->f_name) free(used_filename);
  }
- old = filename_extension[1],filename_extension[1] = 'o';
- write(dep_outfile,used_filename,((filename_extension-used_filename)+2)*sizeof(char));
  write(dep_outfile,":",1*sizeof(char));
- filename_extension[1] = old;
- if (used_filename != file->f_name) free(used_filename);
  pp_depprint(file->f_name,file->f_namesize);
  return 1;
 }
@@ -511,7 +529,7 @@ int main(int argc, char *argv[]) {
                                TPPLEXER_EXTENSION_RECMAC);
  while (argc && argv[0][0] == '-') {
   char *arg = argv[0]+1;
-  /* TODO: All those source dependency switches (-M, -MM, -MF, -MG, -MP, -MT, -MQ, -MD, -MMD) */
+  /* TODO: All those source dependency switches (-MT, -MQ) */
   /* TODO: Look at the arguments 'cpp' can take and try to implement them all (or most).
    *       >> This new version of TPP is meant as a drop-in replacement for cpp! */
        if (!strcmp(arg,"-tok")) outline_tokens = OUTLINE_MODE_TOK;
@@ -548,6 +566,9 @@ int main(int argc, char *argv[]) {
   else if (!strcmp(arg,"MF")) argc > 1 ? ((dep_outfile != TPP_STREAM_INVALID && dep_outfile != stdout_handle)
                                            ? close_stream(dep_outfile) : 0, /* Close a previously opened dependecy output stream. */
                                            dep_outfile = open_out_file(argv[1]),++argv,--argc) : 0;
+  else if (!strcmp(arg,"MT") || /* Specify a custom target name for dependencies. */
+           !strcmp(arg,"MQ")) argc > 1 ? (dep_targetname = argv[1],++argv,--argc) : 0,
+                              dep_escapetarget = !strcmp(arg,"MQ");
   else if (!strcmp(arg,"o")) argc > 1 ? (output_filename = argv[1],++argv,--argc) : 0;
   else if (!strcmp(arg,"-name")) argc > 1 ? (firstname = argv[1],++argv,--argc) : 0;
   else if (!strcmp(arg,"-message-format=gcc")) TPPLexer_Current->l_flags &= ~(TPPLEXER_FLAG_MSVC_MESSAGEFORMAT);
