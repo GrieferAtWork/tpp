@@ -23,9 +23,6 @@
 #ifndef TPP_CONFIG_EXPORT
 #define TPP_CONFIG_EXPORT  0 /* Export all 'extern' functions from the header, for use by shared libraries. */
 #endif
-#ifndef TPP_CONFIG_HOOKS
-#define TPP_CONFIG_HOOKS   0 /* Enable hooks for higher-level preprocessor functionality. */
-#endif
 
 
 
@@ -146,35 +143,6 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
-
-
-/* Source hooks into higher-level compiler functions. */
-#if TPP_CONFIG_HOOKS
-#ifdef __cplusplus
-extern "C" {
-#endif
-extern int tpp_hook_inscomment(char *p, size_t s);
-#define TPP_HOOK_INSCOMMENT   tpp_hook_inscomment
-#ifdef __cplusplus
-}
-#endif
-#endif /* TPP_CONFIG_HOOKS */
-
-/* HOOK fallbacks & documentation. */
-
-/* HOOK: >> int TPP_HOOK_INSCOMMENT(char *p, size_t s);
- *       Insert the given text into the ".comment" section of the current object file.
- * @return: -1: Hook not supported (emit a warning for unsupported feature)
- * @return:  0: Error occurred (stop processing code)
- * @return:  1: Successfully inserted the given text.
- */
-#ifndef TPP_HOOK_INSCOMMENT
-#define TPP_HOOK_INSCOMMENT(p,s) (-1)
-#endif
-
-
-
-
 
 #ifdef _MSC_VER
 LOCAL void *
@@ -3023,6 +2991,7 @@ PUBLIC int TPPLexer_Init(struct TPPLexer *__restrict self) {
  self->l_syspaths.il_pathv = NULL;
  self->l_limit_mrec        = TPPLEXER_DEFAULT_LIMIT_MREC;
  self->l_limit_incl        = TPPLEXER_DEFAULT_LIMIT_INCL;
+ self->l_eof_paren         = 0;
  self->l_counter           = 0;
  self->l_ifdef.is_slotc    = 0;
  self->l_ifdef.is_slota    = 0;
@@ -4916,8 +4885,7 @@ skip_block_and_parse:
    } break;
 
 
-   { /* I still don't fully understand _why_.
-      * >> https://gcc.gnu.org/onlinedocs/cpp/Other-Directives.html */
+   { /* >> https://gcc.gnu.org/onlinedocs/cpp/Other-Directives.html */
     struct TPPConst ident_string; int werror;
    case KWD_ident:
    case KWD_sccs:
@@ -4926,9 +4894,10 @@ skip_block_and_parse:
     if unlikely(!TPPLexer_Eval(&ident_string)) goto err;
     if unlikely(ident_string.c_kind != TPP_CONST_STRING) {
      werror = TPPLexer_Warn(W_EXPECTED_STRING_AFTER_IDENT,&ident_string);
-    } else if ((werror = TPP_HOOK_INSCOMMENT(ident_string.c_data.c_string->s_text,
-                                             ident_string.c_data.c_string->s_size)) == -1) {
+    } else if (!current.l_callbacks.c_ins_comment) {
      werror = TPPLexer_Warn(W_IDENT_SCCS_IGNORED,&ident_string);
+    } else {
+     werror = (*current.l_callbacks.c_ins_comment)(ident_string.c_data.c_string);
     }
     TPPConst_Quit(&ident_string);
     if unlikely(!werror) goto err;

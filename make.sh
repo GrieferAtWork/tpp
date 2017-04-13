@@ -40,12 +40,9 @@ gcc $CFLAGS -o tpp src/frontend.c src/tpp.c
 #                             from a shared library, thus allowing you to create
 #                             and link it as a .dll or .so library.
 #
-#    -  TPP_CONFIG_HOOKS:     DEFAULT: 0
-#                             Confure TPP to call extern function hooks for special
-#                             functionality that require a higher-level implementation.
-#                             Among other things, these hooks can be used to deal
-#                             with compiler-specific pragmas, as well as more
-#                             outlandish functionality such as "#ident" directives.
-#                             For a list of required hooks, see 'tpp.c',
-#                             section >> /* HOOK fallbacks & documentation. */ <<
-#                             Not intended for use in a stand-alone preprocessor.
+#    -  TPP_CONFIG_MINMACRO:  DEFAULT: 0
+#                             Configure TPP never to define builtin macros such
+#                             as '__SIZEOF_POINTER__' or '__INT32_C', essentially
+#                             forcing it to always behave as though '-undef'
+#                             was passed on the commandline.
+#
