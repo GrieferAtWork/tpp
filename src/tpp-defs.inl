@@ -152,6 +152,26 @@ DEF_K(enable)
 DEF_K(suppress)
 DEF_K(default)
 
+/* Explicit namespace for TPP pragma extensions.
+ * Can be used with the following pragmas:
+ * >> #pragma TPP warning(...)
+ * >> #pragma TPP extension(...)
+ * >> #pragma TPP tpp_exec(...)
+ * >> #pragma TPP tpp_set_keyword_flags(...)
+ * >> #pragma TPP include_path(...)
+ */
+DEF_K(TPP)
+
+/* Additional keywords used for pragmas capable of
+ * adding/deleting/pushing/popping system #include-paths:
+ * >> #include <stdlib.h> // FILE NOT FOUND
+ * >> #pragma TPP include_path(push,+ "/usr/include")
+ * >> #include <stdlib.h>
+ * >> #pragma TPP include_path(pop)
+ * >> #include <stdlib.h> // FILE NOT FOUND
+ */
+DEF_K(include_path)
+
 /* Additional keywords required to implement some GCC stuff. */
 DEF_K(GCC)
 DEF_K(diagnostic)
@@ -347,6 +367,7 @@ WARNING(W_EXPECTED_STRING_AFTER_TPP_STRAT, (WG_VALUE),   WSTATE_WARN)    /*< [st
 WARNING(W_EXPECTED_STRING_AFTER_TPP_CNTTOK,(WG_VALUE),   WSTATE_WARN)    /*< [struct TPPConst *]. */
 WARNING(W_EXPECTED_STRING_AFTER_PRGERROR,  (WG_VALUE),   WSTATE_WARN)    /*< [struct TPPConst *]. */
 WARNING(W_EXPECTED_STRING_AFTER_EXTENSION, (WG_VALUE),   WSTATE_WARN)    /*< [struct TPPConst *]. */
+WARNING(W_EXPECTED_STRING_AFTER_TPP_INCPTH,(WG_VALUE),   WSTATE_WARN)    /*< [struct TPPConst *]. */
 WARNING(W_MACRO_RECURSION_LIMIT_EXCEEDED,  (WG_LIMIT),   WSTATE_WARN)    /*< [struct TPPFile *]. */
 WARNING(W_INCLUDE_RECURSION_LIMIT_EXCEEDED,(WG_LIMIT),   WSTATE_WARN)    /*< [struct TPPFile *]. */
 WARNING(W_UNKNOWN_EXTENSION,               (WG_VALUE),   WSTATE_WARN)    /*< [char const *]. */
@@ -360,9 +381,12 @@ WARNING(W_EXPECTED_KEYWORD_AFTER_EXPR_PRED,(WG_DIRECTIVE),WSTATE_WARN)   /*< . *
 WARNING(W_UNKNOWN_ASSERTION,               (WG_VALUE),   WSTATE_DISABLE) /*< [struct TPPKeyword *,struct TPPKeyword *]. */
 WARNING(W_EXPECTED_STRING_AFTER_GCC_DIAG,  (WG_VALUE),   WSTATE_WARN)    /*< [struct TPPConst *]. */
 WARNING(W_CANT_POP_EXTENSIONS,             (WG_VALUE),   WSTATE_WARN)    /*< . */
+WARNING(W_CANT_POP_INCLUDE_PATH,           (WG_VALUE),   WSTATE_WARN)    /*< . */
 WARNING(W_CONSIDER_PAREN_AROUND_LAND,      (WG_QUALITY), WSTATE_WARN)    /*< . */
 WARNING(W_INTEGRAL_OVERFLOW,               (WG_VALUE),   WSTATE_WARN)    /*< [int_t,int_t]. */
 WARNING(W_INTEGRAL_CLAMPED,                (WG_VALUE),   WSTATE_WARN)    /*< [int_t,int_t]. */
+WARNING(W_UNKNOWN_INCLUDE_PATH,            (WG_VALUE),   WSTATE_WARN)    /*< [char const *,size_t]. */
+WARNING(W_INCLUDE_PATH_ALREADY_EXISTS,     (WG_VALUE),   WSTATE_WARN)    /*< [char const *,size_t]. */
 
 #undef TPP_PP_STR
 #undef TPP_PP_STR2

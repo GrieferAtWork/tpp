@@ -239,7 +239,7 @@ void usage(char *appname, char *subject) {
                 "\t" "-MM                         Similar to '-M', but don't include system headers.\n"
                 "\t" "-MD                         Like '-M', but don't disable preprocessing.\n"
                 "\t" "-MMD                        Like '-MD', but don't disable preprocessing.\n"
-                "\t" "-MG                         Similar to '-MD', but include missing files as dependencies, assuming generated files.\n"
+                "\t" "-MG                         Disable preprocessing, but include missing files as dependencies, assuming they will be generated.\n"
                 "\t" "-MP                         Emit dummy targets for every dependency.\n"
                 "\t" "-MF <file>                  Enable dependency tracking and emit its output to <file>, but also preprocess regularly.\n"
                 "\t" "-MT <target>                Specify the target object name used within the generated make dependency.\n"
@@ -386,9 +386,17 @@ static void write_filename_makeescape(stream_t fd, char const *p, size_t s) {
  /* TODO: Escape special characters, such as '$' */
  write_filename(fd,p,s);
 }
+
+static size_t curline_length = 0;
 static void pp_depprint(char *filename, size_t filename_size) {
+#define DEP_MAX_LINELENGTH 70
  if (dep_outfile == TPP_STREAM_INVALID) return;
- write(dep_outfile," \\\n\t",4*sizeof(char));
+ if ((curline_length += (filename_size+1)) >= DEP_MAX_LINELENGTH) {
+  write(dep_outfile," \\\n\t",4*sizeof(char));
+  curline_length = 0;
+ } else {
+  write(dep_outfile," ",1*sizeof(char));
+ }
  write_filename(dep_outfile,filename,filename_size);
 }
 static char **dep_filenamev = NULL;

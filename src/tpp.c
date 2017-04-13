@@ -2255,7 +2255,7 @@ skip_argument_name:
                                                sizeof(struct arginfo_t));
    if (new_arginfo_v) arginfo_v = new_arginfo_v;
   }
-  result->f_macro.m_function.f_arginfo = arginfo_v; /* Inherit data. */
+  result->f_macro.m_function.f_arginfo = arginfo_v; /*< Inherit data. */
   /* At this point, 'TOK == argend_token' unless user-syntax was wrong.
    * >> For that reason, the file pointer should point to the first whitespace of the macro block. */
   assert(curfile == token.t_file);
@@ -2984,6 +2984,7 @@ PUBLIC int TPPLexer_Init(struct TPPLexer *__restrict self) {
  self->l_token.t_end       = TPPFile_Empty.f_end;
  self->l_eob_file          = NULL;
  self->l_noerror           = 0;
+ self->l_syspaths.il_prev  = NULL;
  self->l_syspaths.il_pathc = 0;
  self->l_syspaths.il_pathv = NULL;
  self->l_limit_mrec        = TPPLEXER_DEFAULT_LIMIT_MREC;
@@ -3077,11 +3078,19 @@ PUBLIC void TPPLexer_Quit(struct TPPLexer *__restrict self) {
   TPPFile_Decref(fileiter);
  } while ((fileiter = filenext) != NULL);
  { /* Clear system #include paths. */
-  struct TPPIncludePath *iter,*end;
-  end = (iter = self->l_syspaths.il_pathv)+
-                self->l_syspaths.il_pathc;
-  for (; iter != end; ++iter) free(iter->ip_path);
-  free(self->l_syspaths.il_pathv);
+  struct TPPIncludeList *include_curr,*include_prev;
+  struct TPPString **iter,**end;
+  include_curr = &self->l_syspaths;
+  for (;;) {
+   end = (iter = include_curr->il_pathv)+
+                 include_curr->il_pathc;
+   for (; iter != end; ++iter) TPPString_Decref(*iter);
+   free(include_curr->il_pathv);
+   include_prev = include_curr->il_prev;
+   if (include_curr != &self->l_syspaths) free(include_curr);
+   if (!include_prev) break;
+   include_curr = include_prev;
+  }
  }
  free(self->l_extstack.es_stackv);
 }
@@ -3448,10 +3457,49 @@ fix_filename(char *filename, size_t *pfilename_size) {
  return result;
 }
 
+PUBLIC int TPPLexer_PushInclude(void) {
+ struct TPPIncludeList *oldstate;
+ struct TPPString **iter,**end;
+ assert(TPPLexer_Current);
+ oldstate = (struct TPPIncludeList *)malloc(sizeof(struct TPPIncludeList));
+ if unlikely(!oldstate) return 0;
+ memcpy(oldstate,&current.l_syspaths,sizeof(struct TPPIncludeList));
+ /* Allocate memory for a copy of the #include-vector. */
+ current.l_syspaths.il_pathv = (struct TPPString **)malloc(oldstate->il_pathc*
+                                                           sizeof(struct TPPString *));
+ if unlikely(!current.l_syspaths.il_pathv) goto err_oldstate;
+ memcpy(current.l_syspaths.il_pathv,oldstate->il_pathv,
+        oldstate->il_pathc*sizeof(struct TPPString *));
+ /* Generate references to the #include-paths for our vector copy. */
+ end = (iter = oldstate->il_pathv)+oldstate->il_pathc;
+ for (; iter != end; ++iter) TPPString_Incref(*iter);
+ current.l_syspaths.il_prev = oldstate; /*< Inherit pointer. */
+ return 1;
+err_oldstate:
+ memcpy(&current.l_syspaths,oldstate,sizeof(struct TPPIncludeList));
+ free(oldstate);
+ return 0;
+}
+PUBLIC int TPPLexer_PopInclude(void) {
+ struct TPPIncludeList *oldstate;
+ struct TPPString **iter,**end;
+ assert(TPPLexer_Current);
+ oldstate = current.l_syspaths.il_prev;
+ if unlikely(!oldstate) return 0;
+ end = (iter = current.l_syspaths.il_pathv)+
+               current.l_syspaths.il_pathc;
+ /* Cleanup include paths we're about to drop. */
+ for (; iter != end; ++iter) TPPString_Decref(*iter);
+ free(current.l_syspaths.il_pathv);
+ /* Restore the data from the old state. */
+ memcpy(&current.l_syspaths,oldstate,sizeof(struct TPPIncludeList));
+ free(oldstate);
+ return 1;
+}
+
 PUBLIC int
-TPPLexer_AddIncludePath(char *path, size_t pathsize) {
- struct TPPIncludePath *iter,*end;
- char *path_copy;
+TPPLexer_AddIncludePath(char *__restrict path, size_t pathsize) {
+ struct TPPString **iter,**end,*elem;
  assert(TPPLexer_Current);
  /* Normalize & fix the given path as best as possible. */
  if (HAVE_EXTENSION_CANONICAL_HEADERS) fix_filename(path,&pathsize);
@@ -3462,30 +3510,43 @@ TPPLexer_AddIncludePath(char *path, size_t pathsize) {
  end = (iter = current.l_syspaths.il_pathv)+
                current.l_syspaths.il_pathc;
  for (; iter != end; ++iter) {
-  assert((iter->ip_size != 0) == (iter->ip_path != NULL));
-  if (iter->ip_size == pathsize &&
-     !memcmp(iter->ip_path,path,pathsize*sizeof(char))
+  if ((elem = *iter)->s_size == pathsize &&
+     !memcmp(elem->s_text,path,pathsize*sizeof(char))
      ) return 2; /* Path already exists. */
  }
-#if TPP_CONFIG_DEBUG
- path_copy = (char *)malloc((pathsize+1)*sizeof(char));
- if unlikely(!path_copy) return 0;
- path_copy[pathsize] = '\0';
-#else
- path_copy = (char *)malloc(pathsize*sizeof(char));
- if unlikely(!path_copy) return 0;
-#endif
- memcpy(path_copy,path,pathsize*sizeof(char));
- iter = (struct TPPIncludePath *)realloc(current.l_syspaths.il_pathv,
-                                        (current.l_syspaths.il_pathc+1)*
-                                         sizeof(struct TPPIncludePath));
- if unlikely(!iter) { free(path_copy); return 0; }
+ elem = TPPString_New(path,pathsize);
+ if unlikely(!elem) return 0;
+ iter = (struct TPPString **)realloc(current.l_syspaths.il_pathv,
+                                    (current.l_syspaths.il_pathc+1)*
+                                     sizeof(struct TPPString *));
+ if unlikely(!iter) { TPPString_Decref(elem); return 0; }
  current.l_syspaths.il_pathv = iter;
- iter += current.l_syspaths.il_pathc++;
- iter->ip_size = pathsize;
- iter->ip_path = path_copy;
+ iter[current.l_syspaths.il_pathc++] = elem; /*< Inherit reference. */
  return 1;
 }
+PUBLIC int
+TPPLexer_DelIncludePath(char *__restrict path, size_t pathsize) {
+ struct TPPString **iter,**end,*elem;
+ assert(TPPLexer_Current);
+ if (HAVE_EXTENSION_CANONICAL_HEADERS) fix_filename(path,&pathsize);
+ while (pathsize && path[-1] == SEP) --pathsize;
+ if unlikely(!pathsize) path = ".",pathsize = 1;
+ /* Make sure that the path doesn't already exists. */
+ end = (iter = current.l_syspaths.il_pathv)+
+               current.l_syspaths.il_pathc;
+ for (; iter != end; ++iter) {
+  if ((elem = *iter)->s_size == pathsize &&
+     !memcmp(elem->s_text,path,pathsize*sizeof(char))) {
+   /* Found it! */
+   memmove(iter,iter+1,((end-iter)-1)*sizeof(struct TPPString *));
+   --current.l_syspaths.il_pathc;
+   TPPString_Decref(elem);
+   return 1;
+  }
+ }
+ return 0;
+}
+
 
 PUBLIC int
 TPPLexer_Define(char const *__restrict name, size_t name_size,
@@ -3717,28 +3778,28 @@ nextfile:
  }
  /* Search system folders for this file. */
  {
-  struct TPPIncludePath *iter,*end;
+  struct TPPString **iter,**end,*elem;
   end = (iter = current.l_syspaths.il_pathv)+
                 current.l_syspaths.il_pathc;
 next_syspath:
   for (; iter != end; ++iter) {
-   assert((iter->ip_size != 0) == (iter->ip_path != NULL));
-   if (iter->ip_size == 1 && iter->ip_path[0] == '.') {
+   elem = *iter;
+   if (elem->s_size == 1 && elem->s_text[0] == '.') {
     /* Special case: CWD path. */
     if (checked_empty_path) goto next_syspath;
     checked_empty_path = 1;
     result = open_normal_file(filename,filename_size,pkeyword_entry,1);
    } else {
-    newbuffersize = (iter->ip_size+filename_size+1);
+    newbuffersize = (elem->s_size+filename_size+1);
     if (newbuffersize > buffersize) {
      /* Increase the buffer's size. */
      newbuffer = (char *)realloc(buffer,(newbuffersize+1)*sizeof(char));
      if unlikely(!newbuffer) goto err_buffer;
      buffer = newbuffer,buffersize = newbuffersize;
     }
-    memcpy(buffer,iter->ip_path,iter->ip_size*sizeof(char));
-    buffer[iter->ip_size] = '/';
-    memcpy(buffer+iter->ip_size+1,filename,filename_size*sizeof(char));
+    memcpy(buffer,elem->s_text,elem->s_size*sizeof(char));
+    buffer[elem->s_size] = '/';
+    memcpy(buffer+elem->s_size+1,filename,filename_size*sizeof(char));
     buffer[newbuffersize] = '\0';
     result = open_normal_file(buffer,newbuffersize,pkeyword_entry,1);
    }
@@ -4574,7 +4635,7 @@ def_skip_until_lf:
      if unlikely(!TPPLexer_Eval(&val)) goto err;
      if (val.c_kind == TPP_CONST_STRING) {
       if (textfile->f_textfile.f_usedname) TPPString_Decref(textfile->f_textfile.f_usedname);
-      textfile->f_textfile.f_usedname = val.c_data.c_string; /* Inherit data. */
+      textfile->f_textfile.f_usedname = val.c_data.c_string; /*< Inherit data. */
      } else {
       TPPLexer_Warn(W_EXPECTED_STRING_AFTER_LINE,&val);
      }
@@ -7716,6 +7777,7 @@ TPPLexer_ParseBuiltinPragma(void) {
    struct TPPConst exec_code;
    struct TPPFile *exec_file;
   case KWD_tpp_exec:
+pragma_tpp_exec:
    yield_fetch();
    if unlikely(TOK != '(') TPPLexer_Warn(W_EXPECTED_LPAREN);
    else yield_fetch();
@@ -7764,6 +7826,7 @@ TPPLexer_ParseBuiltinPragma(void) {
    struct TPPKeyword *keyword;
    uint32_t new_flags;
   case KWD_tpp_set_keyword_flags:
+pragma_tpp_set_keyword_flags:
    yield_fetch();
    if unlikely(TOK != '(') TPPLexer_Warn(W_EXPECTED_LPAREN);
    else yield_fetch();
@@ -7795,6 +7858,7 @@ TPPLexer_ParseBuiltinPragma(void) {
   { /* Configure warning behavior by group/id.
      * NOTE: Warning IDs have been chosen for backwards-compatibility with the old TPP. */
   case KWD_warning:
+pragma_warning:
    yield_fetch();
    if unlikely(TOK != '(') TPPLexer_Warn(W_EXPECTED_LPAREN);
    else yield_fetch();
@@ -7899,6 +7963,7 @@ set_warning_newstate:
   { /* Configure TPP extensions from usercode. */
    struct TPPConst extname;
   case KWD_extension:
+pragma_extension:
    yield_fetch();
    if unlikely(TOK != '(') TPPLexer_Warn(W_EXPECTED_LPAREN);
    else yield_fetch();
@@ -7933,6 +7998,74 @@ yield_after_extension:
    if unlikely(TOK != ')') TPPLexer_Warn(W_EXPECTED_RPAREN);
    else yield_fetch();
    return 1;
+  } break;
+
+  { /* TPP-specific pragma namespace. */
+  case KWD_TPP:
+   yield_fetch();
+   switch (TOK) {
+
+    case KWD_warning              : goto pragma_warning;
+    case KWD_extension            : goto pragma_extension;
+    case KWD_tpp_exec             : goto pragma_tpp_exec;
+    case KWD_tpp_set_keyword_flags: goto pragma_tpp_set_keyword_flags;
+
+    { /* Configure system #include-paths. */
+    case KWD_include_path:
+     yield_fetch();
+     if unlikely(TOK != '(') TPPLexer_Warn(W_EXPECTED_LPAREN);
+     else yield_fetch();
+     while (TOK != ')') {
+      switch (TOK) {
+       { /* push/pop the system #include-path. */
+        if (FALSE) { case KWD_push: if unlikely(!TPPLexer_PushInclude()) goto seterr; }
+        if (FALSE) { case KWD_pop:  if unlikely(!TPPLexer_PopInclude() && !TPPLexer_Warn(W_CANT_POP_INCLUDE_PATH)) goto err; }
+        yield_fetch();
+       } break;
+       {
+        int mode,error;
+        struct TPPConst path_string;
+       case '+': yield_fetch();
+       default:  mode = 1;
+        if (FALSE) { case '-': mode = 0; yield_fetch(); }
+        if unlikely(!TPPLexer_Eval(&path_string)) goto err;
+        if (path_string.c_kind != TPP_CONST_STRING) {
+         TPPLexer_Warn(W_EXPECTED_STRING_AFTER_TPP_INCPTH,&path_string);
+        } else {
+         char *path; size_t size = path_string.c_data.c_string->s_size;
+         if (path_string.c_data.c_string->s_refcnt == 1) {
+          path = path_string.c_data.c_string->s_text;
+         } else {
+          path = (char *)malloc((size+1)*sizeof(char));
+          if unlikely(!path) goto seterr;
+          memcpy(path,path_string.c_data.c_string->s_text,
+                (size+1)*sizeof(char));
+         }
+         error = mode ? TPPLexer_AddIncludePath(path,size)
+                      : TPPLexer_DelIncludePath(path,size);
+         if unlikely(mode && !error) goto seterr;
+         if unlikely(error == 2) error = 0;
+         if unlikely(!error) {
+          TPPLexer_Warn(mode ? W_INCLUDE_PATH_ALREADY_EXISTS
+                             : W_UNKNOWN_INCLUDE_PATH,
+                        path,size);
+         }
+         if (path != path_string.c_data.c_string->s_text) free(path);
+         TPPString_Decref(path_string.c_data.c_string);
+        }
+        break;
+       }
+      }
+      if (TOK != ',') break;
+      yield_fetch();
+     }
+     if unlikely(TOK != ')') TPPLexer_Warn(W_EXPECTED_RPAREN);
+     else yield_fetch();
+     return 1;
+    } break;
+
+    default: break; /* Reserved for future use (don't warn about unknown tpp-pragma). */
+   }
   } break;
 
   { /* Emulate some GCC pragmas. */
@@ -8137,8 +8270,9 @@ PUBLIC int TPPLexer_Warn(int wnum, ...) {
   case W_EXPECTED_STRING_AFTER_PRGERROR  : WARNF("Expected string after #pragma error, but got '%s'",CONST_STR()); break;
   case W_EXPECTED_STRING_AFTER_EXTENSION : WARNF("Expected string after #pragma extension, but got '%s'",CONST_STR()); break;
   case W_EXPECTED_STRING_AFTER_GCC_DIAG  : WARNF("Expected string after #pragma GCC diagnostic <mode>, but got '%s'",CONST_STR()); break;
+  case W_EXPECTED_STRING_AFTER_TPP_INCPTH: WARNF("Expected string after #pragma TPP include_path, but got '%s'",CONST_STR()); break;
   case W_FILE_NOT_FOUND                  : WARNF("File not found: '%s'",ARG(char *)); break;
-  case W_UNKNOWN_EXTENSION               : temp = ARG(char *); WARNF("Unknown extension '%s' (Did you mean '%s'?)",temp,find_most_likely_extension(temp)); break;
+  case W_UNKNOWN_EXTENSION               : temp = ARG(char *),WARNF("Unknown extension '%s' (Did you mean '%s'?)",temp,find_most_likely_extension(temp)); break;
   case W_NONPARTABLE_FILENAME_CASING     : { char *temp2; size_t temp3; temp = ARG(char *),temp2 = ARG(char *),temp3 = ARG(size_t); WARNF("Non-portable casing in '%s': '%.*s' should be '%s' instead",temp,(int)temp3,temp2,ARG(char *)); } break;
   case W_ERROR                           : temp = ARG(char *),WARNF("ERROR : %.*s",(int)ARG(size_t),temp); break;
   case W_WARNING                         : temp = ARG(char *),WARNF("WARNING : %.*s",(int)ARG(size_t),temp); break;
@@ -8190,7 +8324,9 @@ PUBLIC int TPPLexer_Warn(int wnum, ...) {
   case W_CONSIDER_PAREN_AROUND_LAND      : WARNF("Consider adding parenthesis around '&&' to prevent confusion with '||'"); break;
   case W_INTEGRAL_OVERFLOW               : WARNF("Integral constant overflow"); break;
   case W_INTEGRAL_CLAMPED                : WARNF("Integral constant clamped to fit"); break;
-  default: WARNF("? %d",wnum); break;
+  case W_INCLUDE_PATH_ALREADY_EXISTS     : temp = ARG(char *),WARNF("System #include-path '%.*s' already exists",(int)ARG(size_t),temp); break;
+  case W_UNKNOWN_INCLUDE_PATH            : temp = ARG(char *),WARNF("Unknown system #include-path '%.*s'",(int)ARG(size_t),temp); break;
+  default                                : WARNF("? %d",wnum); break;
  }
  if (temp_string) TPPString_Decref(temp_string);
 #undef FILENAME

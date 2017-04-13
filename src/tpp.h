@@ -131,6 +131,7 @@
 // [tpp_set_keyword_flags] #pragma tpp_set_keyword_flags("foo",0x2) /*< Set the flags associated with a keyword (A set of TPP_KEYWORDFLAG_* masking 'TPP_KEYWORDFLAG_USERMASK'). */
 // [warning]               #pragma warning(disable: 42)             /*< Configure warnings MSVC-style by ID, or by GCC name. */
 // [extension]             #pragma extension("-fmacro-recursion")   /*< Configure active TPP extensions by name. */
+// [TPP include_path]      #pragma TPP include_path("/usr/include") /*< Push/pop/add/delete the current list of system #include-paths. */
 // [GCC system_header]     #pragma GCC system_header                /*< Disable warnings within the current file. */
 // [GCC diagnostic]        #pragma GCC diagnostic push              /*< Configure warnings GCC-style by name. */
 
@@ -807,18 +808,39 @@ struct TPPExtStack {
  uint64_t *es_stackv; /*< [0..es_stackc|alloc(es_stacka)][owned] Vector of pushed extension states. */
 };
 
-struct TPPIncludePath {
- /* NOTE: A special #include-path exists that is only a '.'.
-  *       This path refers to the current directory itself. */
- size_t ip_size; /*< Length of the path in characters. */
- char  *ip_path; /*< [0..ip_size][owned] Normalized include path (without trailing slash).
-                  *   WARNING: Outside of debug-mode, this string is not necessarily zero-terminated. */
-};
 struct TPPIncludeList {
  /* List of sanitized #include paths. */
- size_t                 il_pathc; /*< Amount of elements in the vector below. */
- struct TPPIncludePath *il_pathv; /*< [0..il_pathc][owned] Vector of sanitized #include path. */
+ struct TPPIncludeList    *il_prev;  /*< [0..1][owned] Pointer to another m-allocated list of system #include-paths.
+                                      *                This field is used to implement system #include-path push/pop. */
+ size_t                    il_pathc; /*< Amount of elements in the vector below. */
+ /*ref*/struct TPPString **il_pathv; /*< [1..1][0..il_pathc][owned] Vector of sanitized #include path. */
 };
+
+//////////////////////////////////////////////////////////////////////////
+// Push/Pop the current system #include-path list.
+// @return: 0: [TPPLexer_PushInclude] Not enough available memory.
+// @return: 0: [TPPLexer_PopInclude] No older #include-path list was available to restore.
+// @return: 1: Successfully pushed/popped the system #include-path list.
+TPPFUN int TPPLexer_PushInclude(void);
+TPPFUN int TPPLexer_PopInclude(void);
+
+//////////////////////////////////////////////////////////////////////////
+// Add/delete the given path from the list of system #include paths.
+// WARNING: This function will modify the given path.
+// WARNING: Be careful with absolute vs. relative paths!
+//          TPP can not tell that they're the same and
+//          '#pragma once' might break as a consequence!
+//       >> As a solution, _always_ use either absolute
+//          or relative paths for the same file/path.
+//         (This also goes for #include directives)
+// @return: 0: [TPPLexer_AddIncludePath] Not enough available memory.
+// @return: 1: [TPPLexer_AddIncludePath] The given path was successfully added.
+// @return: 2: [TPPLexer_AddIncludePath] The given path had already been added before.
+// @return: 0: [TPPLexer_DelIncludePath] The given path was not found.
+// @return: 1: [TPPLexer_DelIncludePath] The given path was successfully removed.
+TPPFUN int TPPLexer_AddIncludePath(char *__restrict path, size_t pathsize);
+TPPFUN int TPPLexer_DelIncludePath(char *__restrict path, size_t pathsize);
+
 
 struct TPPAssertion {
  struct TPPAssertion *as_next; /*< [0..1][owned] Next assertion. */
@@ -1152,20 +1174,6 @@ TPPLexer_LookupKeyword(char const *name, size_t namelen,
 // WARNING: This function is _extremely_ slow and should only
 //          be used if there is absolutely no other choice.
 TPPFUN struct TPPKeyword *TPPLexer_LookupKeywordID(TPP(tok_t) id);
-
-//////////////////////////////////////////////////////////////////////////
-// Adds the given path to the list of system #include paths.
-// WARNING: This function will modify the given path.
-// WARNING: Be careful with absolute vs. relative paths!
-//          TPP can not tell that they're the same and
-//          '#pragma once' might break as a consequence!
-//       >> As a solution, _always_ use either absolute
-//          or relative paths for the same file/path.
-//         (This also goes for #include directives)
-// @return: 0: Not enough available memory.
-// @return: 1: The given path was successfully added.
-// @return: 2: The given path had already been added before.
-TPPFUN int TPPLexer_AddIncludePath(char *path, size_t pathsize);
 
 //////////////////////////////////////////////////////////////////////////
 // Define a regular, keyword-style macro 'name' as 'value'.
