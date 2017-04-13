@@ -4253,7 +4253,7 @@ whitespace:
     /* Parse space tokens. */
     for (;;) {
      while (SKIP_WRAPLF(iter,end));
-     if (!isspace(*iter) || iter == end) break;
+     if (!isspace_nolf(*iter) || iter == end) break;
      ++iter;
     }
     if (!(current.l_flags&TPPLEXER_FLAG_WANTSPACE)) goto startover_iter;
@@ -4455,6 +4455,7 @@ parse_result_directive:
    case '!':
     if (!HAVE_EXTENSION_SHEBANG) goto default_directive;
 def_skip_until_lf:
+    current.l_flags |= TPPLEXER_FLAG_WANTLF;
     while (TOK > 0 && TOK != '\n') TPPLexer_YieldRaw();
    } break;
 
