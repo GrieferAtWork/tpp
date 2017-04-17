@@ -37,6 +37,10 @@
  * >> Basically, disable 'TPPLEXER_EXTENSION_*_MACROS' extensions. */
 #define TPP_CONFIG_MINMACRO   0
 #endif
+#ifndef TPP_CONFIG_GCCFUNC
+/* Make builtin support for various GCC functions available in expressions. */
+#define TPP_CONFIG_GCCFUNC    1
+#endif
 
 #define TPP_PREPROCESSOR_VERSION 200 /* Preprocessor version. */
 #define TPP_API_VERSION          200 /* Api version (Version of this api). */
@@ -163,8 +167,10 @@
 #   define TPP_LOCAL            static inline
 #elif defined(_MSC_VER)
 #   define TPP_LOCAL            static __inline
-#else
+#elif defined(__GNUC__) || defined(__TCC__)
 #   define TPP_LOCAL            static __inline__
+#else
+#   define TPP_LOCAL            static
 #endif
 #ifndef __has_attribute
 #   define __has_attribute(x) 0
@@ -203,15 +209,15 @@
 #else
 #   define TPP_UNNAMED_UNION_DEF(name) name
 #endif
-//#if !defined(_WIN64) && defined(WIN64)
-//#   define _WIN64 WIN64
-//#endif
-//#if !defined(_WIN32) && defined(WIN32)
-//#   define _WIN32 WIN32
-//#endif
-//#if !defined(_WIN32) && defined(__WIN32__)
-//#   define _WIN32 __WIN32__
-//#endif
+#if !defined(_WIN64) && defined(WIN64)
+#   define _WIN64 WIN64
+#endif
+#if !defined(_WIN32) && defined(WIN32)
+#   define _WIN32 WIN32
+#endif
+#if !defined(_WIN32) && defined(__WIN32__)
+#   define _WIN32 __WIN32__
+#endif
 #ifndef __SIZEOF_POINTER__
 #if defined(_WIN64) || defined(__LP64__) || \
     defined(_LP64) || defined(__x86_64__)
@@ -254,6 +260,12 @@ typedef signed char   TPP(wgroup_t);   /*< Warning group ID. */
 typedef int           TPP(col_t);      /*< Column number. */
 typedef int           TPP(line_t);     /*< Line number. */
 typedef unsigned int  TPP(refcnt_t);   /*< Reference counter. */
+#if TPP_HAVE_LONGLONG
+typedef long long     TPP(llong_t);    
+#else
+typedef int64_t       TPP(llong_t);    
+#endif
+typedef int (*TPP(printer_t))(char const *__restrict buf, size_t bufsize, void *closure);
 
 #define TPP_ENCODING_UTF8     0
 #define TPP_ENCODING_UTF16_BE 1
@@ -277,14 +289,14 @@ struct TPPString {
 // @return: * :   A reference to a string containing the sum of what is given.
 // @return: NULL: Not enough available memory.
 TPPFUN /*ref*/struct TPPString *
-TPPString_Cat(/*ref*/struct TPPString *lhs,
-              /*ref*/struct TPPString *rhs);
+TPPString_Cat(/*ref*/struct TPPString *__restrict lhs,
+              /*ref*/struct TPPString *__restrict rhs);
 
 //////////////////////////////////////////////////////////////////////////
 // Returns a new string from the given text.
 // @return: * :   A reference to a string containing the given text.
 // @return: NULL: Not enough available memory.
-TPPFUN /*ref*/struct TPPString *TPPString_New(char const *text, size_t size);
+TPPFUN /*ref*/struct TPPString *TPPString_New(char const *__restrict text, size_t size);
 TPPFUN /*ref*/struct TPPString *TPPString_NewSized(size_t size);
 
 
@@ -342,6 +354,7 @@ struct TPPTextFile {
 #define TPP_FUNOP_VA_NARGS 0x08 /*< [1] Delete ARG(0) characters and insert a decimal representation of the variadic argument size (NOTE: When inserting, the text-pointer is advanced). */
 typedef uint8_t       TPP(funop_t);
 typedef int_least64_t TPP(int_t);
+typedef long double   TPP(float_t);
 
 struct TPP(arginfo_t) {
  TPP(tok_t) ai_id;       /*< Token ID associated with this argument name. */
@@ -532,9 +545,11 @@ TPPFUN int TPPFile_NextChunk(struct TPPFile *__restrict self, int flags);
 TPPFUN char *TPP_Unescape(char *buf, char const *data, size_t size);
 TPPFUN char *TPP_Escape(char *buf, char const *data, size_t size);
 TPPFUN char *TPP_Itos(char *buf, TPP(int_t) i);
+TPPFUN char *TPP_Ftos(char *buf, TPP(float_t) f);
 TPPFUN size_t TPP_SizeofUnescape(char const *data, size_t size);
 TPPFUN size_t TPP_SizeofEscape(char const *data, size_t size);
 TPPFUN size_t TPP_SizeofItos(TPP(int_t) i);
+TPPFUN size_t TPP_SizeofFtos(TPP(float_t) f);
 
 enum{
  /* Special tokens. */
@@ -548,7 +563,7 @@ enum{
  TPP(TOK_COMMENT)   = 'c',  /*< like this one! */
  TPP(TOK_ERR)       = (TPP(tok_t))-1, /*< An error occurred (will always be negative). */
 
- /* Single-character tokens. */
+ /* Single-character tokens (always equal to that character's ordinal). */
  TPP(TOK_ADD)       = '+',
  TPP(TOK_AND)       = '&',
  TPP(TOK_ASSIGN)    = '=',
@@ -664,6 +679,7 @@ typedef enum { /* Warning states. */
  TPP(WSTATE_SUPPRESS) = 3, /*< Can be set multiple times for recursion. */
  TPP(WSTATE_DEFAULT)  = 4,
 } TPP(wstate_t);
+#define TPP_WSTATE_ISENABLED(s) ((6 >> (s))&1) /* WSTATE_ERROR|WSTATE_WARN */
 
 enum{
 #define WGROUP(name,str,default) TPP(name),
@@ -757,6 +773,7 @@ TPPFUN int TPPLexer_PopWarnings(void);
 // @return: 1: Successfully set the given warning number.
 // @return: 2: The given warning number is unknown.
 TPPFUN int TPPLexer_SetWarning(int wnum, TPP(wstate_t) state);
+TPPFUN TPP(wstate_t) TPPLexer_GetWarning(int wnum);
 
 //////////////////////////////////////////////////////////////////////////
 // Similar to 'TPPLexer_SetWarning', but set the state of all warnings from a given group.
@@ -863,10 +880,10 @@ struct TPPRareKeyword {
  /*ref*/struct TPPFile    *kr_oldmacro; /*< [0..1][linked_list(->f_hashnext...)] Linked list of old (aka. pushed) version of this macro. */
  TPP(int_t)                kr_counter;  /*< Counter value used by '__TPP_COUNTER()' */
 #define TPP_KEYWORDFLAG_NONE                   0x00000000
-#define TPP_KEYWORDFLAG_IMPORTED               0x80000000 /*< Set for for files after they've been #import-ed. */
-#define TPP_KEYWORDFLAG_NO_UNDERSCORES         0x00000100 /*< When looking up keyword flags, don't allow this keyword to alias another with additional underscores at the front and back:
+#define TPP_KEYWORDFLAG_NO_UNDERSCORES         0x40000000 /*< When looking up keyword flags, don't allow this keyword to alias another with additional underscores at the front and back:
                                                            *  >> __has_feature(__tpp_dollar_is_alpha__) // If 'tpp_dollar_is_alpha' doesn't have this flag set, it can alias '__tpp_dollar_is_alpha__'
                                                            */
+#define TPP_KEYWORDFLAG_IMPORTED               0x80000000 /*< Set for for files after they've been #import-ed. */
  /* NOTE: These flags share their values with those
   *       from the old TPP for backwards compatibility. */
 #define TPP_KEYWORDFLAG_HAS_ATTRIBUTE          0x00000001
@@ -876,6 +893,7 @@ struct TPPRareKeyword {
 #define TPP_KEYWORDFLAG_HAS_EXTENSION          0x00000010
 #define TPP_KEYWORDFLAG_HAS_FEATURE            0x00000020
 #define TPP_KEYWORDFLAG_IS_DEPRECATED          0x00000040
+#define TPP_KEYWORDFLAG_HAS_TPP_BUILTIN        0x00000100
 #define TPP_KEYWORDFLAG_USERMASK               0x0000007f /*< Set of flags modifiable through pragmas. */
  uint32_t                  kr_flags;    /*< A set of 'TPP_KEYWORDFLAG_*'. */
  struct TPPAssertions      kr_asserts;  /*< Assertions (aka. #assert/#unassert associated with this keyword) */
@@ -1064,6 +1082,11 @@ TPP_LOCAL TPP(col_t) TPPLexer_COLUMN(void) { struct TPPFile *f = TPPLexer_Textfi
 #define TPPLEXER_EXTENSION_EXT_ARE_FEATURES  0x0000200000000000ull /*< [name("extensions-are-features")] extensions (__has_extension) are also considered features (__has_feature). */
 #define TPPLEXER_EXTENSION_MSVC_FIXED_INT    0x0000400000000000ull /*< [name("fixed-length-integrals")] Allow a 'i(8|16|32|64)' suffix in integrals. */
 #define TPPLEXER_EXTENSION_NO_EXPAND_DEFINED 0x0000800000000000ull /*< [name("dont-expand-defined")] Within a function-style macro, placing an argument 'ARG' in 'defined(ARG)' will generate a code equivalent to 'defined(#!ARG)' (MANDELLA!). */
+#define TPPLEXER_EXTENSION_IFELSE_IN_EXPR    0x0001000000000000ull /*< [name("ifelse-in-expressions")] Allow statement-style 'if' in expressions. */
+#define TPPLEXER_EXTENSION_EXTENDED_IDENTS   0x0002000000000000ull /*< [name("extended-identifiers")] Allow ansi characters in keywords. */
+#if TPP_CONFIG_GCCFUNC
+#define TPPLEXER_EXTENSION_BUILTIN_FUNCTIONS 0x0008000000000000ull /*< [name("builtins-in-expressions")] Recognize various gcc-style builtin functions calls in preprocessor expressions. */
+#endif /* TPP_CONFIG_GCCFUNC */
 #if !TPP_CONFIG_MINMACRO
 #define TPPLEXER_EXTENSION_CPU_MACROS        0x2000000000000000ull /*< [name("define-cpu-macros")] Define macros describing the host CPU (e.g.: '-D__i386__=1') */
 #define TPPLEXER_EXTENSION_SYSTEM_MACROS     0x4000000000000000ull /*< [name("define-system-macros")] Define macros describing the host platform (e.g.: '-D_WIN32=1') */
@@ -1086,6 +1109,7 @@ struct TPPLexer {
  size_t                l_limit_mrec; /*< Limit for how often a macro may recursively expand into itself. */
  size_t                l_limit_incl; /*< Limit for how often the same text file may exist on the #include stack. */
  size_t                l_eof_paren;  /*< Recursion counter used by the 'TPPLEXER_FLAG_EOF_ON_PAREN' flag. */
+ size_t                l_warncount;  /*< Amount of warnings that were invoked (including those that were dismissed). */
  TPP(tok_t)            l_noerror;    /*< Old token ID before 'TPPLEXER_FLAG_ERROR' was set. */
  TPP(int_t)            l_counter;    /*< Value returned the next time '__COUNTER__' is expanded (Initialized to ZERO(0)). */
  struct TPPIfdefStack  l_ifdef;      /*< #ifdef stack. */
@@ -1253,23 +1277,51 @@ TPPFUN int TPPLexer_ExpandFunctionMacro(struct TPPFile *__restrict macro);
 
 struct TPPConst {
 #define TPP_CONST_INTEGRAL 0
-#define TPP_CONST_STRING   1
+#define TPP_CONST_FLOAT    1
+#define TPP_CONST_STRING   2
  unsigned int c_kind; /*< Constant kind (One of 'TPP_CONST_*'). */
  union {
          TPP(int_t)        c_int;    /*< [TPP_CONST_INTEGRAL] Integral. */
+         TPP(float_t)      c_float;  /*< [TPP_CONST_FLOAT] Floating point. */
   /*ref*/struct TPPString *c_string; /*< [TPP_CONST_STRING][1..1] String. */
  } c_data;
 };
 #define TPPConst_IsTrue(self) \
- ((self)->c_kind == TPP_CONST_STRING\
+     ((self)->c_kind == TPP_CONST_STRING\
    ? ((self)->c_data.c_string->s_size != 0)\
+   : (self)->c_kind == TPP_CONST_FLOAT\
+   ? ((self)->c_data.c_float != 0.0L)\
    : ((self)->c_data.c_int != 0))
+#define TPPConst_IsBool(self) \
+  ((self)->c_kind == TPP_CONST_INTEGRAL && \
+ !((self)->c_data.c_int&~(TPP(int_t))1))
+#define TPPConst_AsInt(self) \
+    ((self)->c_kind == TPP_CONST_INTEGRAL \
+   ? (self)->c_data.c_int \
+   : (self)->c_kind == TPP_CONST_FLOAT \
+   ? (TPP(int_t))(self)->c_data.c_float \
+   : (self)->c_data.c_string->s_size != 0)
+#define TPPConst_AsFloat(self) \
+    ((self)->c_kind == TPP_CONST_FLOAT \
+   ? (self)->c_data.c_float \
+   : (self)->c_kind == TPP_CONST_INTEGRAL \
+   ? (TPP(float_t))(self)->c_data.c_int \
+   : (TPP(float_t))((self)->c_data.c_string->s_size != 0))
+#define TPPConst_InitCopy(self,right) \
+do{ *(self) = *(right);\
+    if ((self)->c_kind == TPP_CONST_STRING)\
+     TPPString_Incref((self)->c_data.c_string);\
+}while(TPP_MACRO_FALSE)
+
 #define TPPConst_ToBool(self) \
 do{\
  if ((self)->c_kind == TPP_CONST_STRING) {\
   int c_newval = (self)->c_data.c_string->s_size != 0;\
   TPPString_Decref((self)->c_data.c_string);\
   (self)->c_data.c_int = (TPP(int_t))c_newval;\
+  (self)->c_kind = TPP_CONST_INTEGRAL;\
+ } else if ((self)->c_kind == TPP_CONST_FLOAT) {\
+  (self)->c_data.c_int = (self)->c_data.c_float != 0.0L;\
   (self)->c_kind = TPP_CONST_INTEGRAL;\
  } else {\
   (self)->c_data.c_int = !!(self)->c_data.c_int;\
@@ -1281,6 +1333,9 @@ do{\
   int c_newval = (self)->c_data.c_string->s_size != 0;\
   TPPString_Decref((self)->c_data.c_string);\
   (self)->c_data.c_int = (TPP(int_t))c_newval;\
+  (self)->c_kind = TPP_CONST_INTEGRAL;\
+ } else if ((self)->c_kind == TPP_CONST_FLOAT) {\
+  (self)->c_data.c_int = (TPP(int_t))(self)->c_data.c_float;\
   (self)->c_kind = TPP_CONST_INTEGRAL;\
  }\
 }while(TPP_MACRO_FALSE)
@@ -1314,7 +1369,6 @@ TPPConst_ToString(struct TPPConst const *__restrict self);
 // @return: 0: An error occurred.
 TPPFUN int TPPLexer_Eval(struct TPPConst *result);
 
-
 //////////////////////////////////////////////////////////////////////////
 // Parse the data block of a pragma.
 // NOTE: 'TPPLexer_ParseBuiltinPragma' behaves similar to
@@ -1325,7 +1379,6 @@ TPPFUN int TPPLexer_Eval(struct TPPConst *result);
 // @return: 1: Successfully parsed the given pragma.
 TPPFUN int TPPLexer_ParsePragma(void);
 TPPFUN int TPPLexer_ParseBuiltinPragma(void);
-
 
 //////////////////////////////////////////////////////////////////////////
 // Parse an evaluate a string from the current lexer.
@@ -1357,6 +1410,32 @@ TPPFUN int TPP_Atoi(TPP(int_t) *__restrict pint);
 #define TPP_ATOI_TYPE_INT32    0x50 /*< '__int32' (msvc-extension). */
 #define TPP_ATOI_TYPE_INT64    0x60 /*< '__int64' (msvc-extension). */
 
+//////////////////////////////////////////////////////////////////////////
+// Transform the current token (which must be 'TOK_FLOAT') into a
+// floating point value, storing that value in '*pfloat' and returning
+// a set of 'TPP_ATOF_*' flags, indicating typing and success.
+// NOTE: This function does _NOT_ yield the current token once finished.
+//       If intended, the caller is responsible for advancing it upon success.
+// @return: TPP_ATOF_ERR: Emiting a warning caused the lexer to error out (TPPLexer_SetErr() was set).
+// @return: * :           A set of 'TPP_ATOF_*' (see below)
+TPPFUN int TPP_Atof(TPP(float_t) *__restrict pfloat);
+#define TPP_ATOF_ERR             0x00 /*< NOTE: Never used with any flags (indicates failure). */
+#define TPP_ATOF_OK              0x01 /*< Always set on success. */
+#define TPP_ATOF_TYPE_MASK       0xf0 /*< Mask of the float's typing. */
+#define TPP_ATOF_TYPE_DOUBLE     0x00 /*< 'double' (default typing without suffix). */
+#define TPP_ATOF_TYPE_FLOAT      0x10 /*< 'float' (float-suffix 'f') */
+#define TPP_ATOF_TYPE_LONGDOUBLE 0x20 /*< 'long double' (long-double-suffix 'L'). */
+
+//////////////////////////////////////////////////////////////////////////
+// Prints the text contained within the current token, automatically
+// skipping escaped linefeeds and converting di/trigraphs.
+// NOTE: 'TPP_PrintComment' behaves similar, but will
+//        instead handle any kind of comment token,
+//        printing the comment text within.
+// @return: 0: Successfully printed the entire text.
+// @return: *: The first non-ZERO(0) value returned by 'printer'
+TPPFUN int TPP_PrintToken(TPP(printer_t) printer, void *closure);
+TPPFUN int TPP_PrintComment(TPP(printer_t) printer, void *closure);
 
 
 #if TPP_CONFIG_ONELEXER

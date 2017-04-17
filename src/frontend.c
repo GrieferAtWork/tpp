@@ -16,7 +16,7 @@
  *    misrepresented as being the original software.                          *
  * 3. This notice may not be removed or altered from any source distribution. *
  */
-#define TPP(x) TPP_##x /* Global namespace. */
+#define TPP(x) x /* Global namespace. */
 #define _CRT_SECURE_NO_WARNINGS
 #define _CRT_NONSTDC_NO_WARNINGS
 
@@ -69,9 +69,11 @@ extern "C" {
 #define OUTLINE_MODE_NONE 0
 #define OUTLINE_MODE_TOK  1 /* Outline with [...] */
 #define OUTLINE_MODE_ZERO 2 /* Separate with '\0' */
-static int outline_tokens     = OUTLINE_MODE_NONE;
-static int no_magic_tokens    = 1; /*< Disable ~magic~ tokens for small line-shifts to prevent a #line being emit. */
-static int no_line_directives = 0; /*< Disable #line directives being emit. */
+static int outline_tokens  = OUTLINE_MODE_NONE;
+static int no_magic_tokens = 1; /*< Disable ~magic~ tokens for small line-shifts to prevent a #line being emit. */
+static int line_directives = 2; /*< Enable #line directives being emit. */
+static int decode_tokens   = 1; /*< Decode stuff like escape sequences and trigraphs before writing to out. */
+static uint32_t base_flags; /*< Base set of lexer flags. */
 
 #ifdef _WIN32
 static TPP(stream_t) stdout_handle;
@@ -87,6 +89,12 @@ static TPP(stream_t) stdout_handle;
  */
 #define out_write(p,s) write(stdout_handle,p,s)
 
+static int out_printer(char const *buf, size_t bufsize, void *closure) {
+ (void)closure;
+ out_write(buf,bufsize*sizeof(char));
+ return 0;
+}
+
 static int is_at_linefeed;
 static int current_line;
 
@@ -96,7 +104,7 @@ void put_line(void) {
  char const *filename_text;
  struct TPPFile *f;
  int line; char buffer[16];
- if (no_line_directives) return;
+ if (!line_directives) return;
  f = TPPLexer_Textfile();
  if (TPPLexer_Current->l_token.t_file == f) {
   /* Try to use the start of the current token.
@@ -128,7 +136,11 @@ void put_line(void) {
  }
  if (!is_at_linefeed) out_write("\n",sizeof(char));
  current_line = line;
- out_write("#line ",6*sizeof(char));
+ if (line_directives == 2) {
+  out_write("# ",2*sizeof(char));
+ } else {
+  out_write("#line ",6*sizeof(char));
+ }
  out_write(buffer,(TPP_Itos(buffer,(TPP(int_t))(line+1))-buffer)*sizeof(char));
  if (last_filename != filename_text) {
   char *quote_buffer;
@@ -224,52 +236,57 @@ void usage(char *appname, char *subject) {
   }
   return;
  }
+#define INDENT "\t"
  fprintf(stderr,"Usage: %s [options...] [-o outfile] [infile]\n"
                 "       %s [options...] [-o outfile] -i string...\n"
                 "options:\n"
-                "\t" "-o <name>                   Redirect output to a given file (defauls to STDOUT).\n"
-                "\t" "-i <text>                   Preprocess the remained of the commandline\n"
-                "\t" "-Idir                       Adds 'dir' to the list of #include <...> paths\n"
-                "\t" "-Dsym[=val=1]               Defines 'sym' as 'val'\n"
-                "\t" "-Usym                       Undefine a previously defined symbol 'sym'\n"
-                "\t" "-Apred=answer               Define an assertion 'pred' as 'answer'\n"
-                "\t" "-A-pred[=answer]            Delete 'answer' or all assertions previously made about 'pred'\n"
-                "\t" "-P                          Disable emission of #line adjustment directives (Default: on).\n"
-                "\t" "-M                          Instead of emitting preprocessor output, emit a make-style list of dependencies.\n"
-                "\t" "-MM                         Similar to '-M', but don't include system headers.\n"
-                "\t" "-MD                         Like '-M', but don't disable preprocessing.\n"
-                "\t" "-MMD                        Like '-MD', but don't disable preprocessing.\n"
-                "\t" "-MG                         Disable preprocessing, but include missing files as dependencies, assuming they will be generated.\n"
-                "\t" "-MP                         Emit dummy targets for every dependency.\n"
-                "\t" "-MF <file>                  Enable dependency tracking and emit its output to <file>, but also preprocess regularly.\n"
-                "\t" "-MT <target>                Specify the target object name used within the generated make dependency.\n"
-                "\t" "-MQ <target>                Same as '-MT', but escape characters special to make, such as '$'.\n"
-                "\t" "-trigraphs                  Enable recognition of trigraph character sequences.\n"
-                "\t" "-undef                      Disable all builtin macros.\n"
-                "\t" "--tok                       Outline all tokens using the [...] notation (Default: off).\n"
-                "\t" "--pp                        Enable preprocess-mode, which emits all tokens separated by '\\0'-bytes.\n"
-                "\t" "-f[no-]spc                  Configure emission of SPACE tokens (Default: on).\n"
-                "\t" "-f[no-]lf                   Configure emission of LF tokens (Default: on).\n"
-                "\t" "-f[no-]comments             Configure emission of COMMENT tokens (Default: off).\n"
-                "\t" "-f[no-]magiclf              Enable/Disable magic linefeeds sometimes used in place of #line (Default: off).\n"
-                "\t" "-f[no-]longstring           Enable/Disable string continuation between lines (Default: off).\n"
-                "\t" "-f[no-]<extension>          Enable/Disable a given 'extension' (s.a.: '--help extensions').\n"
-                "\t" "-W[no-]<warning>            Enable/Disable a given 'warning' group (s.a.: '--help warnings').\n"
-                "\t" "                            Enabling this option also disabled SPACE and LF tokens, though\n"
-                "\t" "                            they can be re-enabled using the -spc and -lf switches.\n"
-                "\t" "--name <name>               Set the name used for __FILE__ by INFILE (Useful when INFILE is stdin).\n"
-                "\t" "--help [subject]            Display this help and exit.\n"
-                "\t" "                            When specified, subject may be one of {extensions|warnings}\n"
-                "\t" "--version                   Display version information and exit.\n"
+                INDENT "-o <name>                   Redirect output to a given file (defauls to STDOUT).\n"
+                INDENT "-i <text>                   Preprocess the remained of the commandline\n"
+                INDENT "-Idir                       Adds 'dir' to the list of #include <...> paths\n"
+                INDENT "-Dsym[=val=1]               Defines 'sym' as 'val'\n"
+                INDENT "-Usym                       Undefine a previously defined symbol 'sym'\n"
+                INDENT "-Apred=answer               Define an assertion 'pred' as 'answer'\n"
+                INDENT "-A-pred[=answer]            Delete 'answer' or all assertions previously made about 'pred'\n"
+                INDENT "-P                          Disable emission of #line adjustment directives (Default: on).\n"
+                INDENT "-M                          Instead of emitting preprocessor output, emit a make-style list of dependencies.\n"
+                INDENT "-MM                         Similar to '-M', but don't include system headers.\n"
+                INDENT "-MD                         Like '-M', but don't disable preprocessing.\n"
+                INDENT "-MMD                        Like '-MD', but don't disable preprocessing.\n"
+                INDENT "-MG                         Disable preprocessing, but include missing files as dependencies, assuming they will be generated.\n"
+                INDENT "-MP                         Emit dummy targets for every dependency.\n"
+                INDENT "-MF <file>                  Enable dependency tracking and emit its output to <file>, but also preprocess regularly.\n"
+                INDENT "-MT <target>                Specify the target object name used within the generated make dependency.\n"
+                INDENT "-MQ <target>                Same as '-MT', but escape characters special to make, such as '$'.\n"
+                INDENT "-trigraphs                  Enable recognition of trigraph character sequences.\n"
+                INDENT "-undef                      Disable all builtin macros.\n"
+                INDENT "--tok                       Outline all tokens using the [...] notation (Default: off).\n"
+                INDENT "--pp                        Enable preprocess-mode, which emits all tokens separated by '\\0'-bytes.\n"
+                INDENT "-f[no-]spc                  Configure emission of SPACE tokens (Default: on).\n"
+                INDENT "-f[no-]lf                   Configure emission of LF tokens (Default: on).\n"
+                INDENT "-f[no-]comments             Configure emission of COMMENT tokens (Default: off).\n"
+                INDENT "-f[no-]magiclf              Enable/Disable magic linefeeds sometimes used in place of #line (Default: off).\n"
+                INDENT "-f[no-]longstring           Enable/Disable string continuation between lines (Default: off).\n"
+                INDENT "-f[(cpp|no)-]line           Enable/Disable emission of #line directives (Default: cpp-compatible).\n"
+                INDENT "-f[no-]decode               Enable/Disable decoding of di/tri-graphs, as well as escaped linefeeds in output (Default: on).\n"
+                INDENT "-f[no-]unify-pragma         Unify all unknown pragmas to use the preprocessor-directive syntax before re-emission (Default: on).\n"
+                INDENT "-f[no-]<extension>          Enable/Disable a given 'extension' (s.a.: '--help extensions').\n"
+                INDENT "-W[no-]<warning>            Enable/Disable a given 'warning' group (s.a.: '--help warnings').\n"
+                INDENT "                            Enabling this option also disabled SPACE and LF tokens, though\n"
+                INDENT "                            they can be re-enabled using the -spc and -lf switches.\n"
+                INDENT "--name <name>               Set the name used for __FILE__ by INFILE (Useful when INFILE is stdin).\n"
+                INDENT "--help [subject]            Display this help and exit.\n"
+                INDENT "                            When specified, subject may be one of {extensions|warnings}\n"
+                INDENT "--version                   Display version information and exit.\n"
 #ifdef _WIN32
-                "\t" "--message-format={msvc|gcc} Set the format for error message (Default: msvc).\n"
+                INDENT "--message-format={msvc|gcc} Set the format for error message (Default: msvc).\n"
 #else
-                "\t" "--message-format={msvc|gcc} Set the format for error message (Default: gcc).\n"
+                INDENT "--message-format={msvc|gcc} Set the format for error message (Default: gcc).\n"
 #endif
                 "infile:\n"
-                "\t" "-                When not specified or set to '-', use STDIN as input\n"
-                "\t" "<filename>       The name of a file to preprocess, as well as the default value for '--name'\n"
+                INDENT "-                When not specified or set to '-', use STDIN as input\n"
+                INDENT "<filename>       The name of a file to preprocess, as well as the default value for '--name'\n"
          ,appname,appname);
+#undef INDENT
 }
 
 static /*ref*/struct TPPString *
@@ -333,29 +350,26 @@ err_argv_string: TPPString_Decref(argv_string);
  return NULL;
 }
 
-static void pp_normal(void) {
- struct TPPFile *last_token_file;
- char *last_token_end; size_t file_offset;
- /* Initial values to simulate the last token
-  * ending where the first file starts. */
- last_token_file = NULL; // infile; /* Force a line directive at the first token. */
- last_token_end  = TPPLexer_Current->l_token.t_file->f_begin;
- file_offset     = 0;
- current_line    = 0;
- is_at_linefeed  = 1;
- while (TPPLexer_Yield() > 0) {
-  if (last_token_file != TPPLexer_Current->l_token.t_file ||
-     (last_token_end != TPPLexer_Current->l_token.t_begin &&
-      file_offset != get_file_offset(TPPLexer_Current->l_token.t_begin))) {
-   /* The file changed, or there is a difference in the in-file position
-    * between the end of the last token and the start of this one.
-    * >> In any case, we must update the #line offset. */
-   put_line();
-  }
-  last_token_file = TPPLexer_Current->l_token.t_file;
-  last_token_end  = TPPLexer_Current->l_token.t_end;
-  file_offset     = get_file_offset(last_token_end);
-  if (outline_tokens == OUTLINE_MODE_TOK) out_write("[",sizeof(char));
+static struct TPPFile *last_token_file;
+static char *last_token_end; size_t file_offset;
+static void pp_print(char const *buf, size_t bufsize) {
+ if (outline_tokens == OUTLINE_MODE_TOK) out_write("[",sizeof(char));
+ out_write(buf,bufsize*sizeof(char));
+ switch (outline_tokens) {
+  case OUTLINE_MODE_ZERO: out_write("\0",sizeof(char)); is_at_linefeed = 1; break;
+  case OUTLINE_MODE_TOK:  out_write("]",sizeof(char));
+  default: is_at_linefeed = 0; break;
+ }
+}
+static void pp_emit_raw(void) {
+ last_token_file = TPPLexer_Current->l_token.t_file;
+ last_token_end  = TPPLexer_Current->l_token.t_end;
+ file_offset     = get_file_offset(last_token_end);
+ if (outline_tokens == OUTLINE_MODE_TOK) out_write("[",sizeof(char));
+ if (decode_tokens) {
+  TPP_PrintToken(&out_printer,NULL);
+  if (TPPLexer_Current->l_token.t_id == '\n') ++current_line;
+ } else {
   out_write(TPPLexer_Current->l_token.t_begin,
            (size_t)(TPPLexer_Current->l_token.t_end-
                     TPPLexer_Current->l_token.t_begin)*
@@ -364,14 +378,39 @@ static void pp_normal(void) {
    * which is them compared to the actual line number. */
   current_line += count_linefeeds(TPPLexer_Current->l_token.t_begin,
                                   TPPLexer_Current->l_token.t_end);
-  switch (outline_tokens) {
-   case OUTLINE_MODE_ZERO: out_write("\0",sizeof(char)); is_at_linefeed = 1; break;
-   case OUTLINE_MODE_TOK:  out_write("]",sizeof(char)); is_at_linefeed = 0; break;
-   default: 
-    is_at_linefeed = last_token_end[-1] == '\n' ||
-                     last_token_end[-1] == '\r';
-    break;
-  }
+ }
+ switch (outline_tokens) {
+  case OUTLINE_MODE_ZERO: out_write("\0",sizeof(char)); is_at_linefeed = 1; break;
+  case OUTLINE_MODE_TOK:  out_write("]",sizeof(char)); is_at_linefeed = 0; break;
+  default: 
+   is_at_linefeed = last_token_end[-1] == '\n' ||
+                    last_token_end[-1] == '\r';
+   break;
+ }
+}
+static void pp_emit(void) {
+ if (last_token_file != TPPLexer_Current->l_token.t_file ||
+    (last_token_end != TPPLexer_Current->l_token.t_begin &&
+     file_offset != get_file_offset(TPPLexer_Current->l_token.t_begin))) {
+  /* The file changed, or there is a difference in the in-file position
+   * between the end of the last token and the start of this one.
+   * >> In any case, we must update the #line offset. */
+  put_line();
+ }
+ pp_emit_raw();
+}
+
+static void pp_normal(void) {
+ /* Initial values to simulate the last token
+  * ending where the first file starts. */
+ last_token_file = NULL; // infile; /* Force a line directive at the first token. */
+ last_token_end  = TPPLexer_Current->l_token.t_file->f_begin;
+ file_offset     = 0;
+ current_line    = 0;
+ is_at_linefeed  = 1;
+ while (TPPLexer_Yield() > 0) pp_emit();
+ if (outline_tokens == OUTLINE_MODE_ZERO) {
+  out_write("\0",sizeof(char));
  }
 }
 
@@ -489,8 +528,30 @@ static void pp_deponly(void) {
  /* fallback: Use stdout as output file for dependencies if no other file was set.
   * HINT: stdout may have previously been redirected with the '-o' option. */
  if (dep_outfile == TPP_STREAM_INVALID) dep_outfile = stdout_handle;
+ TPPLexer_Current->l_callbacks.c_parse_pragma = NULL;
  while (TPPLexer_Yield() > 0);
 }
+
+static int reemit_pragma(void) {
+#define PRAGMA_COPYMASK  (TPPLEXER_FLAG_WANTCOMMENTS|\
+                          TPPLEXER_FLAG_WANTSPACE|\
+                          TPPLEXER_FLAG_WANTLF)
+ if (!is_at_linefeed && outline_tokens != OUTLINE_MODE_NONE
+     ) pp_print("\n",1),++current_line;
+ pp_print("#",1);
+ pp_print("pragma",6);
+ if (base_flags&TPPLEXER_FLAG_WANTSPACE) pp_print(" ",1);
+ TPPLexer_Current->l_flags &= ~(PRAGMA_COPYMASK);
+ TPPLexer_Current->l_flags |= (base_flags&PRAGMA_COPYMASK);
+ do pp_emit_raw(); while (TPPLexer_Yield() > 0);
+ pp_print("\n",1);
+ ++current_line;
+ is_at_linefeed = 1;
+ last_token_file = NULL;
+ last_token_end  = NULL;
+ return 1;
+}
+
 
 #ifdef _WIN32
 #define close_stream  CloseHandle
@@ -506,7 +567,7 @@ static TPP(stream_t) open_out_file(char const *filename) {
                       NULL,CREATE_ALWAYS,FILE_ATTRIBUTE_NORMAL,NULL);
  if (!result) result = TPP_STREAM_INVALID;
 #else
- result = open(output_filename,O_CREAT|O_WRONLY,0644);
+ result = open(filename,O_CREAT|O_WRONLY,0644);
 #endif
  if (result == TPP_STREAM_INVALID) {
   fprintf(stderr,"Failed to create output file: \"%s\"\n",filename);
@@ -528,6 +589,7 @@ int main(int argc, char *argv[]) {
 #endif
  if (!TPP_INITIALIZE()) return 1;
  if (argc) appname = argv[0],--argc,++argv; else appname = "tpp";
+ TPPLexer_Current->l_callbacks.c_parse_pragma = &reemit_pragma;
  TPPLexer_Current->l_flags |= (TPPLEXER_FLAG_WANTSPACE|
                                TPPLEXER_FLAG_WANTLF|
 #ifdef _WIN32
@@ -535,12 +597,19 @@ int main(int argc, char *argv[]) {
 #endif
                                TPPLEXER_FLAG_TERMINATE_STRING_LF|
                                TPPLEXER_EXTENSION_RECMAC);
- while (argc && argv[0][0] == '-') {
+#if 1
+#define BACKWARDS(x)  x /* Backwards-compatibility with old TPP */
+#else
+#define BACKWARDS(x)  /* nothing */
+#endif
+ while (argc && (argv[0][0] == '-' BACKWARDS(|| argv[0][0] == '/'))) {
   char *arg = argv[0]+1;
   /* TODO: All those source dependency switches (-MT, -MQ) */
   /* TODO: Look at the arguments 'cpp' can take and try to implement them all (or most).
    *       >> This new version of TPP is meant as a drop-in replacement for cpp! */
-       if (!strcmp(arg,"-tok")) outline_tokens = OUTLINE_MODE_TOK;
+       if (!strcmp(arg,"-tok")
+           BACKWARDS(|| !strcmp(arg,"tok"))
+           BACKWARDS(|| !strcmp(arg,"-tokens"))) outline_tokens = OUTLINE_MODE_TOK;
   else if (!strcmp(arg,"fspc")) TPPLexer_Current->l_flags |= TPPLEXER_FLAG_WANTSPACE;
   else if (!strcmp(arg,"fno-spc")) TPPLexer_Current->l_flags &= ~(TPPLEXER_FLAG_WANTSPACE);
   else if (!strcmp(arg,"flf")) TPPLexer_Current->l_flags |= TPPLEXER_FLAG_WANTLF;
@@ -549,8 +618,15 @@ int main(int argc, char *argv[]) {
   else if (!strcmp(arg,"fno-comments")) TPPLexer_Current->l_flags &= ~(TPPLEXER_FLAG_WANTCOMMENTS);
   else if (!strcmp(arg,"fmagiclf")) no_magic_tokens = 0;
   else if (!strcmp(arg,"fno-magiclf")) no_magic_tokens = 1;
+  else if (!strcmp(arg,"fdecode")) decode_tokens = 1;
+  else if (!strcmp(arg,"fno-decode")) decode_tokens = 0;
   else if (!strcmp(arg,"flongstring")) TPPLexer_Current->l_flags &= ~(TPPLEXER_FLAG_TERMINATE_STRING_LF);
   else if (!strcmp(arg,"fno-longstring")) TPPLexer_Current->l_flags |= TPPLEXER_FLAG_TERMINATE_STRING_LF;
+  else if (!strcmp(arg,"funify-pragma")) TPPLexer_Current->l_callbacks.c_parse_pragma = &reemit_pragma;
+  else if (!strcmp(arg,"fno-unify-pragma")) TPPLexer_Current->l_callbacks.c_parse_pragma = NULL;
+  else if (!strcmp(arg,"fline")) line_directives = 1;
+  else if (!strcmp(arg,"fno-line") BACKWARDS(|| !strcmp(arg,"no-line"))) line_directives = 0;
+  else if (!strcmp(arg,"fcpp-line")) line_directives = 2;
   else if (!strcmp(arg,"trigraphs")) TPPLexer_Current->l_extensions |= TPPLEXER_EXTENSION_TRIGRAPHS;
 #if !TPP_CONFIG_MINMACRO
   else if (!strcmp(arg,"undef")) TPPLexer_Current->l_extensions &= ~(TPPLEXER_EXTENSION_CPU_MACROS|
@@ -559,7 +635,7 @@ int main(int argc, char *argv[]) {
 #else /* !TPP_CONFIG_MINMACRO */
   else if (!strcmp(arg,"undef"));
 #endif /* TPP_CONFIG_MINMACRO */
-  else if (!strcmp(arg,"P")) no_line_directives = 0;
+  else if (!strcmp(arg,"P")) line_directives = 0;
   else if (!strcmp(arg,"M") || 
            !strcmp(arg,"MM")) pp_mode = PPMODE_DEPENDENCY, /* Switch to dependency-only mode. */
                              (dep_outfile == TPP_STREAM_INVALID) ? dep_outfile = stdout_handle : 0, /* Change the output file to stdout. */
@@ -577,13 +653,13 @@ int main(int argc, char *argv[]) {
   else if (!strcmp(arg,"MT") || /* Specify a custom target name for dependencies. */
            !strcmp(arg,"MQ")) argc > 1 ? (dep_targetname = argv[1],++argv,--argc) : 0,
                               dep_escapetarget = !strcmp(arg,"MQ");
-  else if (!strcmp(arg,"o")) argc > 1 ? (output_filename = argv[1],++argv,--argc) : 0;
+  else if (!strcmp(arg,"o") BACKWARDS(|| !strcmp(arg,"-out"))) argc > 1 ? (output_filename = argv[1],++argv,--argc) : 0;
   else if (!strcmp(arg,"-name")) argc > 1 ? (firstname = argv[1],++argv,--argc) : 0;
   else if (!strcmp(arg,"-message-format=gcc")) TPPLexer_Current->l_flags &= ~(TPPLEXER_FLAG_MSVC_MESSAGEFORMAT);
   else if (!strcmp(arg,"-message-format=msvc")) TPPLexer_Current->l_flags |= TPPLEXER_FLAG_MSVC_MESSAGEFORMAT;
-  else if (!strcmp(arg,"-help")) usage(appname,argc > 1 && argv[1][0] != '-' ? argv[1] : NULL),_exit(2);
-  else if (!strcmp(arg,"-version")) fwrite(version,sizeof(char),sizeof(version)/sizeof(char)-1,stderr),_exit(2);
-  else if (!strcmp(arg,"i")) { !argc || --argc,++argv; infile = merge_argv(argc,argv); goto use_infile; }
+  else if (!strcmp(arg,"-help") BACKWARDS(|| !strcmp(arg,"h") || !strcmp(arg,"?"))) usage(appname,argc > 1 && argv[1][0] != '-' ? argv[1] : NULL),_exit(2);
+  else if (!strcmp(arg,"-version") BACKWARDS(|| !strcmp(arg,"v"))) fwrite(version,sizeof(char),sizeof(version)/sizeof(char)-1,stderr),_exit(2);
+  else if (!strcmp(arg,"i") BACKWARDS(|| !strcmp(arg,"-in"))) { !argc || --argc,++argv; infile = merge_argv(argc,argv); goto use_infile; }
   else if (!strcmp(arg,"-pp"))
    /* Intermediate preprocessor mode:
     *  - Very useful for invoking tpp from another
@@ -594,10 +670,11 @@ int main(int argc, char *argv[]) {
    TPPLexer_Current->l_flags &= ~(TPPLEXER_FLAG_WANTSPACE|
                                   TPPLEXER_FLAG_WANTLF),
    outline_tokens = OUTLINE_MODE_ZERO;
-  else if (*arg == 'I') { if (!*++arg && argc > 1) arg = argv[1],++argv,--argc;
+  else if (*arg == 'I') { ++arg; BACKWARDS(add_inc:)
+                          if (!*arg && argc > 1) arg = argv[1],++argv,--argc;
                           if (!TPPLexer_AddIncludePath(arg,strlen(arg))) _exit(1); }
-  else if (*arg == 'D') { char *val;
-                          if (!*++arg && argc > 1) arg = argv[1],++argv,--argc;
+  else if (*arg == 'D') { char *val; ++arg; BACKWARDS(add_def:)
+                          if (!*arg && argc > 1) arg = argv[1],++argv,--argc;
                           val = strchr(arg,'=');
                           if (val) *val++ = '\0'; else val = "1";
                           if (!TPPLexer_Define(arg,strlen(arg),val,strlen(val))) _exit(1); }
@@ -616,10 +693,8 @@ int main(int argc, char *argv[]) {
   else if (*arg == 'W') { TPP(wstate_t) state = TPP(WSTATE_ERROR); ++arg; /* Set an extension. */
                           if (!memcmp(arg,"no-",3)) arg += 3,state = TPP(WSTATE_DISABLE);
                           if (!TPPLexer_SetWarnings(arg,state)) goto noopt; }
-#if 1 /* Backwards-compatibility with old TPP */
-  else if (!strcmp(arg,"no-line")) no_line_directives = 1;
-  else if (!strcmp(arg,"tok")) outline_tokens = OUTLINE_MODE_TOK;
-#endif
+  BACKWARDS(else if (!memcmp(arg,"-Inc",4)) { arg += 4; goto add_inc; })
+  BACKWARDS(else if (!memcmp(arg,"-Def",4)) { arg += 4; goto add_def; })
   else {
 noopt:
    fprintf(stderr,
@@ -663,6 +738,7 @@ use_infile:
  TPPLexer_PushFileInherited(infile);
  TPPLexer_Current->l_callbacks.c_new_textfile = &pp_depcallback;
  if (!pp_depfirst(infile)) goto err1;
+ base_flags = TPPLexer_Current->l_flags;
  switch (pp_mode) {
   case PPMODE_DEPENDENCY: pp_deponly(); break;
   default               : pp_normal(); break;

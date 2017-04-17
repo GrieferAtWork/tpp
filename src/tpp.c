@@ -108,6 +108,8 @@
 #define __builtin_bswap16 _byteswap_ushort
 #define __builtin_bswap32 _byteswap_ulong
 #define __builtin_bswap64 _byteswap_uint64
+#define strcasecmp  stricmp
+#define strncasecmp strnicmp
 #endif
 
 #undef FALSE
@@ -195,30 +197,25 @@ extern void __debugbreak(void);
 #define CH_ISALPHA     0x01
 #define CH_ISDIGIT     0x02
 #define CH_ISSPACE     0x04
-#define CH_ISPRINT     0x08
-#define CH_ISTRIGRAPH  0x10 /*< Character can be used as the 3th byte of a trigraph. */
-#define CH_ISMULTICHAR 0x20 /*< Character is the first byte of a multi-character token (non-keyword; non-number; non-string). */
+#define CH_ISANSI      0x08 /*< The character is an ansi-alpha character. */
+#define CH_ISTRIGRAPH  0x10 /*< The character can be used as the 3th byte of a trigraph. */
+#define CH_ISMULTICHAR 0x20 /*< The character is the first byte of a multi-character token (non-keyword; non-number; non-string). */
 #define CH_ISLF        0x40 /*< The character is '\r' or '\n'. */
 #define CH_ISZERO      0x80 /*< The character is '\0'. */
 
 #define ceildiv(x,y) (((x)+((y)-1))/(y))
 
-#undef isalpha
-#undef isdigit
-#undef isalnum
-#undef isspace
-#undef isprint
-#define isalpha(ch)         (chrattr[(uint8_t)(ch)]&CH_ISALPHA)
-#define isdigit(ch)         (chrattr[(uint8_t)(ch)]&CH_ISDIGIT)
-#define isalnum(ch)         (chrattr[(uint8_t)(ch)]&(CH_ISALPHA|CH_ISDIGIT))
-#define isspace(ch)         (chrattr[(uint8_t)(ch)]&CH_ISSPACE)
-#define islf(ch)            (chrattr[(uint8_t)(ch)]&CH_ISLF)
-#define islforzero(ch)      (chrattr[(uint8_t)(ch)]&(CH_ISLF|CH_ISZERO))
-#define isspace_nolf(ch)   ((chrattr[(uint8_t)(ch)]&(CH_ISSPACE|CH_ISLF))==CH_ISSPACE)
-#define isnospace_orlf(ch) ((chrattr[(uint8_t)(ch)]&(CH_ISSPACE|CH_ISLF))!=CH_ISSPACE)
-#define isprint(ch)         (chrattr[(uint8_t)(ch)]&CH_ISPRINT)
-#define istrigraph(ch)      (chrattr[(uint8_t)(ch)]&CH_ISTRIGRAPH)
-#define ismultichar(ch)     (chrattr[(uint8_t)(ch)]&CH_ISMULTICHAR)
+#define tpp_isalpha(ch)         (chrattr[(uint8_t)(ch)]&CH_ISALPHA)
+#define tpp_isdigit(ch)         (chrattr[(uint8_t)(ch)]&CH_ISDIGIT)
+#define tpp_isalnum(ch)         (chrattr[(uint8_t)(ch)]&(CH_ISALPHA|CH_ISDIGIT))
+#define tpp_isansi(ch)          (chrattr[(uint8_t)(ch)]&CH_ISANSI)
+#define tpp_isspace(ch)         (chrattr[(uint8_t)(ch)]&CH_ISSPACE)
+#define tpp_islf(ch)            (chrattr[(uint8_t)(ch)]&CH_ISLF)
+#define tpp_islforzero(ch)      (chrattr[(uint8_t)(ch)]&(CH_ISLF|CH_ISZERO))
+#define tpp_isspace_nolf(ch)   ((chrattr[(uint8_t)(ch)]&(CH_ISSPACE|CH_ISLF))==CH_ISSPACE)
+#define tpp_isnospace_orlf(ch) ((chrattr[(uint8_t)(ch)]&(CH_ISSPACE|CH_ISLF))!=CH_ISSPACE)
+#define tpp_istrigraph(ch)      (chrattr[(uint8_t)(ch)]&CH_ISTRIGRAPH)
+#define tpp_ismultichar(ch)     (chrattr[(uint8_t)(ch)]&CH_ISMULTICHAR)
 
 static uint8_t const chrattr[256] = {
 /*[[[deemon
@@ -230,32 +227,32 @@ for (local i = 0; i < 256; ++i) {
       i == '_' || i == '$') flags |= CH_ISALPHA;
   if (i >= '0' && i <= '9') flags |= CH_ISDIGIT;
   if (i <= 32) flags |= CH_ISSPACE;
-  if (i >= 32 && i < 127) flags |= CH_ISPRINT;
   if (i in ['=','(','/',')','\'','<','!','>','-','?']) flags |= CH_ISTRIGRAPH;
   if (i in ['<','>','=','!','.','+','-','*','/','%',
             '&','|','^','#','~',':','@']) flags |= CH_ISMULTICHAR;
   if (i in ['\r','\n']) flags |= CH_ISLF;
   if (i in ['\0']) flags |= CH_ISZERO;
+  if (i >= 192) flags |= CH_ISANSI;
   print "0x%.2x," % flags,;
   if ((i % 16) == 15) print;
 }
 ]]]*/
   0x84,0x04,0x04,0x04,0x04,0x04,0x04,0x04,0x04,0x04,0x44,0x04,0x04,0x44,0x04,0x04,
   0x04,0x04,0x04,0x04,0x04,0x04,0x04,0x04,0x04,0x04,0x04,0x04,0x04,0x04,0x04,0x04,
-  0x0c,0x38,0x08,0x28,0x09,0x28,0x28,0x18,0x18,0x18,0x28,0x28,0x08,0x38,0x28,0x38,
-  0x0a,0x0a,0x0a,0x0a,0x0a,0x0a,0x0a,0x0a,0x0a,0x0a,0x28,0x08,0x38,0x38,0x38,0x18,
-  0x28,0x09,0x09,0x09,0x09,0x09,0x09,0x09,0x09,0x09,0x09,0x09,0x09,0x09,0x09,0x09,
-  0x09,0x09,0x09,0x09,0x09,0x09,0x09,0x09,0x09,0x09,0x09,0x08,0x08,0x08,0x28,0x09,
-  0x08,0x09,0x09,0x09,0x09,0x09,0x09,0x09,0x09,0x09,0x09,0x09,0x09,0x09,0x09,0x09,
-  0x09,0x09,0x09,0x09,0x09,0x09,0x09,0x09,0x09,0x09,0x09,0x08,0x28,0x08,0x28,0x00,
+  0x04,0x30,0x00,0x20,0x01,0x20,0x20,0x10,0x10,0x10,0x20,0x20,0x00,0x30,0x20,0x30,
+  0x02,0x02,0x02,0x02,0x02,0x02,0x02,0x02,0x02,0x02,0x20,0x00,0x30,0x30,0x30,0x10,
+  0x20,0x01,0x01,0x01,0x01,0x01,0x01,0x01,0x01,0x01,0x01,0x01,0x01,0x01,0x01,0x01,
+  0x01,0x01,0x01,0x01,0x01,0x01,0x01,0x01,0x01,0x01,0x01,0x00,0x00,0x00,0x20,0x01,
+  0x00,0x01,0x01,0x01,0x01,0x01,0x01,0x01,0x01,0x01,0x01,0x01,0x01,0x01,0x01,0x01,
+  0x01,0x01,0x01,0x01,0x01,0x01,0x01,0x01,0x01,0x01,0x01,0x00,0x20,0x00,0x20,0x00,
   0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
   0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
   0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
   0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
-  0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
-  0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
-  0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
-  0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
+  0x08,0x08,0x08,0x08,0x08,0x08,0x08,0x08,0x08,0x08,0x08,0x08,0x08,0x08,0x08,0x08,
+  0x08,0x08,0x08,0x08,0x08,0x08,0x08,0x08,0x08,0x08,0x08,0x08,0x08,0x08,0x08,0x08,
+  0x08,0x08,0x08,0x08,0x08,0x08,0x08,0x08,0x08,0x08,0x08,0x08,0x08,0x08,0x08,0x08,
+  0x08,0x08,0x08,0x08,0x08,0x08,0x08,0x08,0x08,0x08,0x08,0x08,0x08,0x08,0x08,0x08,
 //[[[end]]]
 };
 
@@ -364,13 +361,13 @@ do{ tok_t              _old_tok_id    = token.t_id;\
 #define LSTRIP_SPACE(begin,end) \
     while ((begin) != (end)) {\
      while (SKIP_WRAPLF(begin,end));\
-     if (!isspace(*(begin))) break;\
+     if (!tpp_isspace(*(begin))) break;\
      ++(begin);\
     }
 #define RSTRIP_SPACE(begin,end) \
     while ((end) != (begin)) {\
      while (SKIP_WRAPLF_REV(end,begin));\
-     if (!isspace((end)[-1])) break;\
+     if (!tpp_isspace((end)[-1])) break;\
      --(end);\
     }
 
@@ -424,6 +421,11 @@ do{ tok_t              _old_tok_id    = token.t_id;\
 #define HAVE_EXTENSION_EXT_ARE_FEATURES  (current.l_extensions&TPPLEXER_EXTENSION_EXT_ARE_FEATURES)
 #define HAVE_EXTENSION_MSVC_FIXED_INT    (current.l_extensions&TPPLEXER_EXTENSION_MSVC_FIXED_INT)
 #define HAVE_EXTENSION_NO_EXPAND_DEFINED (current.l_extensions&TPPLEXER_EXTENSION_NO_EXPAND_DEFINED)
+#define HAVE_EXTENSION_IFELSE_IN_EXPR    (current.l_extensions&TPPLEXER_EXTENSION_IFELSE_IN_EXPR)
+#define HAVE_EXTENSION_EXTENDED_IDENTS   (current.l_extensions&TPPLEXER_EXTENSION_EXTENDED_IDENTS)
+#if TPP_CONFIG_GCCFUNC
+#define HAVE_EXTENSION_BUILTIN_FUNCTIONS (current.l_extensions&TPPLEXER_EXTENSION_BUILTIN_FUNCTIONS)
+#endif /* TPP_CONFIG_GCCFUNC */
 #if !TPP_CONFIG_MINMACRO
 #define HAVE_EXTENSION_CPU_MACROS        (current.l_extensions&TPPLEXER_EXTENSION_CPU_MACROS)
 #define HAVE_EXTENSION_SYSTEM_MACROS     (current.l_extensions&TPPLEXER_EXTENSION_SYSTEM_MACROS)
@@ -561,7 +563,7 @@ skip_whitespace_and_comments(char *iter, char *end) {
  while (iter != end) {
   while (iter != end) {
    while (SKIP_WRAPLF(iter,end));
-   if (!isspace(*iter)) break;
+   if (!tpp_isspace(*iter)) break;
    ++iter;
   }
   if (iter == end) break;
@@ -584,10 +586,10 @@ skip_whitespace_and_comments(char *iter, char *end) {
       (current.l_extokens&TPPLEXER_TOKEN_CPP_COMMENT)) {
     iter = forward;
     while (iter != end) {
-     if (*iter == '\\' && iter+1 != end && islf(iter[1])) {
+     if (*iter == '\\' && iter+1 != end && tpp_islf(iter[1])) {
       if (*++iter == '\r' && *iter == '\n' && iter+1 != end) ++iter;
       ++iter;
-     } else if (islf(*iter)) break;
+     } else if (tpp_islf(*iter)) break;
      ++iter;
     }
    }
@@ -605,7 +607,7 @@ next:
  while (iter != begin) {
   while (iter != begin) {
    while (SKIP_WRAPLF_REV(iter,begin));
-   if (!isspace_nolf(iter[-1])) break;
+   if (!tpp_isspace_nolf(iter[-1])) break;
    --iter;
   }
   if (iter == begin) break;
@@ -625,13 +627,13 @@ next:
     continue;
    }
   }
-  if (islf(iter[-1])) {
+  if (tpp_islf(iter[-1])) {
    /* HINT: This linefeed is known not to be escaped, due to the 'SKIP_WRAPLF_REV' above. */
    if (current.l_extokens&TPPLEXER_TOKEN_CPP_COMMENT) {
     /* Check for a C++-style comment. */
     forward = iter-1;
     if (*forward == '\n' && forward != begin && forward[-1] == '\r') --forward;
-    while (forward != begin && !islf(forward[-1])) {
+    while (forward != begin && !tpp_islf(forward[-1])) {
      if (forward[-1] == '/' && *forward == '/') {
       /* Found a C++-style comment.
        * >> Now we must continue skipping whitespace before 'forward-1' */
@@ -693,10 +695,11 @@ PRIVATE struct {
 
 
 PUBLIC /*ref*/struct TPPString *
-TPPString_Cat(/*ref*/struct TPPString *lhs,
-              /*ref*/struct TPPString *rhs) {
+TPPString_Cat(/*ref*/struct TPPString *__restrict lhs,
+              /*ref*/struct TPPString *__restrict rhs) {
  struct TPPString *result;
  size_t total_size,alloc_size,lhs_size;
+ assert(lhs),assert(rhs),assert(lhs != rhs);
  if ((total_size = rhs->s_size) == 0) { TPPString_Decref(rhs); return lhs; }
  if (!lhs->s_size) { TPPString_Decref(lhs); return rhs; }
  total_size += (lhs_size = lhs->s_size);
@@ -744,7 +747,7 @@ err:
 }
 
 PUBLIC /*ref*/struct TPPString *
-TPPString_New(char const *text, size_t size) {
+TPPString_New(char const *__restrict text, size_t size) {
  struct TPPString *result;
  if unlikely(!size) {
   /* Special case: Can return the empty string. */
@@ -932,7 +935,7 @@ string_find_eol_after_comments(char *iter, char *end) {
  assert(iter <= end);
  while (iter != end) {
        if (*iter == '\\') { if (++iter == end) break; }
-  else if (islf(*iter)) break;
+  else if (tpp_islf(*iter)) break;
   else if (*iter == '/' &&
           (current.l_extokens&TPPLEXER_TOKEN_C_COMMENT)) {
    if (++iter != end) while (SKIP_WRAPLF(iter,end));
@@ -1049,7 +1052,7 @@ TPPFile_ColumnAt(struct TPPFile const *__restrict self,
  begin = self->f_text->s_text,iter = text_pointer;
  /* NOTE: Must accept \0 as linefeed here to correctly
   *       determine column numbers after a #define directive. */
- while (iter != begin && !islforzero(iter[-1])) --iter;
+ while (iter != begin && !tpp_islforzero(iter[-1])) --iter;
  /* WARNING: This value stops being accurate in expanded macros! */
  return (int)(text_pointer-iter);
 }
@@ -1532,7 +1535,7 @@ search_suitable_end_again:
      *    >> #error This error contains an unmatched ", but that's OK (< and so was that)
      * NOTE: Though remember that escaped linefeeds are always more powerful!
      */
-    else if (termstring_onlf && islf(ch)) mode &= ~(MODE_INCHAR|MODE_INSTRING);
+    else if (termstring_onlf && tpp_islf(ch)) mode &= ~(MODE_INCHAR|MODE_INSTRING);
     else if (iter != end) {
      if (mode&MODE_INCOMMENT) {
       /* End multi-line comment. */
@@ -1550,7 +1553,7 @@ search_suitable_end_again:
        ++iter;
       } else if (ch == '/') {
        /* Line-comment. */
-       while (iter != end && !islf(*iter)) ++iter;
+       while (iter != end && !tpp_islf(*iter)) ++iter;
        if (iter != end && *iter == '\r') ++iter;
        if (iter != end && *iter == '\n') ++iter;
       }
@@ -1613,6 +1616,8 @@ TPP_Unescape(char *buf, char const *data, size_t size) {
  unsigned char val;
  end = (iter = (char *)data)+size;
  while (iter != end) {
+  /* TODO: en/decode trigraph character sequences. */
+  /* TODO: decode escaped linefeeds. */
   if ((ch = *iter++) == '\\' && iter != end) {
    ch = *iter++;
    switch (ch) {
@@ -1678,6 +1683,8 @@ TPP_SizeofUnescape(char const *data, size_t size) {
  end = (iter = (char *)data)+size;
 next:
  while (iter != end) {
+  /* TODO: en/decode trigraph character sequences. */
+  /* TODO: decode escaped linefeeds. */
   if ((ch = *iter++) == '\\' && iter != end) {
    ch = *iter++;
    switch (ch) {
@@ -1731,6 +1738,7 @@ TPP_Escape(char *buf, char const *data, size_t size) {
  unsigned char *iter,*end,temp,ch;
  end = (iter = (unsigned char *)data)+size;
  for (; iter != end; ++iter) {
+  /* TODO: en/decode trigraph character sequences. */
   ch = *iter;
   switch (ch) {
    case '\a':   ch = 'a'; goto escape_ch;
@@ -1774,6 +1782,7 @@ TPP_SizeofEscape(char const *data, size_t size) {
  size_t result = size;
  end = (iter = (unsigned char *)data)+size;
  for (; iter != end; ++iter) {
+  /* TODO: en/decode trigraph character sequences. */
   ch = *iter;
   switch (ch) {
    case '\033':
@@ -1812,6 +1821,17 @@ TPP_SizeofItos(int_t i) {
  do ++result;
  while ((i /= 10) != 0);
  return result;
+}
+
+PUBLIC char *
+TPP_Ftos(char *buf, float_t f) {
+ (void)f; /* TODO */
+ return buf;
+}
+PUBLIC size_t
+TPP_SizeofFtos(float_t f) {
+ (void)f; /* TODO */
+ return 0;
 }
 
 
@@ -2290,7 +2310,7 @@ skip_argument_name:
    while (result->f_begin != curfile->f_end) {
     while (SKIP_WRAPLF(result->f_begin,curfile->f_end));
     if (result->f_begin == curfile->f_end || 
-        isnospace_orlf(*result->f_begin)) break;
+        tpp_isnospace_orlf(*result->f_begin)) break;
     ++result->f_begin;
    }
   }
@@ -2305,7 +2325,7 @@ skip_argument_name:
   while (result->f_end != result->f_begin) {
    while (SKIP_WRAPLF_REV(result->f_end,result->f_begin));
    if (result->f_end == result->f_begin ||
-      !isspace(result->f_end[-1])) break;
+      !tpp_isspace(result->f_end[-1])) break;
    --result->f_end;
   }
  }
@@ -2908,8 +2928,23 @@ PRIVATE int set_wstate(int wid, wstate_t state) {
  return 1;
 }
 
+PUBLIC wstate_t TPPLexer_GetWarning(int wnum) {
+ struct TPPWarningState *curstate;
+ uint8_t bitset_byte,byte_shift;
+ assert(TPPLexer_Current);
+ if unlikely(wnum < 0 || wnum >= W_COUNT) return WSTATE_WARN;
+ curstate = current.l_warnings.w_curstate;
+ assert(curstate);
+ assert((curstate == &current.l_warnings.w_basestate) ==
+        (curstate->ws_prev == NULL));
+ wnum += WG_COUNT;
+ assert(wnum < TPP_WARNING_TOTAL);
+ bitset_byte = curstate->ws_state[wnum/(8/TPP_WARNING_BITS)];
+ byte_shift  = (wnum%(8/TPP_WARNING_BITS))*TPP_WARNING_BITS;
+ return (wstate_t)((bitset_byte >> byte_shift)&3);
+}
 PUBLIC int TPPLexer_SetWarning(int wnum, wstate_t state) {
- return unlikely(wnum >= W_COUNT) ? 2 : set_wstate(wnum+WG_COUNT,state);
+ return unlikely(wnum < 0 || wnum >= W_COUNT) ? 2 : set_wstate(wnum+WG_COUNT,state);
 }
 PUBLIC int TPPLexer_SetWarnings(char const *__restrict group, wstate_t state) {
  char const *const *iter;
@@ -2990,6 +3025,7 @@ PUBLIC int TPPLexer_Init(struct TPPLexer *__restrict self) {
  self->l_limit_mrec        = TPPLEXER_DEFAULT_LIMIT_MREC;
  self->l_limit_incl        = TPPLEXER_DEFAULT_LIMIT_INCL;
  self->l_eof_paren         = 0;
+ self->l_warncount         = 0;
  self->l_counter           = 0;
  self->l_ifdef.is_slotc    = 0;
  self->l_ifdef.is_slota    = 0;
@@ -3150,16 +3186,23 @@ PRIVATE struct tpp_extension const tpp_extensions[] = {
  EXTENSION("extensions-are-features",TPPLEXER_EXTENSION_EXT_ARE_FEATURES),
  EXTENSION("fixed-length-integrals",TPPLEXER_EXTENSION_MSVC_FIXED_INT),
  EXTENSION("dont-expand-defined",TPPLEXER_EXTENSION_NO_EXPAND_DEFINED),
+ EXTENSION("ifelse-in-expressions",TPPLEXER_EXTENSION_IFELSE_IN_EXPR),
+ EXTENSION("extended-identifiers",TPPLEXER_EXTENSION_EXTENDED_IDENTS),
+#if TPP_CONFIG_GCCFUNC
+ EXTENSION("builtins-in-expressions",TPPLEXER_EXTENSION_BUILTIN_FUNCTIONS),
+#endif /* TPP_CONFIG_GCCFUNC */
 #if !TPP_CONFIG_MINMACRO
- EXTENSION("dont-expand-defined",TPPLEXER_EXTENSION_CPU_MACROS),
- EXTENSION("dont-expand-defined",TPPLEXER_EXTENSION_SYSTEM_MACROS),
- EXTENSION("dont-expand-defined",TPPLEXER_EXTENSION_UTILITY_MACROS),
+ EXTENSION("define-cpu-macros",TPPLEXER_EXTENSION_CPU_MACROS),
+ EXTENSION("define-system-macros",TPPLEXER_EXTENSION_SYSTEM_MACROS),
+ EXTENSION("define-utility-macros",TPPLEXER_EXTENSION_UTILITY_MACROS),
 #endif /* !TPP_CONFIG_MINMACRO */
 #undef EXTENSION
  {NULL,0,0},
 };
 
+#ifdef tolower
 #undef tolower
+#endif
 #define tolower(c) ((c) >= 'A' && (c) <= 'Z' ? ((c)+('a'-'A')) : (c))
 
 #if 0
@@ -3367,8 +3410,8 @@ do_fix_filename(char *filename, size_t *pfilename_size) {
  char *text_iter,*text_end,*slash; size_t filename_size;
  filename_size = *pfilename_size;
  /* General filename sanitizations. */
- while (isspace(*filename) && filename_size) ++filename,--filename_size;
- while (filename_size && isspace(filename[filename_size-1])) --filename_size;
+ while (tpp_isspace(*filename) && filename_size) ++filename,--filename_size;
+ while (filename_size && tpp_isspace(filename[filename_size-1])) --filename_size;
  filename[filename_size] = '\0'; /* Create a zero-terminated string. */
  text_end = filename+filename_size;
 #ifdef ALTSEP
@@ -3380,12 +3423,12 @@ do_fix_filename(char *filename, size_t *pfilename_size) {
  for (text_iter = filename; text_iter != text_end;) {
   assert(text_iter < text_end);
   if (*text_iter == SEP) {
-   while (text_iter != filename && isspace(text_iter[-1])) {
+   while (text_iter != filename && tpp_isspace(text_iter[-1])) {
     memmove(text_iter-1,text_iter, /* NOTE: This also moves the '\0'-terminator. */
            (size_t)((text_end-text_iter)+1)*sizeof(char));
     --text_iter,--text_end;
    }
-   while (text_end != text_iter && isspace(text_iter[1])) {
+   while (text_end != text_iter && tpp_isspace(text_iter[1])) {
     memmove(text_iter+1,text_iter+2, /* NOTE: This also moves the '\0'-terminator. */
            (size_t)((text_end-text_iter)-1)*sizeof(char));
     --text_end;
@@ -3907,9 +3950,11 @@ PUBLIC tok_t TPPLexer_YieldRaw(void) {
  struct TPPFile *file,*prev_file;
  char *iter,*end,*forward; tok_t ch;
  assert(TPPLexer_Current);
- /* Refuse parsing more data if an error occurred. */
+ /* Check for special lexer state. */
  if (current.l_flags&(TPPLEXER_FLAG_ERROR|TPPLEXER_FLAG_EOF_ON_PAREN)) {
+  /* Refuse parsing more data if an error occurred. */
   if (current.l_flags&TPPLEXER_FLAG_ERROR) return TOK_ERR;
+  assert(current.l_flags&TPPLEXER_FLAG_EOF_ON_PAREN);
   /* Refuse to return anything other than EOF when eof-on-paren is
    * turned on an the parenthesis recursion has dropped to ZERO(0). */
   if (!current.l_eof_paren) { return TOK = TOK_EOF; }
@@ -3927,9 +3972,9 @@ startover_iter:
  assert(iter <= end);
  /* Start reading data. */
  ch = (unsigned char)*iter++;
- if (ismultichar(ch)) {
+ if (tpp_ismultichar(ch)) {
 parse_multichar:
-  /* For multi-char sequences such as '<<' or '!=' */
+  /* Common code for multi-char sequences such as '<<' or '!=' */
   forward = iter;
   while (SKIP_WRAPLF(forward,end));
  }
@@ -3977,7 +4022,7 @@ parse_multichar:
    /* Scan forward until the end of the string/character. */
    while (iter != end && *iter != (char)ch) {
     while (SKIP_WRAPLF(iter,end));
-    if ((current.l_flags&TPPLEXER_FLAG_TERMINATE_STRING_LF) && islforzero(*iter)) {
+    if ((current.l_flags&TPPLEXER_FLAG_TERMINATE_STRING_LF) && tpp_islforzero(*iter)) {
      if unlikely(!TPPLexer_Warn(W_STRING_TERMINATED_BY_LINEFEED)) goto err;
      break;
     }
@@ -4018,7 +4063,7 @@ parse_multichar:
     }
     if unlikely(!TPPLexer_Warn(W_ENCOUNTERED_TRIGRAPH,iter-1)) goto err;
     iter += 2;
-    if (ismultichar(ch)) goto parse_multichar;
+    if (tpp_ismultichar(ch)) goto parse_multichar;
    }
    goto settok;
 
@@ -4159,7 +4204,7 @@ parse_multichar:
      while (SKIP_WRAPLF(forward,end)) {
       if unlikely(!TPPLexer_Warn(W_LINE_COMMENT_CONTINUED)) goto err;
      }
-    } while (!islforzero(*forward));
+    } while (!tpp_islforzero(*forward));
     if (!(current.l_flags&TPPLEXER_FLAG_COMMENT_NOOWN_LF) &&
        (*forward && *forward++ == '\r' && *forward == '\n')) ++forward;
     iter = forward;
@@ -4238,26 +4283,28 @@ set_comment:
    if (current.l_flags&TPPLEXER_FLAG_EOF_ON_PAREN) {
     /* Handle EOF parenthesis recursion. */
     assert(current.l_eof_paren); /* Already checked above. */
-    ch == '(' ? ++current.l_eof_paren
-              : --current.l_eof_paren;
+         if (ch == '(') ++current.l_eof_paren;
+    else if (!--current.l_eof_paren) ch = TOK_EOF;
    }
    goto settok;
 
   case '$':
    if (!HAVE_EXTENSION_DOLLAR_IS_ALPHA) goto settok;
   default:
-   if (isalpha(ch)) {
+   if (tpp_isalpha(ch) || (HAVE_EXTENSION_EXTENDED_IDENTS && tpp_isansi(ch))) {
     struct TPPKeyword *kwd_entry;
-    size_t name_size = 1;
-    size_t name_escapesize;
+    size_t name_escapesize,name_size = 1;
+    uint8_t chflags = CH_ISALPHA|CH_ISDIGIT;
+    /* Set the ANSI flag if we're supporting those characters. */
+    if (HAVE_EXTENSION_EXTENDED_IDENTS) chflags |= CH_ISANSI;
     /* keyword: scan until a non-alnum character is found. */
     if (HAVE_EXTENSION_DOLLAR_IS_ALPHA) for (;;) {
      while (SKIP_WRAPLF(iter,end));
-     if (!isalnum(*iter)) break;
+     if (!(chrattr[*iter]&chflags)) break;
      ++iter,++name_size;
     } else for (;;) {
      while (SKIP_WRAPLF(iter,end));
-     if (!isalnum(*iter) || *iter == '$') break;
+     if (!(chrattr[*iter]&chflags) || *iter == '$') break;
      ++iter,++name_size;
     }
     /* Lookup/generate the token id of this keyword. */
@@ -4281,13 +4328,13 @@ set_comment:
     }
     break;
    }
-   if (isdigit(ch)) {
+   if (tpp_isdigit(ch)) {
     /* Integer/float. */
     token.t_id = TOK_INT;
     for (;;) {
      while (SKIP_WRAPLF(iter,end));
 continue_int:
-     if (!isalnum(*iter)) {
+     if (!tpp_isalnum(*iter)) {
       switch (*iter) {
        case '.':
         /* Switch to a float-token for the first encountered dot. */
@@ -4311,12 +4358,12 @@ continue_int:
      ++iter;
     }
    }
-   if (isspace(ch)) {
+   if (tpp_isspace(ch)) {
 whitespace:
     /* Parse space tokens. */
     for (;;) {
      while (SKIP_WRAPLF(iter,end));
-     if (!isspace_nolf(*iter) || iter == end) break;
+     if (!tpp_isspace_nolf(*iter) || iter == end) break;
      ++iter;
     }
     if (!(current.l_flags&TPPLEXER_FLAG_WANTSPACE)) goto startover_iter;
@@ -4363,7 +4410,7 @@ PRIVATE int at_start_of_line(void) {
  /* STDC allows comments here (So we must ignore slash-star comments)! */
  line_begin = skip_whitespacenolf_and_comments_rev(line_begin,file_begin);
  if (line_begin != file_begin &&
-    !islforzero(line_begin[-1])
+    !tpp_islforzero(line_begin[-1])
      ) return 0; /* Not at the start of a line. */
  return 1;
 }
@@ -4621,6 +4668,7 @@ def_skip_until_lf:
     int line_offset;
    case KWD_line:
     TPPLexer_Yield();
+   case TOK_INT: /* For compatibility with cpp's line emissions. */
     if unlikely(!TPPLexer_Eval(&val)) goto err;
     TPPConst_ToInt(&val);
     textfile = TPPLexer_Textfile();
@@ -4674,9 +4722,9 @@ def_skip_until_lf:
     int line,block_mode;
     struct TPPKeyword *ifndef_keyword;
     struct TPPFile *curfile;
-   case KWD_ifdef:
-   case KWD_ifndef:
-    block_mode = TOK == KWD_ifndef;
+    if (FALSE) { case KWD_ifdef:  block_mode = 0; }
+    if (FALSE) { case KWD_ifndef: block_mode = 1; }
+    assert(block_mode == (TOK == KWD_ifndef));
     ifndef_keyword = NULL;
     line = TPPLexer_LINE();
     TPPLexer_YieldRaw();
@@ -4783,7 +4831,10 @@ not_a_guard:
      yield_fetch();
     }
     if unlikely(!TPPLexer_Eval(&ifval)) goto err;
-    TPPConst_ToBool(&ifval);
+    if (!TPPConst_IsBool(&ifval)) {
+     TPPLexer_Warn(W_EXPECTED_BOOL,&ifval);
+     TPPConst_ToBool(&ifval);
+    }
     block_mode = (int)ifval.c_data.c_int;
     goto create_block;
    } break;
@@ -4807,7 +4858,10 @@ not_a_guard:
      assert(!else_slot->iss_mode);
      yield_fetch();
      if unlikely(!TPPLexer_Eval(&elif_val)) goto err;
-     TPPConst_ToBool(&elif_val);
+     if (!TPPConst_IsBool(&elif_val)) {
+      TPPLexer_Warn(W_EXPECTED_BOOL,&elif_val);
+      TPPConst_ToBool(&elif_val);
+     }
      else_slot->iss_mode = (int)elif_val.c_data.c_int;
      /* If the block is now enabled, skip the rest
       * of the line and continue from there on. */
@@ -4987,8 +5041,8 @@ asm_comment:
       * WARNING: Similar to line-comments this kind of comment
       *          takes precedence before slash-start comments.
       *          For that reason (and unlike other directives),
-      *          we search for the regular EOL instead of the one
-      *          post potential c-style comments
+      *          we search for the regular EOL instead of the
+      *          one past potential c-style comments.
       *       >> Therefor, we call 'string_find_eol' below,
       *          instead of 'string_find_eol_after_comments'.
       */
@@ -5322,6 +5376,7 @@ create_int_file:
     int create_missing_keyword;
    case KWD___has_attribute:
    case KWD___has_builtin:
+   case KWD___has_tpp_builtin:
    case KWD___has_cpp_attribute:
    case KWD___has_declspec_attribute:
    case KWD___has_extension:
@@ -5349,7 +5404,7 @@ create_int_file:
     keyword_end = keyword_begin;
     while (keyword_end != file_end) {
      while (SKIP_WRAPLF(keyword_end,file_end));
-     if (!isalnum(*keyword_end)) break;
+     if (!tpp_isalnum(*keyword_end)) break;
      ++keyword_end;
     }
     file_pos = skip_whitespace_and_comments(keyword_end,file_end);
@@ -5399,6 +5454,7 @@ create_int_file:
       uint32_t mask;
       if (FALSE) { case KWD___has_attribute:          mask  = TPP_KEYWORDFLAG_HAS_ATTRIBUTE;          }
       if (FALSE) { case KWD___has_builtin:            mask  = TPP_KEYWORDFLAG_HAS_BUILTIN;            }
+      if (FALSE) { case KWD___has_tpp_builtin:        mask  = TPP_KEYWORDFLAG_HAS_TPP_BUILTIN;        }
       if (FALSE) { case KWD___has_cpp_attribute:      mask  = TPP_KEYWORDFLAG_HAS_CPP_ATTRIBUTE;      }
       if (FALSE) { case KWD___has_declspec_attribute: mask  = TPP_KEYWORDFLAG_HAS_DECLSPEC_ATTRIBUTE; }
       if (FALSE) { case KWD___has_extension:          mask  = TPP_KEYWORDFLAG_HAS_EXTENSION;          }
@@ -5534,9 +5590,11 @@ create_int_file:
     current.l_eof_paren = 1; /* Use EOF-on-paren recursion here. */
     pragma_error        = TPPLexer_ParsePragma();
     current.l_eof_paren = old_eofparen;
+    current.l_flags    &= ~(TPPLEXER_FLAG_EOF_ON_PAREN);
     current.l_flags    |= (_oldflags&TPPLEXER_FLAG_EOF_ON_PAREN);
     if (!pragma_error && (current.l_flags&TPPLEXER_FLAG_EAT_UNKNOWN_PRAGMA)) pragma_error = 1;
     while (token.t_file != current.l_eof_file) popfile();
+    if (!TOK && *token.t_begin == ')') TOK = ')';
     if (pragma_error) {
      int recursion = 1;
      while (TOK > 0) {
@@ -5865,6 +5923,7 @@ err_substr:  TPPString_Decref(basestring);
 }
 #include "tpp-defs.inl"
 #undef BUILTIN_MACRO
+    ;
 predef_macro:
     predefined_macro->f_pos = predefined_macro->f_begin;
     pushfile((struct TPPFile *)predefined_macro);
@@ -6434,7 +6493,7 @@ TPPLexer_ExpandFunctionMacro(struct TPPFile *__restrict macro) {
   end = arguments_file->f_end;
   while (iter != end) {
    while (SKIP_WRAPLF(iter,end));
-   if (!isspace(*iter)) goto at_next_non_whitespace;
+   if (!tpp_isspace(*iter)) goto at_next_non_whitespace;
    ++iter;
   }
   arguments_file = arguments_file->f_prev;
@@ -6789,8 +6848,7 @@ done_args:
     * name was encountered must be restored.
     * s.a.: The other comment above.
     */
-   assert(file_iter);
-   while (file_iter != &TPPFile_Empty) {
+   while ((assert(file_iter),file_iter != &TPPFile_Empty)) {
      /* Check the text of a previous version again that of this one. */
     if (file_iter->f_kind == TPPFILE_KIND_MACRO &&
        (file_iter->f_macro.m_flags&TPP_MACROFILE_KIND) == TPP_MACROFILE_KIND_EXPANDED &&
@@ -6837,6 +6895,11 @@ TPPConst_ToString(struct TPPConst const *__restrict self) {
   TPP_Escape(result->s_text+1,
              self->c_data.c_string->s_text,
              self->c_data.c_string->s_size);
+ } else if (self->c_kind == TPP_CONST_FLOAT) {
+  result_size = TPP_SizeofFtos(self->c_data.c_float);
+  result = TPPString_NewSized(result_size);
+  if unlikely(!result) return NULL;
+  TPP_Ftos(result->s_text,self->c_data.c_float);
  } else {
   result_size = TPP_SizeofItos(self->c_data.c_int);
   result = TPPString_NewSized(result_size);
@@ -6861,12 +6924,6 @@ TPPConst_ToString(struct TPPConst const *__restrict self) {
 #define EVAL_CALL  /* nothing */
 #endif
 
-
-#ifdef _MSC_VER
-#pragma warning(push)
-#pragma warning(disable: 4701)
-#endif
-PRIVATE void EVAL_CALL eval_question(struct TPPConst *result);
 
 PUBLIC /*ref*/struct TPPString *
 TPPLexer_ParseString(void) {
@@ -7044,8 +7101,176 @@ end:   return result;
 err:   result = TPP_ATOI_ERR; goto end;
 }
 
+PUBLIC int TPP_Atof(TPP(float_t) *__restrict pfloat) {
+ assert(pfloat);
+ assert(TPPLexer_Current);
+ assert(TOK == TOK_FLOAT);
+ *pfloat = 0; /* TODO! */
+ return 0;
+}
+
+
+PUBLIC int TPP_PrintToken(printer_t printer, void *closure) {
+ char *flush_start,*iter,*end,arg[1],temp; int error = 0;
+#define print(s,l)         do{if((error=(*printer)(s,l,closure))!=0)goto done;}while(FALSE)
+#define return_print(s,l)  do{error = (*printer)(s,l,closure);goto done;}while(FALSE)
+ assert(TPPLexer_Current);
+ assert(printer);
+ /* Manually print digraph/trigraph characters. */
+ switch (TOK) {
+  case '{': case '[': case '}':
+  case ']': case '#': case '\\':
+  case '^': case '|': case '~':
+  case '?': arg[0] = (char)TOK;
+            return_print(arg,1);
+  case TOK_GLUE: return_print("##",2);
+  default: break;
+ }
+ iter = flush_start = token.t_begin,end = token.t_end;
+ while (iter != end) {
+  assert(iter < end);
+  /* Handle escaped linefeeds. */
+  if (*iter == '\\' && tpp_islf(iter[1])) {
+   if (iter != flush_start) print(flush_start,(size_t)(iter-flush_start));
+   if (*++iter == '\r' && iter[1] == '\n') ++iter;
+   flush_start = ++iter;
+   continue;
+  }
+  if (HAVE_FEATURE_TRIGRAPHS &&
+      iter[0] == '?' && iter[1] == '?') {
+   /* Decode trigraph sequences. */
+   switch (iter[2]) {
+    case '=':  temp = '#';  break; /* ??= */
+    case '(':  temp = '[';  break; /* ??( */
+    case '/':  temp = '\\'; break; /* ??/ */
+    case ')':  temp = ']';  break; /* ??) */
+    case '\'': temp = '^';  break; /* ??' */
+    case '<':  temp = '{';  break; /* ??< */
+    case '!':  temp = '|';  break; /* ??! */
+    case '>':  temp = '}';  break; /* ??> */
+    case '-':  temp = '~';  break; /* ??- */
+    case '?':  temp = '?';  break; /* ??? */
+    default: goto next;
+   }
+   arg[0] = temp;
+   print(arg,1);
+   iter += 3;
+   continue;
+  }
+next:
+  ++iter;
+ }
+ if (iter != flush_start) {
+  error = (*printer)(flush_start,(size_t)(iter-flush_start),closure);
+ }
+done:
+ return error;
+#undef return_print
+#undef print
+}
+PUBLIC int TPP_PrintComment(printer_t printer, void *closure) {
+ (void)printer,(void)closure;
+ return 0; /* TODO */
+}
+
+#if TPP_CONFIG_GCCFUNC
+#ifndef __INTELLISENSE__
+#define DECLARE_BUILTIN_FUNCTIONS
+#include "tpp-defs.inl"
+#undef DECLARE_BUILTIN_FUNCTIONS
+#endif
+
+PRIVATE int get_builtin_argc(tok_t function) {
+ int result = -1;
+ switch (function) {
+#ifndef __INTELLISENSE__
+#define BUILTIN_FUNCTION(name,argc,expr) case name: result = (argc); break;
+#include "tpp-defs.inl"
+#undef BUILTIN_FUNCTION
+#endif
+  default: break;
+ }
+ return result;
+}
+
+PRIVATE int EVAL_CALL
+eval_call_builtin(struct TPPConst *__restrict result) {
+ int retval = 0,argc; tok_t function = TOK;
+ struct TPPConst *argv,*iter,*end;
+ assert(result);
+ if unlikely((argc = get_builtin_argc(function)) < 0) goto ret;
+ yield_fetch();
+ if (TOK != '(') TPPLexer_Warn(W_EXPECTED_LPAREN);
+ else yield_fetch();
+ argv = (struct TPPConst *)alloca(argc*sizeof(struct TPPConst));
+ end = (iter = argv)+argc;
+ if (iter != end) for (;;) {
+  if unlikely(!TPPLexer_Eval(iter)) goto err_iter;
+  if (++iter == end) break;
+  if (TOK != ',') TPPLexer_Warn(W_EXPECTED_COMMA);
+  else yield_fetch();
+ }
+ if (TOK != ')') TPPLexer_Warn(W_EXPECTED_LPAREN);
+ else yield_fetch();
+ /* The argument list has been parsed. - Time for the big function-switch. */
+ switch (function) {
+#ifndef __INTELLISENSE__
+#define SETERR()              goto seterr_argv
+#define ERR()                 goto err_argv
+#define A(i)                 (argv+(i))
+#define INT(i)                TPPConst_AsInt(A(i))
+#define FLOAT(i)              TPPConst_AsFloat(A(i))
+#define STRING(i)            (A(i)->c_data.c_string)
+#define IS_STRING(i)         (A(i)->c_kind == TPP_CONST_STRING)
+#define RETURN_INHERIT(val) { *(result) = *(val); goto success; }
+#define RETURN_COPY(val)    { TPPConst_InitCopy(result,val); goto success; }
+#define RETURN_INT(val)     { result->c_data.c_int = (val); goto set_int_common; }
+#define RETURN_STRING(val)  { result->c_data.c_string = (val); goto set_string_common; }
+#define BUILTIN_FUNCTION(name,argc,expr) case name: expr; break;
+#include "tpp-defs.inl"
+#undef BUILTIN_FUNCTION
+#undef RETURN_STRING
+#undef RETURN_INT
+#undef RETURN_COPY
+#undef RETURN_INHERIT
+#undef IS_STRING
+#undef STRING
+#undef FLOAT
+#undef INT
+#undef A
+#undef ERR
+#undef SETERR
+#endif
+  default:
+#ifdef _MSC_VER
+   __assume(0);
+#elif defined(__GNUC__)
+   __builtin_unreachable();
+#else
+   TPPConst_ZERO(result);
+   break;
+#endif
+set_int_common:    result->c_kind = TPP_CONST_INTEGRAL; break;
+//set_float_common:  result->c_kind = TPP_CONST_FLOAT; break;
+set_string_common: result->c_kind = TPP_CONST_STRING; break;
+ }
+success:     retval = 1;
+err_argv:    iter = argv+argc;
+err_iter:    while (iter-- != argv) TPPConst_Quit(iter);
+ret:         return retval;
+seterr_argv: TPPLexer_SetErr(); goto err_argv;
+}
+#endif /* TPP_CONFIG_GCCFUNC */
+
+
+#ifdef _MSC_VER
+#pragma warning(push)
+#pragma warning(disable: 4701)
+#endif
+PRIVATE void EVAL_CALL eval_question(struct TPPConst *result);
 
 PRIVATE void EVAL_CALL eval_unary(struct TPPConst *result) {
+again_unary:
  switch (TOK) {
 
   { /* Parse an integer/character. */
@@ -7054,6 +7279,15 @@ PRIVATE void EVAL_CALL eval_unary(struct TPPConst *result) {
    if (result) {
     result->c_kind = TPP_CONST_INTEGRAL;
     TPP_Atoi(&result->c_data.c_int);
+   }
+   yield_fetch();
+  } break;
+
+  { /* Parse a floating point value. */
+  case TOK_FLOAT:
+   if (result) {
+    result->c_kind = TPP_CONST_FLOAT;
+    TPP_Atof(&result->c_data.c_float);
    }
    yield_fetch();
   } break;
@@ -7071,9 +7305,20 @@ PRIVATE void EVAL_CALL eval_unary(struct TPPConst *result) {
 
   case '!':
    yield_fetch();
+   if (TOK == '!') {
+    /* Prevent the warning below.
+     * >> '!!42' should evaluate to '1' without a warning. */
+    yield_fetch();
+    eval_unary(result);
+    TPPConst_ToBool(result);
+    break;
+   }
    eval_unary(result);
    if (result) {
-    TPPConst_ToBool(result);
+    if (!TPPConst_IsBool(result)) {
+     TPPLexer_Warn(W_EXPECTED_BOOL_UNARY,result);
+     TPPConst_ToBool(result);
+    }
     result->c_data.c_int ^= 1;
    }
    break;
@@ -7106,12 +7351,65 @@ PRIVATE void EVAL_CALL eval_unary(struct TPPConst *result) {
    break;
 
   case '(':
+   /* Extension for parsing c-style casting expressions:
+    * >> __TPP_EVAL((int)42);
+    * NOTE: Since the preprocessor doesn't know about c-types,
+    *       it warns about such usage, but is still able to
+    *       
+    */
+   yield_fetch();
+   if (TPP_ISKEYWORD(TOK) &&
+      (TPP_ISUSERKEYWORD(TOK) || (
+#if TPP_CONFIG_GCCFUNC
+       get_builtin_argc(TOK) == -1 &&
+       TOK != KWD___builtin_constant_p &&
+       TOK != KWD___builtin_choose_expr &&
+#endif
+       TOK != KWD_defined &&
+       TOK != KWD_if))) {
+    unsigned int recursion = 1;
+    /* Keyword without any special meaning associated to it.
+     * >> Assume c-style casting and recursively skip it. */
+    if (result && !TPPLexer_Warn(W_TYPECAST_IN_EXPRESSION)) return;
+    while (TOK > 0) {
+     yield_fetch();
+          if (TOK == '(') ++recursion;
+     else if (TOK == ')' && !--recursion) break;
+    }
+    if (TOK == ')') yield_fetch();
+    else TPPLexer_Warn(W_EXPECTED_RPAREN_AFTER_CAST);
+    goto again_unary;
+   }
+   if (TOK == '{') {
+    unsigned int recursion = 1;
+    if (result) {
+     /* Warn about statements in expressions, only if the result is used.
+      * Don't warn if used like this:
+      * >> #define compiletime_add(a,b)
+      * >> #define foo()
+      * >> __TPP_EVAL((__builtin_constant_p(42)) : )
+      */
+     TPPLexer_Warn(W_STATEMENT_IN_EXPRESSION);
+     TPPConst_ZERO(result);
+    }
+    while (TOK > 0) {
+     yield_fetch();
+          if (TOK == '{') ++recursion;
+     else if (TOK == '}' && !--recursion) break;
+    }
+    if (TOK == '}') yield_fetch();
+    else TPPLexer_Warn(W_EXPECTED_RBRACE_AFTER_STATEMENT);
+    goto rparen_after_expression;
+   }
+   goto begin_after_paren;
    for (;;) {
     yield_fetch();
+begin_after_paren:
     eval_question(result);
     if (TOK != ',') break;
     if (result) TPPConst_Quit(result);
    }
+rparen_after_expression:
    if (TOK == ')') yield_fetch();
    else TPPLexer_Warn(W_EXPECTED_RPAREN_IN_EXPRESSION);
    break;
@@ -7193,14 +7491,149 @@ PRIVATE void EVAL_CALL eval_unary(struct TPPConst *result) {
    }
   } break;
 
+  { /* Statement-style if expressions. */
+   int is_true;
+  case KWD_if:
+   if (!HAVE_EXTENSION_IFELSE_IN_EXPR) goto defch;
+   yield_fetch();
+   if (TOK != '(') TPPLexer_Warn(W_EXPECTED_LPAREN);
+   else yield_fetch();
+   eval_question(result);
+   if (TOK != ')') TPPLexer_Warn(W_EXPECTED_RPAREN);
+   else yield_fetch();
+   if (result && !TPPConst_IsBool(result)) {
+    TPPLexer_Warn(W_EXPECTED_BOOL,result);
+    TPPConst_ToBool(result);
+   }
+   is_true = !result || result->c_data.c_int;
+   eval_question(is_true ? result : NULL);
+   for (;;) {
+    while (TOK == ';') yield_fetch();
+    if (TOK != KWD_elif) break;
+    yield_fetch();
+    if (TOK != '(') TPPLexer_Warn(W_EXPECTED_LPAREN);
+    else yield_fetch();
+    eval_question(is_true ? NULL : result);
+    if (TOK != ')') TPPLexer_Warn(W_EXPECTED_RPAREN);
+    else yield_fetch();
+    assert(result || is_true);
+    eval_question((!is_true && TPPConst_IsTrue(result)) ?
+                   (is_true = 1,result->c_kind == TPP_CONST_STRING
+                   ? TPPString_Decref(result->c_data.c_string)
+                   : (void)0,result) : NULL);
+   }
+   assert(result || is_true);
+   if (TOK == KWD_else) {
+    yield_fetch();
+    eval_question(is_true ? NULL : result);
+    while (TOK == ';') yield_fetch();
+   } else if (!is_true) {
+    TPPLexer_Warn(W_EXPECTED_ELSE_IN_EXPRESSION);
+    assert(result);
+    TPPConst_ZERO(result);
+   }
+  } break;
+
+#if TPP_CONFIG_GCCFUNC
+  {
+   size_t old_warncount; int eval_error;
+  case KWD___builtin_constant_p:
+   yield_fetch();
+   if (TOK != '(') TPPLexer_Warn(W_EXPECTED_LPAREN);
+   else yield_fetch();
+   old_warncount = current.l_warncount;
+   /* __builtin_constant_p() returns true if the
+    * given expression can be resolved at compile-time.
+    * The only thing that can prevent this here are unknown
+    * identifiers, which as it turns out emit a warning when
+    * encountered.
+    * >> To implement this builtin, we simply check if any
+    *    warnings occurred while evaluating the expression.
+    * Using this builtin, TPP can implement some ~really~ high-level macros:
+    * >> #define CAT2(a,b) a##b
+    * >> #define CAT(a,b) CAT2(a,b)
+    * >> #define __TPP_TRYEVAL_0(expr)              expr
+    * >> #define __TPP_TRYEVAL_1(expr)   __TPP_EVAL(expr)
+    * >> #define __TPP_TRYEVAL(expr) CAT(__TPP_TRYEVAL_,__TPP_EVAL(__builtin_constant_p(expr)))(expr)
+    * >> #define add(a,b) __TPP_TRYEVAL(a+b)
+    * >> add(10,20) // Expands to: [30]
+    * >> add(10,b)  // Expands to: [10][+][b]
+    * >> add(a,20)  // Expands to: [a][+][20]
+    * >> add(a,b)   // Expands to: [a][+][b]
+    * But the main purpose is for implicit, extended
+    * compatibility with existing code like this:
+    * >> extern uint16_t __arch_bswap16_impl(uint16_t x);
+    * >> #define __arch_bswap16(x) \
+    * >> ({ typeof(x) _x = (x); \
+    * >>    if (cpu_version() >= 2) {\
+    * >>      __asm__("call i386_bswamp16_v2\n" : "+a" (_x));\
+    * >>    } else {\
+    * >>      _x = __arch_bswap16_impl(_x);\
+    * >>    }\
+    * >>    _x;\
+    * >> })
+    * >> #define __compiler_bswap16(x) ((x) >> 8 | (x) << 8)
+    * >> #define bswap16(x) (__builtin_constant_p(x) ? __compiler_bswap16(x) : __arch_bswap16(x))
+    * >> int x = bswap16(0xabcd); // Expands to a bunch of code that will compile to a compile-time constant
+    * >> int y = __TPP_EVAL(bswap16(0xabcd)); // Expands to [11259307] (Will _not_ warn about unknown identifier '__arch_bswap16', or use of a GCC statement-expression)
+    * >> #if bswap16(0xabcd) == 11259307 // Obviously, the function can also be used in #if-directives
+    * >> int z = bswap16(getchar()); // Expands to bunch of code that will compile to a runtime-time
+    * >>                             // call to '__arch_bswap16', passing the return value 'getchar()'
+    * >> #endif
+    * >> int w = __TPP_EVAL(bswap16(x)); // [W0119] Expands to [0]
+    */
+   pushf();
+   current.l_flags |= TPPLEXER_FLAG_NO_WARNINGS; /* Don't emit warnings (they'll still be counted, though!) */
+   eval_error = TPPLexer_Eval(result);
+   popf();
+   if unlikely(!eval_error) goto restore_warnings;
+   if (result) {
+    TPPConst_Quit(result);
+    result->c_kind = TPP_CONST_INTEGRAL;
+    result->c_data.c_int = current.l_warncount == old_warncount;
+   }
+restore_warnings:
+   current.l_warncount = old_warncount;
+   if (TOK != ')') TPPLexer_Warn(W_EXPECTED_RPAREN);
+   else yield_fetch();
+  } break;
+
+  {
+   int is_true;
+  case KWD___builtin_choose_expr:
+   yield_fetch();
+   if unlikely(TOK != '(') TPPLexer_Warn(W_EXPECTED_LPAREN);
+   else yield_fetch();
+   if unlikely(!TPPLexer_Eval(result)) return;
+   is_true = 0;
+   if (result) {
+    if (!TPPConst_IsBool(result)) TPPLexer_Warn(W_EXPECTED_BOOL,result);
+    is_true = TPPConst_IsTrue(result);
+    is_true = 1;
+    TPPConst_Quit(result);
+   }
+   if unlikely(TOK != ',') TPPLexer_Warn(W_EXPECTED_COMMA);
+   else yield_fetch();
+   if unlikely(!TPPLexer_Eval(is_true ? result : NULL)) return;
+   if unlikely(TOK != ',') TPPLexer_Warn(W_EXPECTED_COMMA);
+   else yield_fetch();
+   if unlikely(!TPPLexer_Eval(is_true ? NULL : result)) return;
+   if unlikely(TOK != ')') TPPLexer_Warn(W_EXPECTED_RPAREN);
+   else yield_fetch();
+  } break;
+#endif
+
   default:defch:
    if (TOK < 0) return;
-   if (result) {
-    TPPLexer_Warn(W_UNKNOWN_TOKEN_IN_EXPR_IS_ZERO);
-   }
+#if TPP_CONFIG_GCCFUNC
+   if (TPP_ISKEYWORD(TOK) && result &&
+       HAVE_EXTENSION_BUILTIN_FUNCTIONS &&
+       eval_call_builtin(result)) break;
+#endif
+   if (result) TPPLexer_Warn(W_UNKNOWN_TOKEN_IN_EXPR_IS_ZERO);
    if (TPP_ISKEYWORD(TOK)) {
     yield_fetch();
-#if 1 /* Recursively skip paren-style arguments to an imaginary function. */
+#if TPP_CONFIG_GCCFUNC || 1 /* Recursively skip paren-style arguments to an imaginary function. */
     while (TOK == '(') {
      unsigned int recursion = 1;
      while (TOK > 0) {
@@ -7249,7 +7682,7 @@ skip_array_deref:
      index_begin = (ptrdiff_t)temp.c_data.c_int;
      if (index_begin < 0) index_begin = (ptrdiff_t)result->c_data.c_string->s_size+index_begin;
      if (index_begin < 0 || (size_t)index_begin >= result->c_data.c_string->s_size) {
-      TPPLexer_Warn(W_INTEX_OUT_OF_BOUNDS,result->c_data.c_string,index_begin);
+      TPPLexer_Warn(W_INDEX_OUT_OF_BOUNDS,result->c_data.c_string,index_begin);
       index_begin %= (result->c_data.c_string->s_size+1);
       if (index_begin < 0) index_begin += result->c_data.c_string->s_size;
      }
@@ -7262,7 +7695,7 @@ skip_array_deref:
       index_end = (ptrdiff_t)temp.c_data.c_int;
       if (index_end < 0) index_end = (ptrdiff_t)result->c_data.c_string->s_size+index_end;
       if (index_end < 0 || (size_t)index_end >= result->c_data.c_string->s_size) {
-       TPPLexer_Warn(W_INTEX_OUT_OF_BOUNDS,result->c_data.c_string,index_end);
+       TPPLexer_Warn(W_INDEX_OUT_OF_BOUNDS,result->c_data.c_string,index_end);
        index_end %= (result->c_data.c_string->s_size+1);
        if (index_end < 0) index_end += result->c_data.c_string->s_size;
       }
@@ -7286,7 +7719,7 @@ skip_array_deref:
      char ch; /* Access character at 'begin'. */
      ptrdiff_t index = (ptrdiff_t)temp.c_data.c_int;
      if (index < 0 || (size_t)index >= result->c_data.c_string->s_size) {
-      TPPLexer_Warn(W_INTEX_OUT_OF_BOUNDS,result->c_data.c_string,index);
+      TPPLexer_Warn(W_INDEX_OUT_OF_BOUNDS,result->c_data.c_string,index);
       index %= result->c_data.c_string->s_size;
       if (index < 0) index += result->c_data.c_string->s_size;
      }
@@ -7526,11 +7959,17 @@ PRIVATE void EVAL_CALL eval_land(struct TPPConst *result) {
   do {
    yield_fetch();
    if (result) {
-    TPPConst_ToBool(result);
+    if (!TPPConst_IsBool(result)) {
+     TPPLexer_Warn(W_EXPECTED_BOOL_BINARY_LHS,result);
+     TPPConst_ToBool(result);
+    }
     if (!result->c_data.c_int) goto nullop2;
     //TPPConst_Quit(result); /* Unnecessary. */
     eval_or(result);
-    TPPConst_ToBool(result);
+    if (!TPPConst_IsBool(result)) {
+     TPPLexer_Warn(W_EXPECTED_BOOL_BINARY_RHS,result);
+     TPPConst_ToBool(result);
+    }
    } else {
 nullop2:
     eval_or(NULL);
@@ -7547,10 +7986,16 @@ PRIVATE void EVAL_CALL eval_lxor(struct TPPConst *result) {
   yield_fetch();
   if (result) {
    int oldbool;
-   TPPConst_ToBool(result);
+   if (!TPPConst_IsBool(result)) {
+    TPPLexer_Warn(W_EXPECTED_BOOL_BINARY_LHS,result);
+    TPPConst_ToBool(result);
+   }
    oldbool = !!result->c_data.c_int;
    eval_land(result);
-   TPPConst_ToBool(result);
+   if (!TPPConst_IsBool(result)) {
+    TPPLexer_Warn(W_EXPECTED_BOOL_BINARY_RHS,result);
+    TPPConst_ToBool(result);
+   }
    result->c_data.c_int ^= oldbool;
   } else {
    eval_land(NULL);
@@ -7562,11 +8007,17 @@ PRIVATE void EVAL_CALL eval_lor(struct TPPConst *result) {
  while (TOK == TOK_LOR) {
   yield_fetch();
   if (result) {
-   TPPConst_ToBool(result);
+   if (!TPPConst_IsBool(result)) {
+    TPPLexer_Warn(W_EXPECTED_BOOL_BINARY_LHS,result);
+    TPPConst_ToBool(result);
+   }
    if (result->c_data.c_int) goto nullop2;
    //TPPConst_Quit(result); /* Unnecessary. */
    eval_lxor(result);
-   TPPConst_ToBool(result);
+   if (!TPPConst_IsBool(result)) {
+    TPPLexer_Warn(W_EXPECTED_BOOL_BINARY_RHS,result);
+    TPPConst_ToBool(result);
+   }
   } else {
 nullop2:
    eval_lxor(NULL);
@@ -7589,6 +8040,9 @@ PRIVATE void EVAL_CALL eval_question(struct TPPConst *result) {
     }
    } else {
     int was_true = TPPConst_IsTrue(result);
+    /* NOTE: Only warn about non-boolean condition if
+     *       this isn't a gcc if-then-else-style expression. */
+    if (!TPPConst_IsBool(result)) TPPLexer_Warn(W_EXPECTED_BOOL,result);
     TPPConst_Quit(result);
     eval_lor(was_true ? result : NULL);
     if (TOK == ':') {
@@ -7614,7 +8068,6 @@ PRIVATE void EVAL_CALL eval_question(struct TPPConst *result) {
 
 PUBLIC int
 TPPLexer_Eval(struct TPPConst *result) {
- assert(result);
  if unlikely(TOK <= 0) return 0;
  eval_question(result);
  return TOK >= 0;
@@ -7931,7 +8384,7 @@ set_warning_newstate:
        else if (val.c_data.c_int == 1) newstate = WSTATE_DISABLE;
        else newstate = WSTATE_SUPPRESS;
        goto set_warning_newstate;
-      } else {
+      } else if (val.c_kind == TPP_CONST_STRING) {
        /* Very nice-looking warning directives:
         * >> #pragma warning(push,"-Wno-syntax")
         * >> ... // Do something ~nasty~.
@@ -7949,6 +8402,8 @@ set_warning_newstate:
        if (wset_error == 2) wset_error = TPPLexer_Warn(W_INVALID_WARNING,&val);
        TPPString_Decref(val.c_data.c_string);
        if unlikely(!wset_error) goto seterr;
+      } else {
+       if unlikely(!TPPLexer_Warn(W_EXPECTED_WARNING_NAMEORID,&val)) goto err;
       }
      } break;
     }
@@ -8141,6 +8596,7 @@ PUBLIC int TPPLexer_Warn(int wnum, ...) {
  struct TPPIfdefStackSlot *ifdef_slot;
  struct TPPString *temp_string = NULL;
  if (current.l_flags&TPPLEXER_FLAG_ERROR) return 0; /* Already in an error-state. */
+ ++current.l_warncount; /* Always count warnings, even if they'll be dismissed. */
  if (current.l_flags&TPPLEXER_FLAG_NO_WARNINGS) return 1; /* Warnings are disabled. */
  /* Check for per-warning behavior, as configured by the current lexer. */
  behavior = TPPLexer_InvokeWarning(wnum);
@@ -8231,7 +8687,7 @@ PUBLIC int TPPLexer_Warn(int wnum, ...) {
   case W_CHARACTER_TOO_LONG              : WARNF("Character sequence is too long"); break;
   case W_MULTICHAR_NOT_ALLOWED           : temp = ARG(char *),WARNF("The multi-character sequence '%.*s' is not not allowed",(int)ARG(size_t),temp); break;
   case W_DIVIDE_BY_ZERO                  : WARNF("Divide by ZERO"); break;
-  case W_INTEX_OUT_OF_BOUNDS             : { ptrdiff_t temp2 = ARG(ptrdiff_t); WARNF("Index %ld is out-of-bounds of 0..%lu",temp2,ARG(struct TPPString *)->s_size); } break;
+  case W_INDEX_OUT_OF_BOUNDS             : { ptrdiff_t temp2 = ARG(ptrdiff_t); WARNF("Index %ld is out-of-bounds of 0..%lu",temp2,ARG(struct TPPString *)->s_size); } break;
   case W_EXPECTED_MACRO_ARGUMENT_NAME    : WARNF("Expected argument name"); break;
   case W_ARGUMENT_NAMED_ALREADY_TAKEN    : WARNF("Argument name '%s' is already in use",TOK_NAME()); break;
   case W_EXPECTED_COMMA_OR_ARGEND        : WARNF("Expected ',' or end of argument list, but got " TOK_S,TOK_A); break;
@@ -8248,6 +8704,10 @@ PUBLIC int TPPLexer_Warn(int wnum, ...) {
   case W_COMMENT_TERMINATED_BY_EOF       : WARNF("Comment was terminated by EOF"); break;
   case W_UNKNOWN_TOKEN_IN_EXPR_IS_ZERO   : WARNF("Unrecognized token " TOK_S " is replaced with '0' in expression",TOK_A); break;
   case W_EXPECTED_RPAREN_IN_EXPRESSION   : WARNF("Expected ')' in expression, but got " TOK_S,TOK_A); break;
+  case W_TYPECAST_IN_EXPRESSION          : WARNF("C-style type cast " TOK_S " in expression is not understood (Consider using bit-masks to narrow integral types)",TOK_A); break;
+  case W_STATEMENT_IN_EXPRESSION         : WARNF("GCC-style statement " TOK_S " in expression is not understood",TOK_A); break;
+  case W_EXPECTED_RPAREN_AFTER_CAST      : WARNF("Expected ')' after casting type, but got " TOK_S,TOK_A); break;
+  case W_EXPECTED_RBRACE_AFTER_STATEMENT : WARNF("Expected '}' after statement, but got " TOK_S,TOK_A); break;
   case W_EXPECTED_RBRACKET_IN_EXPRESSION : WARNF("Expected ']' in expression, but got " TOK_S,TOK_A); break;
   case W_EXPECTED_COLLON_AFTER_WARNING   : WARNF("Expected ':' after #pragma warning, but got " TOK_S,TOK_A); break;
   case W_EXPECTED_KEYWORD_AFTER_IFDEF    : WARNF("Expected keyword after #ifdef, but got " TOK_S,TOK_A); break;
@@ -8284,12 +8744,16 @@ PUBLIC int TPPLexer_Warn(int wnum, ...) {
     if (*wname == 'W') ++wname;
     if (!memcmp(wname,"no-",3)) wname += 3;
     WARNF("Invalid warning '%s' (Did you mean '%s')",wname,find_most_likely_warning(wname));
-   } else {
+   } else if (c->c_kind == TPP_CONST_FLOAT) {
+    WARNF("Invalid warning '%f'",(double)c->c_data.c_float);
+   } else if (c->c_kind == TPP_CONST_INTEGRAL) {
 #if TPP_HAVE_LONGLONG
     WARNF("Invalid warning '%lld'",(long long)c->c_data.c_int);
 #else
     WARNF("Invalid warning '%ld'",(long)c->c_data.c_int);
 #endif
+   } else {
+    WARNF("Invalid warning");
    }
   } break;
   case W_CANT_POP_WARNINGS               : WARNF("Can't pop warnings"); break;
@@ -8326,6 +8790,15 @@ PUBLIC int TPPLexer_Warn(int wnum, ...) {
   case W_INTEGRAL_CLAMPED                : WARNF("Integral constant clamped to fit"); break;
   case W_INCLUDE_PATH_ALREADY_EXISTS     : temp = ARG(char *),WARNF("System #include-path '%.*s' already exists",(int)ARG(size_t),temp); break;
   case W_UNKNOWN_INCLUDE_PATH            : temp = ARG(char *),WARNF("Unknown system #include-path '%.*s'",(int)ARG(size_t),temp); break;
+  case W_EXPECTED_ELSE_IN_EXPRESSION     : WARNF("Expected 'else' in expression, but got " TOK_S,TOK_A); break;
+  case W_EXPECTED_WARNING_NAMEORID       : WARNF("Expected warning name or id, but got '%s'",CONST_STR()); break;
+  { char const *use; /* Warn about non-boolean integral. */
+    if (FALSE) { case W_EXPECTED_BOOL           : use = ""; }
+    if (FALSE) { case W_EXPECTED_BOOL_UNARY     : use = " for operand"; }
+    if (FALSE) { case W_EXPECTED_BOOL_BINARY_LHS: use = " for left operand"; }
+    if (FALSE) { case W_EXPECTED_BOOL_BINARY_RHS: use = " for right operand"; }
+    WARNF("Expected boolean expression%s, but got %s",use,CONST_STR());
+  } break;
   default                                : WARNF("? %d",wnum); break;
  }
  if (temp_string) TPPString_Decref(temp_string);

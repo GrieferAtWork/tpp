@@ -16,7 +16,7 @@
  *    misrepresented as being the original software.                          *
  * 3. This notice may not be removed or altered from any source distribution. *
  */
-#if (defined(KWD_FLAGS) || defined(MACRO)) && !defined(HAS_EXTENSION)
+#if defined(KWD_FLAGS) || defined(MACRO)
 #define HAS_EXTENSION(x) (TPPLexer_Current->l_extensions & (x))
 #endif
 
@@ -49,18 +49,32 @@
 #define TPP_DEFS_DEFINES_BUILTIN_MACRO
 #define BUILTIN_MACRO(name,value)
 #endif
+#ifndef BUILTIN_FUNCTION
+#define TPP_DEFS_DEFINES_BUILTIN_FUNCTION
+#define BUILTIN_FUNCTION(name,argc,expr)
+#endif
 
 #define DEF_K(name)         KWD(KWD_##name,#name)
 #define DEF_M(name)         KWD(KWD_##name,#name) MACRO(KWD_##name,1)
 #define DEF_M_IF(name,expr) KWD(KWD_##name,#name) MACRO(KWD_##name,expr)
 
+#define DEF_BUILTIN_IF(name,if)   KWD(KWD_##name,#name) KWD_FLAGS(KWD_##name,(if) ? TPP_KEYWORDFLAG_HAS_BUILTIN : 0)
 #define DEF_FEATURE_IF(name,if)   KWD(KWD_##name,#name) KWD_FLAGS(KWD_##name,(if) ? TPP_KEYWORDFLAG_HAS_FEATURE : 0)
 #define DEF_EXTENSION_IF(name,if) KWD(KWD_##name,#name) KWD_FLAGS(KWD_##name,(if) ? TPP_KEYWORDFLAG_HAS_EXTENSION : 0)
 
-#define PREDEFINED_KWDMACRO(name,str,value)       KWD(name,str) MACRO(name,1) BUILTIN_MACRO(name,value)
-#define PREDEFINED_KWDMACRO_IF(name,str,if,value) KWD(name,str) MACRO(name,if) BUILTIN_MACRO(name,value)
-#define PREDEFINED_MACRO(name,value)              PREDEFINED_KWDMACRO(KWD_##name,#name,value)
-#define PREDEFINED_MACRO_IF(name,if,value)        PREDEFINED_KWDMACRO_IF(KWD_##name,#name,if,value)
+#define PREDEFINED_KWDMACRO(name,str,value)                       KWD(name,str) MACRO(name,1) BUILTIN_MACRO(name,value)
+#define PREDEFINED_KWDMACRO_IF(name,str,if,value)                 KWD(name,str) MACRO(name,if) BUILTIN_MACRO(name,value)
+#define PREDEFINED_MACRO(name,value)                              PREDEFINED_KWDMACRO(KWD_##name,#name,value)
+#define PREDEFINED_MACRO_IF(name,if,value)                        PREDEFINED_KWDMACRO_IF(KWD_##name,#name,if,value)
+#define PREDEFINED_KWDFUNCTION_IF(name,str,if,argc,expr)          KWD(name,str) BUILTIN_FUNCTION(name,(if) ? (int)(argc) : -1,expr)
+#define PREDEFINED_KWDFUNCTION(name,str,argc,expr)                KWD(name,str) BUILTIN_FUNCTION(name,argc,expr)
+#define PREDEFINED_FUNCTION_IF(name,if,argc,expr)                 PREDEFINED_KWDFUNCTION_IF(KWD_##name,#name,if,argc,expr)
+#define PREDEFINED_FUNCTION(name,argc,expr)                       PREDEFINED_KWDFUNCTION_IF(KWD_##name,#name,1,argc,expr)
+#define PREDEFINED_BUILTIN_KWDFUNCTION_IF(name,str,if,argc,expr)  KWD(name,str) KWD_FLAGS(name,(HAS_EXTENSION(TPPLEXER_EXTENSION_BUILTIN_FUNCTIONS) && (if)) ? (TPP_KEYWORDFLAG_HAS_BUILTIN|TPP_KEYWORDFLAG_HAS_TPP_BUILTIN) : 0) BUILTIN_FUNCTION(name,(if) ? (int)(argc) : -1,expr)
+#define PREDEFINED_BUILTIN_KWDFUNCTION(name,str,argc,expr)        KWD(name,str) KWD_FLAGS(name,HAS_EXTENSION(TPPLEXER_EXTENSION_BUILTIN_FUNCTIONS) ? (TPP_KEYWORDFLAG_HAS_BUILTIN|TPP_KEYWORDFLAG_HAS_TPP_BUILTIN) : 0) BUILTIN_FUNCTION(name,argc,expr)
+#define PREDEFINED_BUILTIN_FUNCTION_IF(name,if,argc,expr)         PREDEFINED_BUILTIN_KWDFUNCTION_IF(KWD_##name,#name,if,argc,expr)
+#define PREDEFINED_BUILTIN_FUNCTION(name,argc,expr)               PREDEFINED_BUILTIN_KWDFUNCTION_IF(KWD_##name,#name,1,argc,expr)
+
 #define TPP_PP_STR2(x) #x
 #define TPP_PP_STR(x)  TPP_PP_STR2(x)
 
@@ -107,6 +121,7 @@ DEF_M_IF(__is_builtin_identifier, HAS_EXTENSION(TPPLEXER_EXTENSION_CLANG_FEATURE
 DEF_M_IF(__is_deprecated,         HAS_EXTENSION(TPPLEXER_EXTENSION_CLANG_FEATURES))
 DEF_M_IF(__has_attribute,         HAS_EXTENSION(TPPLEXER_EXTENSION_CLANG_FEATURES))
 DEF_M_IF(__has_builtin,           HAS_EXTENSION(TPPLEXER_EXTENSION_CLANG_FEATURES))
+DEF_M_IF(__has_tpp_builtin,       HAS_EXTENSION(TPPLEXER_EXTENSION_CLANG_FEATURES))
 DEF_M_IF(__has_cpp_attribute,     HAS_EXTENSION(TPPLEXER_EXTENSION_CLANG_FEATURES))
 DEF_M_IF(__has_declspec_attribute,HAS_EXTENSION(TPPLEXER_EXTENSION_CLANG_FEATURES))
 DEF_M_IF(__has_extension,         HAS_EXTENSION(TPPLEXER_EXTENSION_CLANG_FEATURES))
@@ -207,21 +222,21 @@ DEF_EXTENSION_IF(tpp_va_args,                     HAS_EXTENSION(TPPLEXER_EXTENSI
 DEF_EXTENSION_IF(tpp_named_va_args,               HAS_EXTENSION(TPPLEXER_EXTENSION_GCC_VA_ARGS))
 DEF_EXTENSION_IF(tpp_va_comma,                    HAS_EXTENSION(TPPLEXER_EXTENSION_VA_COMMA))
 DEF_EXTENSION_IF(tpp_reemit_unknown_pragmas,      !(TPPLexer_Current->l_flags&TPPLEXER_FLAG_EAT_UNKNOWN_PRAGMA))
-//DEF_EXTENSION_IF(tpp_msvc_integer_suffix,       HAS_EXTENSION(0))
+DEF_EXTENSION_IF(tpp_msvc_integer_suffix,         HAS_EXTENSION(TPPLEXER_EXTENSION_MSVC_FIXED_INT))
 DEF_EXTENSION_IF(tpp_charize_operator,            HAS_EXTENSION(TPPLEXER_EXTENSION_HASH_AT))
 DEF_EXTENSION_IF(tpp_trigraphs,                   HAS_EXTENSION(TPPLEXER_EXTENSION_TRIGRAPHS))
 DEF_EXTENSION_IF(tpp_digraphs,                    HAS_EXTENSION(TPPLEXER_EXTENSION_DIGRAPHS))
-DEF_EXTENSION_IF(tpp_pragma_push_macro,           1)
-DEF_EXTENSION_IF(tpp_pragma_pop_macro,            1)
-DEF_EXTENSION_IF(tpp_pragma_region,               1)
-DEF_EXTENSION_IF(tpp_pragma_endregion,            1)
-DEF_EXTENSION_IF(tpp_pragma_warning,              1)
-DEF_EXTENSION_IF(tpp_pragma_message,              1)
-DEF_EXTENSION_IF(tpp_pragma_error,                1)
-DEF_EXTENSION_IF(tpp_pragma_once,                 1)
-DEF_EXTENSION_IF(tpp_pragma_tpp_exec,             1)
-DEF_EXTENSION_IF(tpp_pragma_deprecated,           1)
-DEF_EXTENSION_IF(tpp_pragma_tpp_set_keyword_flags,1)
+DEF_EXTENSION_IF(tpp_pragma_push_macro,           TPP_PREPROCESSOR_VERSION >= 200)
+DEF_EXTENSION_IF(tpp_pragma_pop_macro,            TPP_PREPROCESSOR_VERSION >= 200)
+DEF_EXTENSION_IF(tpp_pragma_region,               TPP_PREPROCESSOR_VERSION >= 200)
+DEF_EXTENSION_IF(tpp_pragma_endregion,            TPP_PREPROCESSOR_VERSION >= 200)
+DEF_EXTENSION_IF(tpp_pragma_warning,              TPP_PREPROCESSOR_VERSION >= 200)
+DEF_EXTENSION_IF(tpp_pragma_message,              TPP_PREPROCESSOR_VERSION >= 200)
+DEF_EXTENSION_IF(tpp_pragma_error,                TPP_PREPROCESSOR_VERSION >= 200)
+DEF_EXTENSION_IF(tpp_pragma_once,                 TPP_PREPROCESSOR_VERSION >= 200)
+DEF_EXTENSION_IF(tpp_pragma_tpp_exec,             TPP_PREPROCESSOR_VERSION >= 200)
+DEF_EXTENSION_IF(tpp_pragma_deprecated,           TPP_PREPROCESSOR_VERSION >= 200)
+DEF_EXTENSION_IF(tpp_pragma_tpp_set_keyword_flags,TPP_PREPROCESSOR_VERSION >= 200)
 DEF_EXTENSION_IF(tpp_directive_include_next,      HAS_EXTENSION(TPPLEXER_EXTENSION_INCLUDE_NEXT))
 DEF_EXTENSION_IF(tpp_directive_import,            HAS_EXTENSION(TPPLEXER_EXTENSION_IMPORT))
 DEF_EXTENSION_IF(tpp_directive_warning,           HAS_EXTENSION(TPPLEXER_EXTENSION_WARNING))
@@ -234,10 +249,11 @@ DEF_EXTENSION_IF(tpp_token_collon_assign,         TPPLexer_Current->l_extokens&T
 DEF_EXTENSION_IF(tpp_token_collon_collon,         TPPLexer_Current->l_extokens&TPPLEXER_TOKEN_COLLONCOLLON)
 DEF_EXTENSION_IF(tpp_macro_calling_conventions,   HAS_EXTENSION(TPPLEXER_EXTENSION_ALTMAC))
 DEF_EXTENSION_IF(tpp_strict_whitespace,           (TPPLexer_Current->l_flags&TPPLEXER_FLAG_KEEP_ARG_WHITESPACE))
-DEF_EXTENSION_IF(tpp_strict_integer_overflow,     0) /* TODO: (Re-)add detection for this. */
+DEF_EXTENSION_IF(tpp_strict_integer_overflow,     TPP_WSTATE_ISENABLED(TPPLexer_GetWarning(W_INTEGRAL_OVERFLOW)) ||
+                                                  TPP_WSTATE_ISENABLED(TPPLexer_GetWarning(W_INTEGRAL_CLAMPED)))
 DEF_EXTENSION_IF(tpp_support_ansi_characters,     0) /* TODO: (Re-)add support for this. */
 DEF_EXTENSION_IF(tpp_emit_lf_after_directive,     (TPPLexer_Current->l_flags&TPPLEXER_FLAG_DIRECTIVE_NOOWN_LF))
-DEF_EXTENSION_IF(tpp_if_cond_expression,          0) /* TODO: (Re-)add support for this. ('__TPP_EVAL(if (foo) 42 else 10)') */
+DEF_EXTENSION_IF(tpp_if_cond_expression,          HAS_EXTENSION(TPPLEXER_EXTENSION_IFELSE_IN_EXPR))
 DEF_EXTENSION_IF(tpp_debug,                       TPP_CONFIG_DEBUG)
 
 /* Predefined macros and their values.
@@ -251,12 +267,107 @@ PREDEFINED_MACRO(__TPP_VERSION__,TPP_PP_STR(TPP_PREPROCESSOR_VERSION))
 #include "tpp-gcc-defs.inl"
 #endif /* !TPP_CONFIG_MINMACRO */
 
+#if TPP_CONFIG_GCCFUNC
+/* Builtin functions recognized in expressions. */
+#ifdef DECLARE_BUILTIN_FUNCTIONS
+PRIVATE int_t tpp_ffs(int_t i) {
+ int_t result;
+ if (!i) return 0;
+ for (result = 1; !(i&1); ++result) i >>= 1;
+ return result;
+}
+#endif
+/* Special functions that require designated preprocessor support. */
+DEF_BUILTIN_IF(__builtin_constant_p,HAS_EXTENSION(TPPLEXER_EXTENSION_BUILTIN_FUNCTIONS))
+DEF_BUILTIN_IF(__builtin_choose_expr,HAS_EXTENSION(TPPLEXER_EXTENSION_BUILTIN_FUNCTIONS))
+/* Define regular builtin functions. */
+PREDEFINED_BUILTIN_FUNCTION(__builtin_ffs,1,{ RETURN_INT(tpp_ffs(INT(0)&((int)-1))); })
+PREDEFINED_BUILTIN_FUNCTION(__builtin_ffsl,1,{ RETURN_INT(tpp_ffs(INT(0)&((long)-1))); })
+PREDEFINED_BUILTIN_FUNCTION(__builtin_ffsll,1,{ RETURN_INT(tpp_ffs(INT(0)&((llong_t)-1))); })
+PREDEFINED_BUILTIN_FUNCTION(__builtin_strlen,1,{ RETURN_INT(IS_STRING(0) ? strlen(STRING(0)->s_text) : 0); })
+PREDEFINED_BUILTIN_FUNCTION(__builtin_bswap16,1,{ RETURN_INT(__builtin_bswap16((uint16_t)INT(0))); })
+PREDEFINED_BUILTIN_FUNCTION(__builtin_bswap32,1,{ RETURN_INT(__builtin_bswap32((uint32_t)INT(0))); })
+PREDEFINED_BUILTIN_FUNCTION(__builtin_bswap64,1,{ RETURN_INT(__builtin_bswap64((uint64_t)INT(0))); })
+PREDEFINED_BUILTIN_FUNCTION(__builtin_strcmp,2,{ RETURN_INT((IS_STRING(0) && IS_STRING(1)) ? strcmp(STRING(0)->s_text,STRING(1)->s_text) : -1); })
+PREDEFINED_BUILTIN_FUNCTION(__builtin_strncmp,3,{ RETURN_INT((IS_STRING(0) && IS_STRING(1)) ? strncmp(STRING(0)->s_text,STRING(1)->s_text,(size_t)INT(2)) : -1); })
+PREDEFINED_BUILTIN_FUNCTION(__builtin_strcasecmp,2,{ RETURN_INT((IS_STRING(0) && IS_STRING(1)) ? strcasecmp(STRING(0)->s_text,STRING(1)->s_text) : -1); })
+PREDEFINED_BUILTIN_FUNCTION(__builtin_strncasecmp,3,{ RETURN_INT((IS_STRING(0) && IS_STRING(1)) ? strncasecmp(STRING(0)->s_text,STRING(1)->s_text,(size_t)INT(2)) : -1); })
+//PREDEFINED_BUILTIN_FUNCTION(__builtin_strchr,2,{ RETURN_INT(IS_STRING(0) ? !!strchr(STRING(0)->s_text,(int)INT(1)) : 0); })
+//PREDEFINED_BUILTIN_FUNCTION(__builtin_strrchr,2,{ RETURN_INT(IS_STRING(0) ? !!strchr(STRING(0)->s_text,(int)INT(1)) : 0); })
+PREDEFINED_BUILTIN_FUNCTION(__builtin_expect,2,{ RETURN_COPY(A(0)); })
+PREDEFINED_BUILTIN_FUNCTION(__builtin_abs,1,{ int_t x = INT(0)&((int)-1); RETURN_INT(x < 0 ? -x : x); })
+PREDEFINED_BUILTIN_FUNCTION(__builtin_labs,1,{ int_t x = INT(0)&((long)-1); RETURN_INT(x < 0 ? -x : x); })
+PREDEFINED_BUILTIN_FUNCTION(__builtin_llabs,1,{ int_t x = INT(0)&((llong_t)-1); RETURN_INT(x < 0 ? -x : x); })
+PREDEFINED_BUILTIN_FUNCTION(__builtin_assume_aligned,2,{ RETURN_COPY(A(0)); })
+// TODO: int __builtin_clz(unsigned int x);
+// TODO: int __builtin_ctz(unsigned int x);
+// TODO: int __builtin_clrsb(int x);
+// TODO: int __builtin_popcount(unsigned int x);
+// TODO: int __builtin_parity(unsigned int x);
+// TODO: int __builtin_ffsl(long);
+// TODO: int __builtin_clzl(unsigned long);
+// TODO: int __builtin_ctzl(unsigned long);
+// TODO: int __builtin_clrsbl(long);
+// TODO: int __builtin_popcountl(unsigned long);
+// TODO: int __builtin_parityl(unsigned long);
+// TODO: int __builtin_ffsll(long long);
+// TODO: int __builtin_clzll(unsigned long long);
+// TODO: int __builtin_ctzll(unsigned long long);
+// TODO: int __builtin_clrsbll(long long);
+// TODO: int __builtin_popcountll(unsigned long long);
+// TODO: int __builtin_parityll(unsigned long long);
+// TODO: __builtin_isfinite
+// TODO: __builtin_isinf
+// TODO: __builtin_isinff
+// TODO: __builtin_isinfl
+// TODO: __builtin_isnan
+// TODO: __builtin_isnanf
+// TODO: __builtin_isnanl
+// TODO: __builtin_isnormal
+// TODO: __builtin_isgreater
+// TODO: __builtin_isgreaterequal
+// TODO: __builtin_isless
+// TODO: __builtin_islessequal
+// TODO: __builtin_islessgreater
+// TODO: __builtin_isunordered
+// TODO: ... (Floating point math.h functions)
+PREDEFINED_BUILTIN_FUNCTION(__builtin_FILE,0,{
+ size_t length;
+ char const *filename = TPPLexer_FILE(&length);
+ struct TPPString *s = TPPString_New(filename,length);
+ if unlikely(!s) SETERR();
+ RETURN_STRING(s);
+})
+PREDEFINED_BUILTIN_FUNCTION(__builtin_LINE,0,{ RETURN_INT(TPPLexer_LINE()); })
+// TODO?: char const *__builtin_FUNCTION(void);
+PREDEFINED_BUILTIN_FUNCTION(__builtin_isalnum,1,{ RETURN_INT(isalnum((int)INT(0))); })
+PREDEFINED_BUILTIN_FUNCTION(__builtin_isalpha,1,{ RETURN_INT(isalpha((int)INT(0))); })
+PREDEFINED_BUILTIN_FUNCTION(__builtin_isascii,1,{ RETURN_INT(isascii((int)INT(0))); })
+PREDEFINED_BUILTIN_FUNCTION(__builtin_isblank,1,{ RETURN_INT(isblank((int)INT(0))); })
+PREDEFINED_BUILTIN_FUNCTION(__builtin_iscntrl,1,{ RETURN_INT(iscntrl((int)INT(0))); })
+PREDEFINED_BUILTIN_FUNCTION(__builtin_isdigit,1,{ RETURN_INT(isdigit((int)INT(0))); })
+PREDEFINED_BUILTIN_FUNCTION(__builtin_isgraph,1,{ RETURN_INT(isgraph((int)INT(0))); })
+PREDEFINED_BUILTIN_FUNCTION(__builtin_islower,1,{ RETURN_INT(islower((int)INT(0))); })
+PREDEFINED_BUILTIN_FUNCTION(__builtin_isprint,1,{ RETURN_INT(isprint((int)INT(0))); })
+PREDEFINED_BUILTIN_FUNCTION(__builtin_ispunct,1,{ RETURN_INT(ispunct((int)INT(0))); })
+PREDEFINED_BUILTIN_FUNCTION(__builtin_isspace,1,{ RETURN_INT(isspace((int)INT(0))); })
+PREDEFINED_BUILTIN_FUNCTION(__builtin_isupper,1,{ RETURN_INT(isupper((int)INT(0))); })
+PREDEFINED_BUILTIN_FUNCTION(__builtin_isxdigit,1,{ RETURN_INT(isxdigit((int)INT(0))); })
+PREDEFINED_BUILTIN_FUNCTION(__builtin_toascii,1,{ RETURN_INT(toascii((int)INT(0))); })
+PREDEFINED_BUILTIN_FUNCTION(__builtin_tolower,1,{ RETURN_INT(tolower((int)INT(0))); })
+PREDEFINED_BUILTIN_FUNCTION(__builtin_toupper,1,{ RETURN_INT(toupper((int)INT(0))); })
+
+
+#endif /* TPP_CONFIG_GCCFUNC */
+
 
 WGROUP(WG_COMMENT,             "comment",             WSTATE_ERROR)
 WGROUP(WG_COMMENTS,            "comments",            WSTATE_ERROR)
 WGROUP(WG_MACROS,              "macros",              WSTATE_ERROR)
 WGROUP(WG_SYNTAX,              "syntax",              WSTATE_ERROR)
+WGROUP(WG_USAGE,               "usage",               WSTATE_ERROR)
 WGROUP(WG_VALUE,               "value",               WSTATE_ERROR)
+WGROUP(WG_BOOLVALUE,           "boolean-value",       WSTATE_ERROR)
 WGROUP(WG_USER,                "user",                WSTATE_ERROR)
 WGROUP(WG_ENVIRON,             "environ",             WSTATE_ERROR)
 WGROUP(WG_LIMIT,               "limit",               WSTATE_ERROR)
@@ -335,11 +446,11 @@ WGROUP(WG_QUALITY,             "quality",             WSTATE_ERROR)
 /*65*/WARNING(W_UNUSED_15,                       (WG_VALUE),   WSTATE_WARN)    /*< OLD(TPPWarn_VaCommaUsedAsMacroParameter). */
 /*66*/WARNING(W_UNUSED_16,                       (WG_VALUE),   WSTATE_WARN)    /*< OLD(TPPWarn_Unexpected). */
 /*67*/WARNING(W_UNUSED_17,                       (WG_VALUE),   WSTATE_WARN)    /*< OLD(TPPWarn_VaArgsMustBeLastParameter). */
-/*68*/WARNING(W_UNUSED_18,                       (WG_VALUE),   WSTATE_WARN)    /*< OLD(TPPWarn_ExpectedBoolExpression). */
-/*69*/WARNING(W_UNUSED_19,                       (WG_VALUE),   WSTATE_WARN)    /*< OLD(TPPWarn_ExpectedBoolExpressionNot). */
-/*70*/WARNING(W_UNUSED_1A,                       (WG_VALUE),   WSTATE_WARN)    /*< OLD(TPPWarn_ExpectedBoolExpressionLhsOP). */
-/*71*/WARNING(W_UNUSED_1B,                       (WG_VALUE),   WSTATE_WARN)    /*< OLD(TPPWarn_ExpectedBoolExpressionRhsOP). */
-/*72*/WARNING(W_UNUSED_1C,                       (WG_VALUE),   WSTATE_WARN)    /*< OLD(TPPWarn_ExpectedKeyword). */
+/*68*/WARNING(W_EXPECTED_BOOL,                   (WG_BOOLVALUE,WG_VALUE),WSTATE_WARN) /*< [struct TPPConst *] OLD(TPPWarn_ExpectedBoolExpression). */
+/*69*/WARNING(W_EXPECTED_BOOL_UNARY,             (WG_BOOLVALUE,WG_VALUE),WSTATE_WARN) /*< [struct TPPConst *] OLD(TPPWarn_ExpectedBoolExpressionNot). */
+/*70*/WARNING(W_EXPECTED_BOOL_BINARY_LHS,        (WG_BOOLVALUE,WG_VALUE),WSTATE_WARN) /*< [struct TPPConst *] OLD(TPPWarn_ExpectedBoolExpressionLhsOP). */
+/*71*/WARNING(W_EXPECTED_BOOL_BINARY_RHS,        (WG_BOOLVALUE,WG_VALUE),WSTATE_WARN) /*< [struct TPPConst *] OLD(TPPWarn_ExpectedBoolExpressionRhsOP). */
+/*72*/WARNING(W_UNUSED_18,                       (WG_VALUE),   WSTATE_WARN)    /*< OLD(TPPWarn_ExpectedKeyword). */
 
 /* Warnings added by the new TPP. */
 WARNING(W_SLASHSTAR_INSIDE_OF_COMMENT,     (WG_COMMENTS,WG_COMMENT),WSTATE_WARN) /*< [char *]. */
@@ -350,7 +461,7 @@ WARNING(W_FUNCTION_MACRO_ALREADY_ONSTACK,  (WG_MACROS),  WSTATE_DISABLE) /*< [st
 WARNING(W_NOT_ENGOUH_MACRO_ARGUMENTS,      (WG_MACROS),  WSTATE_WARN)    /*< [struct TPPFile *]. */
 WARNING(W_CHARACTER_TOO_LONG,              (WG_VALUE),   WSTATE_WARN)    /*< . */
 WARNING(W_MULTICHAR_NOT_ALLOWED,           (WG_VALUE),   WSTATE_WARN)    /*< [char const *,size_t]. */
-WARNING(W_INTEX_OUT_OF_BOUNDS,             (WG_VALUE),   WSTATE_DISABLE) /*< [struct TPPString *,ptrdiff_t]. */
+WARNING(W_INDEX_OUT_OF_BOUNDS,             (WG_VALUE),   WSTATE_DISABLE) /*< [struct TPPString *,ptrdiff_t]. */
 WARNING(W_STRING_TERMINATED_BY_LINEFEED,   (WG_SYNTAX),  WSTATE_WARN)    /*< . */
 WARNING(W_STRING_TERMINATED_BY_EOF,        (WG_SYNTAX),  WSTATE_WARN)    /*< . */
 WARNING(W_COMMENT_TERMINATED_BY_EOF,       (WG_SYNTAX),  WSTATE_WARN)    /*< . */
@@ -387,19 +498,39 @@ WARNING(W_INTEGRAL_OVERFLOW,               (WG_VALUE),   WSTATE_WARN)    /*< [in
 WARNING(W_INTEGRAL_CLAMPED,                (WG_VALUE),   WSTATE_WARN)    /*< [int_t,int_t]. */
 WARNING(W_UNKNOWN_INCLUDE_PATH,            (WG_VALUE),   WSTATE_WARN)    /*< [char const *,size_t]. */
 WARNING(W_INCLUDE_PATH_ALREADY_EXISTS,     (WG_VALUE),   WSTATE_WARN)    /*< [char const *,size_t]. */
+WARNING(W_EXPECTED_ELSE_IN_EXPRESSION,     (WG_SYNTAX),  WSTATE_WARN)    /*< . */
+WARNING(W_STATEMENT_IN_EXPRESSION,         (WG_USAGE,WG_SYNTAX),WSTATE_WARN) /*< . */
+WARNING(W_TYPECAST_IN_EXPRESSION,          (WG_USAGE,WG_SYNTAX),WSTATE_WARN) /*< . */
+WARNING(W_EXPECTED_RPAREN_AFTER_CAST,      (WG_SYNTAX),  WSTATE_WARN)    /*< . */
+WARNING(W_EXPECTED_RBRACE_AFTER_STATEMENT, (WG_SYNTAX),  WSTATE_WARN)    /*< . */
+WARNING(W_EXPECTED_WARNING_NAMEORID,       (WG_VALUE),   WSTATE_WARN)    /*< [struct TPPConst *]. */
+/* _always_ add new warnings here! */
 
 #undef TPP_PP_STR
 #undef TPP_PP_STR2
+#undef PREDEFINED_BUILTIN_FUNCTION_IF
+#undef PREDEFINED_BUILTIN_FUNCTION
+#undef PREDEFINED_BUILTIN_KWDFUNCTION_IF
+#undef PREDEFINED_BUILTIN_KWDFUNCTION
+#undef PREDEFINED_FUNCTION_IF
+#undef PREDEFINED_FUNCTION
+#undef PREDEFINED_KWDFUNCTION_IF
+#undef PREDEFINED_KWDFUNCTION
 #undef PREDEFINED_MACRO_IF
 #undef PREDEFINED_MACRO
 #undef PREDEFINED_KWDMACRO_IF
 #undef PREDEFINED_KWDMACRO
 #undef DEF_EXTENSION_IF
 #undef DEF_FEATURE_IF
+#undef DEF_BUILTIN_IF
 #undef DEF_M_IF
 #undef DEF_M
 #undef DEF_K
 
+#ifdef TPP_DEFS_DEFINES_BUILTIN_FUNCTION
+#undef TPP_DEFS_DEFINES_BUILTIN_FUNCTION
+#undef BUILTIN_FUNCTION
+#endif
 #ifdef TPP_DEFS_DEFINES_BUILTIN_MACRO
 #undef TPP_DEFS_DEFINES_BUILTIN_MACRO
 #undef BUILTIN_MACRO
@@ -423,4 +554,8 @@ WARNING(W_INCLUDE_PATH_ALREADY_EXISTS,     (WG_VALUE),   WSTATE_WARN)    /*< [ch
 #ifdef TPP_DEFS_DEFINES_KWD
 #undef TPP_DEFS_DEFINES_KWD
 #undef KWD
+#endif
+
+#if defined(KWD_FLAGS) || defined(MACRO)
+#undef HAS_EXTENSION
 #endif
