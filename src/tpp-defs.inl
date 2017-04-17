@@ -36,6 +36,10 @@
 #define TPP_DEFS_DEFINES_WARNING
 #define WARNING(name,groups,default)
 #endif
+#ifndef WARNING_NAMESPACE
+#define TPP_DEFS_DEFINES_WARNING_NAMESPACE
+#define WARNING_NAMESPACE(name,start)
+#endif
 #ifndef MACRO
 #define TPP_DEFS_DEFINES_MACRO
 /* Reference a keyword that would behave as a predefined
@@ -53,10 +57,16 @@
 #define TPP_DEFS_DEFINES_BUILTIN_FUNCTION
 #define BUILTIN_FUNCTION(name,argc,expr)
 #endif
+#ifndef WARNING_MESSAGE
+#define TPP_DEFS_DEFINES_WARNING_MESSAGE
+#define WARNING_MESSAGE(name,expr)
+#endif
+
 
 #define DEF_K(name)         KWD(KWD_##name,#name)
 #define DEF_M(name)         KWD(KWD_##name,#name) MACRO(KWD_##name,1)
 #define DEF_M_IF(name,expr) KWD(KWD_##name,#name) MACRO(KWD_##name,expr)
+#define DEF_WARNING(name,groups,default,expr) WARNING(name,groups,default) WARNING_MESSAGE(name,expr)
 
 #define DEF_BUILTIN_IF(name,if)   KWD(KWD_##name,#name) KWD_FLAGS(KWD_##name,(if) ? TPP_KEYWORDFLAG_HAS_BUILTIN : 0)
 #define DEF_FEATURE_IF(name,if)   KWD(KWD_##name,#name) KWD_FLAGS(KWD_##name,(if) ? TPP_KEYWORDFLAG_HAS_FEATURE : 0)
@@ -409,133 +419,211 @@ WGROUP(WG_DIRECTIVE,           "directive",           WSTATE_ERROR)
 WGROUP(WG_QUALITY,             "quality",             WSTATE_ERROR)
 
 /* NOTE: These warnings are arranged to mirror those from the old TPP. */
-/* 0*/WARNING(W_EXPECTED_KEYWORD_AFTER_DEFINE,   (WG_SYNTAX),  WSTATE_WARN)    /*< OLD(TPPWarn_ExpectedKeywordAfterDefine). */
-/* 1*/WARNING(W_REDEFINING_BUILTIN_KEYWORD,      (WG_MACROS),  WSTATE_DISABLE) /*< [struct TPPKeyword *] OLD(TPPWarn_RedefiningBuiltinKeyword). */
-/* 2*/WARNING(W_UNKNOWN_PREPROCESSOR_DIRECTIVE,  (WG_SYNTAX),  WSTATE_WARN)    /*< OLD(TPPWarn_UnknownPreprocessorDirective). */
-/* 3*/WARNING(W_STARSLASH_OUTSIDE_OF_COMMENT,    (WG_COMMENT,WG_COMMENTS),WSTATE_WARN) /*< [char *] OLD(TPPWarn_StarSlashOutsideOfComment). */
-/* 4*/WARNING(W_ERROR,                           (WG_USER),    WSTATE_ERROR)   /*< [char const *,size_t] OLD(TPPWarn_DirectiveError). */
-/* 5*/WARNING(W_WARNING,                         (WG_USER),    WSTATE_WARN)    /*< [char const *,size_t] OLD(TPPWarn_DirectiveWarning). */
-/* 6*/WARNING(W_EXPECTED_KWDLPAR_AFTER_DEFINED,  (WG_SYNTAX),  WSTATE_WARN)    /*< OLD(TPPWarn_ExpectedKeywordOrLParenAfterDefined). */
-/* 7*/WARNING(W_EXPECTED_KEYWORD_AFTER_DEFINED,  (WG_SYNTAX),  WSTATE_WARN)    /*< OLD(TPPWarn_ExpectedKeywordAfterDefined). */
-/* 8*/WARNING(W_EXPECTED_RPAREN_AFTER_DEFINED,   (WG_SYNTAX),  WSTATE_WARN)    /*< OLD(TPPWarn_ExpectedRParenAfterDefined). */
-/* 9*/WARNING(W_EXPECTED_MACRO_ARGUMENT_NAME,    (WG_SYNTAX),  WSTATE_WARN)    /*< [tok_t] OLD(TPPWarn_ExpectedKeywordForMacroArgument). */
-/*10*/WARNING(W_EXPECTED_ARGEND_AFTER_VARARGS,   (WG_SYNTAX),  WSTATE_WARN)    /*< [tok_t] OLD(TPPWarn_ExpectedRParenAfterVaArgs). */
-/*11*/WARNING(W_EXPECTED_COMMA_OR_ARGEND,        (WG_SYNTAX),  WSTATE_WARN)    /*< [tok_t] OLD(TPPWarn_ExpectedCommaOrRParenForMacroFuncDecl). */
-/*12*/WARNING(W_TOO_MANY_MACRO_ARGUMENTS,        (WG_MACROS),  WSTATE_WARN)    /*< [struct TPPFile *] OLD( TPPWarn_InvalidMacroArgCount). */
-/*13*/WARNING(W_EOF_IN_MACRO_ARGUMENT_LIST,      (WG_SYNTAX),  WSTATE_WARN)    /*< OLD(TPPWarn_UnexpectedEOFInMacroArgList). */
-/*14*/WARNING(W_EXPECTED_INCLUDE_STRING,         (WG_SYNTAX),  WSTATE_WARN)    /*< OLD(TPPWarn_ExpectedIncludeString). */
-/*15*/WARNING(W_FILE_NOT_FOUND,                  (WG_ENVIRON), WSTATE_WARN)    /*< [char const *] OLD(TPPWarn_IncludeFileNotFound). */
-/*16*/WARNING(W_UNUSED_00,                       (WG_VALUE),   WSTATE_DISABLE) /*< OLD(TPPWarn_SysIncludeFileNotFound). */
-/*17*/WARNING(W_UNUSED_01,                       (WG_VALUE),   WSTATE_DISABLE) /*< OLD(TPPWarn_ExpectedLParenAfterTPPCounter). */
-/*18*/WARNING(W_UNUSED_02,                       (WG_VALUE),   WSTATE_DISABLE) /*< OLD(TPPWarn_ExpectedKeywordAfterTPPCounter). */
-/*19*/WARNING(W_UNUSED_03,                       (WG_VALUE),   WSTATE_DISABLE) /*< OLD(TPPWarn_ExpectedRParenAfterTPPCounter). */
-/*20*/WARNING(W_UNUSED_04,                       (WG_VALUE),   WSTATE_DISABLE) /*< OLD(TPPWarn_ExpectedLParenAfterTPPRandom). */
-/*21*/WARNING(W_UNUSED_05,                       (WG_VALUE),   WSTATE_DISABLE) /*< OLD(TPPWarn_ExpectedIntegerAfterTPPRandom1). */
-/*22*/WARNING(W_UNUSED_06,                       (WG_VALUE),   WSTATE_DISABLE) /*< OLD(TPPWarn_ExpectedCommaAfterTPPRandom). */
-/*23*/WARNING(W_UNUSED_07,                       (WG_VALUE),   WSTATE_DISABLE) /*< OLD(TPPWarn_ExpectedIntegerAfterTPPRandom2). */
-/*24*/WARNING(W_UNUSED_08,                       (WG_VALUE),   WSTATE_DISABLE) /*< OLD(TPPWarn_ExpectedRParenAfterTPPRandom). */
-/*25*/WARNING(W_REDEFINING_MACRO,                (WG_MACROS),  WSTATE_WARN)    /*< [struct TPPKeyword *] OLD(TPPWarn_MacroAlreadyDefined). */
-/*26*/WARNING(W_EXPECTED_KEYWORD_AFTER_UNDEF,    (WG_SYNTAX),  WSTATE_WARN)    /*< OLD(TPPWarn_ExpectedKeywordAfterUndef). */
-/*27*/WARNING(W_EXPECTED_KEYWORD_AFTER_IFDEF,    (WG_SYNTAX),  WSTATE_WARN)    /*< OLD(TPPWarn_ExpectedKeywordAfterIfdef). */
-/*28*/WARNING(W_ELSE_WITHOUT_IF,                 (WG_SYNTAX),  WSTATE_WARN)    /*< OLD(TPPWarn_ElseWithoutIfdef). */
-/*29*/WARNING(W_ELSE_AFTER_ELSE,                 (WG_SYNTAX),  WSTATE_WARN)    /*< [struct TPPIfdefStackSlot *] OLD(TPPWarn_ElseAfterElse). */
-/*30*/WARNING(W_ELIF_WITHOUT_IF,                 (WG_SYNTAX),  WSTATE_WARN)    /*< OLD(TPPWarn_ElifWithoutIfdef). */
-/*31*/WARNING(W_ELIF_AFTER_ELSE,                 (WG_SYNTAX),  WSTATE_WARN)    /*< [struct TPPIfdefStackSlot *] OLD(TPPWarn_ElifAfterElse). */
-/*32*/WARNING(W_IF_WITHOUT_ENDIF,                (WG_SYNTAX),  WSTATE_WARN)    /*< [struct TPPIfdefStackSlot *] OLD(TPPWarn_IfdefWithoutEndif). */
-/*33*/WARNING(W_ENDIF_WITHOUT_IF,                (WG_SYNTAX),  WSTATE_WARN)    /*< OLD(TPPWarn_EndifWithoutIfdef). */
-/*34*/WARNING(W_UNUSED_09,                       (WG_VALUE),   WSTATE_DISABLE) /*< OLD(TPPWarn_ExpectedIntAfterLine). */
-/*35*/WARNING(W_EXPECTED_STRING_AFTER_LINE,      (WG_VALUE),   WSTATE_WARN)    /*< [struct TPPConst *] OLD(TPPWarn_ExpectedStringAfterLine). */
-/*36*/WARNING(W_MACRO_NOT_DEFINED,               (WG_VALUE),   WSTATE_DISABLE) /*< [struct TPPKeyword *] OLD(TPPWarn_MacroDoesntExist). */
-/*37*/WARNING(W_CANT_UNDEF_BUILTIN_MACRO,        (WG_VALUE),   WSTATE_WARN)    /*< [struct TPPKeyword *] OLD(TPPWarn_CantUndefBuiltinMacro). */
-/*38*/WARNING(W_UNUSED_0A,                       (WG_VALUE),   WSTATE_DISABLE) /*< OLD(TPPWarn_ExpectedLParenAfterHasInclude). */
-/*39*/WARNING(W_UNUSED_0B,                       (WG_VALUE),   WSTATE_DISABLE) /*< OLD(TPPWarn_ExpectedRParenAfterHasInclude). */
-/*40*/WARNING(W_EXPECTED_COLLON_AFTER_QUESTION,  (WG_SYNTAX),  WSTATE_WARN)    /*< OLD(TPPWarn_ExpectedCollonAfterQuestion). */
-/*41*/WARNING(W_INVALID_INTEGER_SUFFIX,          (WG_SYNTAX),  WSTATE_WARN)    /*< [char const *,size_t] OLD(TPPWarn_ExpectedInteger). */
-/*42*/WARNING(W_EXPECTED_RPAREN_IN_EXPRESSION,   (WG_SYNTAX),  WSTATE_WARN)    /*< OLD(TPPWarn_ExpectedRparenAfterLParen). */
-/*43*/WARNING(W_UNKNOWN_TOKEN_IN_EXPR_IS_ZERO,   (WG_UNDEF,WG_SYNTAX),WSTATE_WARN) /*< OLD(TPPWarn_UnexpectedTokenInConstExpr). */
-/*44*/WARNING(W_UNUSED_0C,                       (WG_VALUE),   WSTATE_DISABLE) /*< OLD(TPPWarn_ExpectedLParenAfterTPPEval). */
-/*45*/WARNING(W_UNUSED_0D,                       (WG_VALUE),   WSTATE_DISABLE) /*< OLD(TPPWarn_ExpectedRParenAfterTPPEval). */
-/*46*/WARNING(W_UNUSED_0E,                       (WG_VALUE),   WSTATE_DISABLE) /*< OLD(TPPWarn_ExpectedLParenAfterPragma). */
-/*47*/WARNING(W_EXPECTED_STRING_AFTER_PRAGMA,    (WG_VALUE),   WSTATE_WARN)    /*< [struct TPPConst *] OLD(TPPWarn_ExpectedStringAfterPragma). */
-/*48*/WARNING(W_UNUSED_0F,                       (WG_VALUE),   WSTATE_DISABLE) /*< OLD(TPPWarn_ExpectedRParenAfterPragma). */
-/*49*/WARNING(W_UNUSED_10,                       (WG_VALUE),   WSTATE_DISABLE) /*< OLD(TPPWarn_UnexpectedToken). */
-/*50*/WARNING(W_INVALID_WARNING,                 (WG_VALUE),   WSTATE_WARN)    /*< [struct TPPConst *] OLD(TPPWarn_InvalidWarning). */
-/*51*/WARNING(W_CANT_POP_WARNINGS,               (WG_VALUE),   WSTATE_WARN)    /*< OLD(TPPWarn_CantPopWarnings). */
-/*52*/WARNING(W_UNUSED_11,                       (WG_VALUE),   WSTATE_DISABLE) /*< OLD(TPPWarn_TPPLoadFileNotFound). */
-/*53*/WARNING(W_EXPECTED_STRING_AFTER_PUSHMACRO, (WG_VALUE),   WSTATE_WARN)    /*< [struct TPPConst *] OLD(TPPWarn_ExpectedStringAfterPushMacro). */
-/*54*/WARNING(W_UNUSED_12,                       (WG_VALUE),   WSTATE_DISABLE) /*< OLD(TPPWarn_CantPopMacro). */
-/*55*/WARNING(W_UNUSED_13,                       (WG_VALUE),   WSTATE_DISABLE) /*< OLD(TPPWarn_ExpectedLParenAfterTPPStrDecompile). */
-/*56*/WARNING(W_EXPECTED_STRING_AFTER_TPP_STRD,  (WG_VALUE),   WSTATE_WARN)    /*< [struct TPPConst *] OLD(TPPWarn_ExpectedStringAfterTPPStrDecompile). */
-/*57*/WARNING(W_UNUSED_14,                       (WG_VALUE),   WSTATE_DISABLE) /*< OLD(TPPWarn_ExpectedRParenAfterTPPStrDecompile). */
-/*58*/WARNING(W_EXPECTED_LPAREN,                 (WG_SYNTAX),  WSTATE_WARN)    /*< OLD(TPPWarn_ExpectedLParen). */
-/*59*/WARNING(W_EXPECTED_RPAREN,                 (WG_SYNTAX),  WSTATE_WARN)    /*< OLD(TPPWarn_ExpectedRParen). */
-/*60*/WARNING(W_DEPRECATED_IDENTIFIER,           (WG_USER),    WSTATE_WARN)    /*< [struct TPPKeyword *] OLD(TPPWarn_DeprecatedKeyword). */
-/*61*/WARNING(W_NONPARTABLE_FILENAME_CASING,     (WG_ENVIRON), WSTATE_WARN)    /*< [char const *,char const *,size_t,char const *]. (path,wrong_begin,wrong_size,corrent_begin) OLD(TPPWarn_InvalidPathCasing). */
-/*62*/WARNING(W_DIVIDE_BY_ZERO,                  (WG_VALUE),   WSTATE_WARN)    /*< OLD(TPPWarn_DivideByZero|TPPWarn_ModuloByZero). */
-/*63*/WARNING(W_ARGUMENT_NAMED_ALREADY_TAKEN,    (WG_MACROS),  WSTATE_WARN)    /*< [tok_t] OLD(TPPWarn_ReusedMacroParameter). */
-/*64*/WARNING(W_SPECIAL_ARGUMENT_NAME,           (WG_MACROS),  WSTATE_WARN)    /*< [struct TPPKeyword *] OLD(TPPWarn_VaArgsUsedAsMacroParameter). */
-/*65*/WARNING(W_UNUSED_15,                       (WG_VALUE),   WSTATE_WARN)    /*< OLD(TPPWarn_VaCommaUsedAsMacroParameter). */
-/*66*/WARNING(W_UNUSED_16,                       (WG_VALUE),   WSTATE_WARN)    /*< OLD(TPPWarn_Unexpected). */
-/*67*/WARNING(W_UNUSED_17,                       (WG_VALUE),   WSTATE_WARN)    /*< OLD(TPPWarn_VaArgsMustBeLastParameter). */
-/*68*/WARNING(W_EXPECTED_BOOL,                   (WG_BOOLVALUE,WG_VALUE),WSTATE_WARN) /*< [struct TPPConst *] OLD(TPPWarn_ExpectedBoolExpression). */
-/*69*/WARNING(W_EXPECTED_BOOL_UNARY,             (WG_BOOLVALUE,WG_VALUE),WSTATE_WARN) /*< [struct TPPConst *] OLD(TPPWarn_ExpectedBoolExpressionNot). */
-/*70*/WARNING(W_EXPECTED_BOOL_BINARY_LHS,        (WG_BOOLVALUE,WG_VALUE),WSTATE_WARN) /*< [struct TPPConst *] OLD(TPPWarn_ExpectedBoolExpressionLhsOP). */
-/*71*/WARNING(W_EXPECTED_BOOL_BINARY_RHS,        (WG_BOOLVALUE,WG_VALUE),WSTATE_WARN) /*< [struct TPPConst *] OLD(TPPWarn_ExpectedBoolExpressionRhsOP). */
-/*72*/WARNING(W_UNUSED_18,                       (WG_VALUE),   WSTATE_WARN)    /*< OLD(TPPWarn_ExpectedKeyword). */
+/* 0*/DEF_WARNING(W_EXPECTED_KEYWORD_AFTER_DEFINE,(WG_SYNTAX),WSTATE_WARN,WARNF("Expected keyword after #define, but got " TOK_S,TOK_A)) /*< OLD(TPPWarn_ExpectedKeywordAfterDefine). */
+/* 1*/DEF_WARNING(W_REDEFINING_BUILTIN_KEYWORD,(WG_MACROS),WSTATE_DISABLE,WARNF("Redefining builtin macro '%s'",KWDNAME())) /*< [struct TPPKeyword *] OLD(TPPWarn_RedefiningBuiltinKeyword). */
+/* 2*/DEF_WARNING(W_UNKNOWN_PREPROCESSOR_DIRECTIVE,(WG_SYNTAX),WSTATE_WARN,WARNF("Unknown preprocessor directive " TOK_S,TOK_A)) /*< OLD(TPPWarn_UnknownPreprocessorDirective). */
+/* 3*/DEF_WARNING(W_STARSLASH_OUTSIDE_OF_COMMENT,(WG_COMMENT,WG_COMMENTS),WSTATE_WARN,WARNF("'*" "/' outside of comment")) /*< [char *] OLD(TPPWarn_StarSlashOutsideOfComment). */
+/* 4*/DEF_WARNING(W_ERROR,(WG_USER),WSTATE_ERROR,{ char *temp = ARG(char *); WARNF("ERROR : %.*s",(int)ARG(size_t),temp); }) /*< [char const *,size_t] OLD(TPPWarn_DirectiveError). */
+/* 5*/DEF_WARNING(W_WARNING,(WG_USER),WSTATE_WARN,{ char *temp = ARG(char *); WARNF("WARNING : %.*s",(int)ARG(size_t),temp); }) /*< [char const *,size_t] OLD(TPPWarn_DirectiveWarning). */
+/* 6*/DEF_WARNING(W_EXPECTED_KWDLPAR_AFTER_DEFINED,(WG_SYNTAX),WSTATE_WARN,WARNF("Expected keyword or '(' after 'defined', but got " TOK_S,TOK_A)) /*< OLD(TPPWarn_ExpectedKeywordOrLParenAfterDefined). */
+/* 7*/DEF_WARNING(W_EXPECTED_KEYWORD_AFTER_DEFINED,(WG_SYNTAX),WSTATE_WARN,WARNF("Expected keyword after 'defined', but got " TOK_S,TOK_A)) /*< OLD(TPPWarn_ExpectedKeywordAfterDefined). */
+/* 8*/DEF_WARNING(W_EXPECTED_RPAREN_AFTER_DEFINED,(WG_SYNTAX),WSTATE_WARN,WARNF("Expected ')' after 'defined', but got " TOK_S,TOK_A)) /*< OLD(TPPWarn_ExpectedRParenAfterDefined). */
+/* 9*/DEF_WARNING(W_EXPECTED_MACRO_ARGUMENT_NAME,(WG_SYNTAX),WSTATE_WARN,WARNF("Expected argument name")) /*< [tok_t] OLD(TPPWarn_ExpectedKeywordForMacroArgument). */
+/*10*/DEF_WARNING(W_EXPECTED_ARGEND_AFTER_VARARGS,(WG_SYNTAX),WSTATE_WARN,WARNF("Expected end of argument list after arg-args, but got " TOK_S,TOK_A)) /*< [tok_t] OLD(TPPWarn_ExpectedRParenAfterVaArgs). */
+/*11*/DEF_WARNING(W_EXPECTED_COMMA_OR_ARGEND,(WG_SYNTAX),WSTATE_WARN,WARNF("Expected ',' or end of argument list, but got " TOK_S,TOK_A)) /*< [tok_t] OLD(TPPWarn_ExpectedCommaOrRParenForMacroFuncDecl). */
+/*12*/DEF_WARNING(W_TOO_MANY_MACRO_ARGUMENTS,(WG_MACROS),WSTATE_WARN,WARNF("Too many arguments for '%s'",FILENAME())) /*< [struct TPPFile *] OLD( TPPWarn_InvalidMacroArgCount). */
+/*13*/DEF_WARNING(W_EOF_IN_MACRO_ARGUMENT_LIST,(WG_SYNTAX),WSTATE_WARN,WARNF("EOF in macro argument list")) /*< OLD(TPPWarn_UnexpectedEOFInMacroArgList). */
+/*14*/DEF_WARNING(W_EXPECTED_INCLUDE_STRING,(WG_SYNTAX),WSTATE_WARN,WARNF("Expected #include-string, but got " TOK_S,TOK_A)) /*< OLD(TPPWarn_ExpectedIncludeString). */
+/*15*/DEF_WARNING(W_FILE_NOT_FOUND,(WG_ENVIRON),WSTATE_WARN,WARNF("File not found: '%s'",ARG(char *))) /*< [char const *] OLD(TPPWarn_IncludeFileNotFound). */
+/*16*/WARNING(W_UNUSED_00,(WG_VALUE),WSTATE_DISABLE) /*< OLD(TPPWarn_SysIncludeFileNotFound). */
+/*17*/WARNING(W_UNUSED_01,(WG_VALUE),WSTATE_DISABLE) /*< OLD(TPPWarn_ExpectedLParenAfterTPPCounter). */
+/*18*/WARNING(W_UNUSED_02,(WG_VALUE),WSTATE_DISABLE) /*< OLD(TPPWarn_ExpectedKeywordAfterTPPCounter). */
+/*19*/WARNING(W_UNUSED_03,(WG_VALUE),WSTATE_DISABLE) /*< OLD(TPPWarn_ExpectedRParenAfterTPPCounter). */
+/*20*/WARNING(W_UNUSED_04,(WG_VALUE),WSTATE_DISABLE) /*< OLD(TPPWarn_ExpectedLParenAfterTPPRandom). */
+/*21*/WARNING(W_UNUSED_05,(WG_VALUE),WSTATE_DISABLE) /*< OLD(TPPWarn_ExpectedIntegerAfterTPPRandom1). */
+/*22*/WARNING(W_UNUSED_06,(WG_VALUE),WSTATE_DISABLE) /*< OLD(TPPWarn_ExpectedCommaAfterTPPRandom). */
+/*23*/WARNING(W_UNUSED_07,(WG_VALUE),WSTATE_DISABLE) /*< OLD(TPPWarn_ExpectedIntegerAfterTPPRandom2). */
+/*24*/WARNING(W_UNUSED_08,(WG_VALUE),WSTATE_DISABLE) /*< OLD(TPPWarn_ExpectedRParenAfterTPPRandom). */
+/*25*/DEF_WARNING(W_REDEFINING_MACRO,(WG_MACROS),WSTATE_WARN,{
+ /* [struct TPPKeyword *] OLD(TPPWarn_MacroAlreadyDefined). */
+ struct TPPFile *textfile;
+ struct TPPKeyword *kwd = ARG(struct TPPKeyword *);
+ assert(kwd->k_macro);
+ assert(kwd->k_macro->f_kind == TPPFILE_KIND_MACRO);
+ assert((kwd->k_macro->f_macro.m_flags&TPP_MACROFILE_KIND) != TPP_MACROFILE_KIND_EXPANDED);
+ textfile = kwd->k_macro->f_macro.m_deffile;
+ assert(textfile);
+ assert(textfile->f_kind == TPPFILE_KIND_TEXT);
+ WARNF("Redefining macro '%s'\n",kwd->k_name); 
+ WARNF(current.l_flags&TPPLEXER_FLAG_MSVC_MESSAGEFORMAT
+       ? "%s(%d) : " : "%s:%d: "
+       , textfile->f_textfile.f_usedname
+       ? textfile->f_textfile.f_usedname->s_text
+       : textfile->f_name,kwd->k_macro->f_macro.m_defline+1);
+ WARNF("See reference to previous definition"); 
+})
+/*26*/DEF_WARNING(W_EXPECTED_KEYWORD_AFTER_UNDEF,(WG_SYNTAX),WSTATE_WARN,WARNF("Expected keyword after #undef, but got " TOK_S,TOK_A)) /*< OLD(TPPWarn_ExpectedKeywordAfterUndef). */
+/*27*/DEF_WARNING(W_EXPECTED_KEYWORD_AFTER_IFDEF,(WG_SYNTAX),WSTATE_WARN,WARNF("Expected keyword after #ifdef, but got " TOK_S,TOK_A)) /*< OLD(TPPWarn_ExpectedKeywordAfterIfdef). */
+/*28*/DEF_WARNING(W_ELSE_WITHOUT_IF,(WG_SYNTAX),WSTATE_WARN,WARNF("#else without #if")) /*< OLD(TPPWarn_ElseWithoutIfdef). */
+/*29*/DEF_WARNING(W_ELSE_AFTER_ELSE,(WG_SYNTAX),WSTATE_WARN,{
+ /* [struct TPPIfdefStackSlot *] OLD(TPPWarn_ElseAfterElse). */
+ struct TPPIfdefStackSlot *ifdef_slot;
+ WARNF("#else after #else\n");
+ ifdef_slot = ARG(struct TPPIfdefStackSlot *);
+ WARNF(current.l_flags&TPPLEXER_FLAG_MSVC_MESSAGEFORMAT
+       ? "%s(%d) : " : "%s:%d: ",
+       ifdef_slot->iss_file->f_name,ifdef_slot->iss_line+1);
+ WARNF("See reference to previous #else");
+})
+/*30*/DEF_WARNING(W_ELIF_WITHOUT_IF,(WG_SYNTAX),WSTATE_WARN,WARNF("#elif without #if")) /*< OLD(TPPWarn_ElifWithoutIfdef). */
+/*31*/DEF_WARNING(W_ELIF_AFTER_ELSE,(WG_SYNTAX),WSTATE_WARN,{
+ /* [struct TPPIfdefStackSlot *] OLD(TPPWarn_ElifAfterElse). */
+ struct TPPIfdefStackSlot *ifdef_slot;
+ WARNF("#elif after #else\n");
+ ifdef_slot = ARG(struct TPPIfdefStackSlot *);
+ WARNF(current.l_flags&TPPLEXER_FLAG_MSVC_MESSAGEFORMAT
+       ? "%s(%d) : " : "%s:%d: ",
+       ifdef_slot->iss_file->f_name,ifdef_slot->iss_line+1);
+ WARNF("See reference to #else");
+})
+/*32*/DEF_WARNING(W_IF_WITHOUT_ENDIF,(WG_SYNTAX),WSTATE_WARN,WARNF("#if without #endif")) /*< [struct TPPIfdefStackSlot *] OLD(TPPWarn_IfdefWithoutEndif). */
+/*33*/DEF_WARNING(W_ENDIF_WITHOUT_IF,(WG_SYNTAX),WSTATE_WARN,WARNF("#endif without #if")) /*< OLD(TPPWarn_EndifWithoutIfdef). */
+/*34*/WARNING(W_UNUSED_09,(WG_VALUE),WSTATE_DISABLE) /*< OLD(TPPWarn_ExpectedIntAfterLine). */
+/*35*/DEF_WARNING(W_EXPECTED_STRING_AFTER_LINE,(WG_VALUE),WSTATE_WARN,WARNF("Expected string after #line, but got '%s'",CONST_STR())) /*< [struct TPPConst *] OLD(TPPWarn_ExpectedStringAfterLine). */
+/*36*/DEF_WARNING(W_MACRO_NOT_DEFINED,(WG_VALUE),WSTATE_DISABLE,WARNF("Macro '%s' is not defined",KWDNAME())) /*< [struct TPPKeyword *] OLD(TPPWarn_MacroDoesntExist). */
+/*37*/DEF_WARNING(W_CANT_UNDEF_BUILTIN_MACRO,(WG_VALUE),WSTATE_WARN,WARNF("Cannot #undef builtin macro '%s'",KWDNAME())) /*< [struct TPPKeyword *] OLD(TPPWarn_CantUndefBuiltinMacro). */
+/*38*/WARNING(W_UNUSED_0A,(WG_VALUE),WSTATE_DISABLE) /*< OLD(TPPWarn_ExpectedLParenAfterHasInclude). */
+/*39*/WARNING(W_UNUSED_0B,(WG_VALUE),WSTATE_DISABLE) /*< OLD(TPPWarn_ExpectedRParenAfterHasInclude). */
+/*40*/DEF_WARNING(W_EXPECTED_COLLON_AFTER_QUESTION,(WG_SYNTAX),WSTATE_WARN,WARNF("Expected ':' after '?'")) /*< OLD(TPPWarn_ExpectedCollonAfterQuestion). */
+/*41*/DEF_WARNING(W_INVALID_INTEGER_SUFFIX,(WG_SYNTAX),WSTATE_WARN,{ char *temp = ARG(char *); WARNF("Invalid integer suffix '%.*s'",(int)ARG(size_t),temp); }) /*< [char const *,size_t] OLD(TPPWarn_ExpectedInteger). */
+/*42*/DEF_WARNING(W_EXPECTED_RPAREN_IN_EXPRESSION,(WG_SYNTAX),WSTATE_WARN,WARNF("Expected ')' in expression, but got " TOK_S,TOK_A)) /*< OLD(TPPWarn_ExpectedRparenAfterLParen). */
+/*43*/DEF_WARNING(W_UNKNOWN_TOKEN_IN_EXPR_IS_ZERO,(WG_UNDEF,WG_SYNTAX),WSTATE_WARN,WARNF("Unrecognized token " TOK_S " is replaced with '0' in expression",TOK_A)) /*< OLD(TPPWarn_UnexpectedTokenInConstExpr). */
+/*44*/WARNING(W_UNUSED_0C,(WG_VALUE),WSTATE_DISABLE) /*< OLD(TPPWarn_ExpectedLParenAfterTPPEval). */
+/*45*/WARNING(W_UNUSED_0D,(WG_VALUE),WSTATE_DISABLE) /*< OLD(TPPWarn_ExpectedRParenAfterTPPEval). */
+/*46*/WARNING(W_UNUSED_0E,(WG_VALUE),WSTATE_DISABLE) /*< OLD(TPPWarn_ExpectedLParenAfterPragma). */
+/*47*/DEF_WARNING(W_EXPECTED_STRING_AFTER_PRAGMA,(WG_VALUE),WSTATE_WARN,WARNF("Expected string after _Pragma, but got '%s'",CONST_STR())) /*< [struct TPPConst *] OLD(TPPWarn_ExpectedStringAfterPragma). */
+/*48*/WARNING(W_UNUSED_0F,(WG_VALUE),WSTATE_DISABLE) /*< OLD(TPPWarn_ExpectedRParenAfterPragma). */
+/*49*/WARNING(W_UNUSED_10,(WG_VALUE),WSTATE_DISABLE) /*< OLD(TPPWarn_UnexpectedToken). */
+/*50*/DEF_WARNING(W_INVALID_WARNING,(WG_VALUE),WSTATE_WARN,{
+ /* [struct TPPConst *] OLD(TPPWarn_InvalidWarning). */
+ struct TPPConst *c = ARG(struct TPPConst *);
+ if (c->c_kind == TPP_CONST_STRING) {
+  char const *wname = c->c_data.c_string->s_text;
+  if (*wname == '-') ++wname;
+  if (*wname == 'W') ++wname;
+  if (!memcmp(wname,"no-",3)) wname += 3;
+  WARNF("Invalid warning '%s' (Did you mean '%s')",wname,find_most_likely_warning(wname));
+ } else if (c->c_kind == TPP_CONST_FLOAT) {
+  WARNF("Invalid warning '%f'",(double)c->c_data.c_float);
+ } else if (c->c_kind == TPP_CONST_INTEGRAL) {
+  WARNF("Invalid warning '%ld'",(long)c->c_data.c_int);
+ } else {
+  WARNF("Invalid warning");
+ }
+})
+/*51*/DEF_WARNING(W_CANT_POP_WARNINGS,(WG_VALUE),WSTATE_WARN,WARNF("Can't pop warnings")) /*< OLD(TPPWarn_CantPopWarnings). */
+/*52*/WARNING(W_UNUSED_11,(WG_VALUE),WSTATE_DISABLE) /*< OLD(TPPWarn_TPPLoadFileNotFound). */
+/*53*/DEF_WARNING(W_EXPECTED_STRING_AFTER_PUSHMACRO,(WG_VALUE),WSTATE_WARN,WARNF("Expected string after push_macro, but got '%s'",CONST_STR())) /*< [struct TPPConst *] OLD(TPPWarn_ExpectedStringAfterPushMacro). */
+/*54*/WARNING(W_UNUSED_12,(WG_VALUE),WSTATE_DISABLE) /*< OLD(TPPWarn_CantPopMacro). */
+/*55*/WARNING(W_UNUSED_13,(WG_VALUE),WSTATE_DISABLE) /*< OLD(TPPWarn_ExpectedLParenAfterTPPStrDecompile). */
+/*56*/DEF_WARNING(W_EXPECTED_STRING_AFTER_TPP_STRD,(WG_VALUE),WSTATE_WARN,WARNF("Expected string after __TPP_STR_DECOMPILE, but got '%s'",CONST_STR())) /*< [struct TPPConst *] OLD(TPPWarn_ExpectedStringAfterTPPStrDecompile). */
+/*57*/WARNING(W_UNUSED_14,(WG_VALUE),WSTATE_DISABLE) /*< OLD(TPPWarn_ExpectedRParenAfterTPPStrDecompile). */
+/*58*/DEF_WARNING(W_EXPECTED_LPAREN,(WG_SYNTAX),WSTATE_WARN,WARNF("Expected '(', but got " TOK_S,TOK_A)) /*< OLD(TPPWarn_ExpectedLParen). */
+/*59*/DEF_WARNING(W_EXPECTED_RPAREN,(WG_SYNTAX),WSTATE_WARN,WARNF("Expected ')', but got " TOK_S,TOK_A)) /*< OLD(TPPWarn_ExpectedRParen). */
+/*60*/DEF_WARNING(W_DEPRECATED_IDENTIFIER,(WG_USER),WSTATE_WARN,WARNF("DEPRECATED : '%s'",KWDNAME())) /*< [struct TPPKeyword *] OLD(TPPWarn_DeprecatedKeyword). */
+/*61*/DEF_WARNING(W_NONPARTABLE_FILENAME_CASING,(WG_ENVIRON),WSTATE_WARN,{
+ /* [char const *,char const *,size_t,char const *]. (path,wrong_begin,wrong_size,corrent_begin)
+  *  OLD(TPPWarn_InvalidPathCasing). */
+ char *temp; char *temp2; size_t temp3;
+ temp = ARG(char *); temp2 = ARG(char *); temp3 = ARG(size_t);
+ WARNF("Non-portable casing in '%s': '%.*s' should be '%s' instead",
+       temp,(int)temp3,temp2,ARG(char *));
+})
+/*62*/DEF_WARNING(W_DIVIDE_BY_ZERO,(WG_VALUE),WSTATE_WARN,WARNF("Divide by ZERO")) /*< OLD(TPPWarn_DivideByZero|TPPWarn_ModuloByZero). */
+/*63*/DEF_WARNING(W_ARGUMENT_NAMED_ALREADY_TAKEN,(WG_MACROS),WSTATE_WARN,WARNF("Argument name '%s' is already in use",TOK_NAME())) /*< [tok_t] OLD(TPPWarn_ReusedMacroParameter). */
+/*64*/DEF_WARNING(W_SPECIAL_ARGUMENT_NAME,(WG_MACROS),WSTATE_WARN,WARNF("Special keyword '%s' used as argument name",KWDNAME())) /*< [struct TPPKeyword *] OLD(TPPWarn_VaArgsUsedAsMacroParameter). */
+/*65*/WARNING(W_UNUSED_15,(WG_VALUE),WSTATE_WARN) /*< OLD(TPPWarn_VaCommaUsedAsMacroParameter). */
+/*66*/WARNING(W_UNUSED_16,(WG_VALUE),WSTATE_WARN) /*< OLD(TPPWarn_Unexpected). */
+/*67*/WARNING(W_UNUSED_17,(WG_VALUE),WSTATE_WARN) /*< OLD(TPPWarn_VaArgsMustBeLastParameter). */
+/*68*/WARNING(W_EXPECTED_BOOL,(WG_BOOLVALUE,WG_VALUE),WSTATE_WARN) /*< [struct TPPConst *] OLD(TPPWarn_ExpectedBoolExpression). */
+/*69*/WARNING(W_EXPECTED_BOOL_UNARY,(WG_BOOLVALUE,WG_VALUE),WSTATE_WARN) /*< [struct TPPConst *] OLD(TPPWarn_ExpectedBoolExpressionNot). */
+/*70*/WARNING(W_EXPECTED_BOOL_BINARY_LHS,(WG_BOOLVALUE,WG_VALUE),WSTATE_WARN) /*< [struct TPPConst *] OLD(TPPWarn_ExpectedBoolExpressionLhsOP). */
+/*71*/WARNING(W_EXPECTED_BOOL_BINARY_RHS,(WG_BOOLVALUE,WG_VALUE),WSTATE_WARN) /*< [struct TPPConst *] OLD(TPPWarn_ExpectedBoolExpressionRhsOP). */
+/*72*/WARNING(W_UNUSED_18,(WG_VALUE),WSTATE_WARN) /*< OLD(TPPWarn_ExpectedKeyword). */
+#ifdef DECLARE_WARNING_MESSAGES
+{ char const *use; /* Warn about non-boolean integral. */
+  if (FALSE) { case W_EXPECTED_BOOL           : use = ""; }
+  if (FALSE) { case W_EXPECTED_BOOL_UNARY     : use = " for operand"; }
+  if (FALSE) { case W_EXPECTED_BOOL_BINARY_LHS: use = " for left operand"; }
+  if (FALSE) { case W_EXPECTED_BOOL_BINARY_RHS: use = " for right operand"; }
+  WARNF("Expected boolean expression%s, but got %s",use,CONST_STR());
+} break;
+#endif
+
+WARNING_NAMESPACE(WN_TPX,100)
 
 /* Warnings added by the new TPP. */
-WARNING(W_SLASHSTAR_INSIDE_OF_COMMENT,     (WG_COMMENTS,WG_COMMENT),WSTATE_WARN) /*< [char *]. */
-WARNING(W_LINE_COMMENT_CONTINUED,          (WG_COMMENTS,WG_COMMENT),WSTATE_WARN) /*< . */
-WARNING(W_VA_KEYWORD_IN_REGULAR_MACRO,     (WG_MACROS),  WSTATE_WARN)    /*< [struct TPPKeyword *]. */
-WARNING(W_KEYWORD_MACRO_ALREADY_ONSTACK,   (WG_MACROS),  WSTATE_DISABLE) /*< [struct TPPFile *]. */
-WARNING(W_FUNCTION_MACRO_ALREADY_ONSTACK,  (WG_MACROS),  WSTATE_DISABLE) /*< [struct TPPFile *]. */
-WARNING(W_NOT_ENGOUH_MACRO_ARGUMENTS,      (WG_MACROS),  WSTATE_WARN)    /*< [struct TPPFile *]. */
-WARNING(W_CHARACTER_TOO_LONG,              (WG_VALUE),   WSTATE_WARN)    /*< . */
-WARNING(W_MULTICHAR_NOT_ALLOWED,           (WG_VALUE),   WSTATE_WARN)    /*< [char const *,size_t]. */
-WARNING(W_INDEX_OUT_OF_BOUNDS,             (WG_VALUE),   WSTATE_DISABLE) /*< [struct TPPString *,ptrdiff_t]. */
-WARNING(W_STRING_TERMINATED_BY_LINEFEED,   (WG_SYNTAX),  WSTATE_WARN)    /*< . */
-WARNING(W_STRING_TERMINATED_BY_EOF,        (WG_SYNTAX),  WSTATE_WARN)    /*< . */
-WARNING(W_COMMENT_TERMINATED_BY_EOF,       (WG_SYNTAX),  WSTATE_WARN)    /*< . */
-WARNING(W_ENCOUNTERED_TRIGRAPH,            (WG_TRIGRAPHS),WSTATE_WARN)   /*< [char (*)[3]]. */
-WARNING(W_EXPECTED_RBRACKET_IN_EXPRESSION, (WG_SYNTAX),  WSTATE_WARN)    /*< . */
-WARNING(W_EXPECTED_COLLON_AFTER_WARNING,   (WG_SYNTAX),  WSTATE_WARN)    /*< . */
-WARNING(W_EXPECTED_COMMA,                  (WG_SYNTAX),  WSTATE_WARN)    /*< . */
-WARNING(W_EXPECTED_STRING_IN_EXPRESSION,   (WG_VALUE),   WSTATE_WARN)    /*< [struct TPPConst *]. */
-WARNING(W_EXPECTED_STRING_AFTER_MESSAGE,   (WG_VALUE),   WSTATE_WARN)    /*< [struct TPPConst *]. */
-WARNING(W_EXPECTED_STRING_AFTER_DEPRECATED,(WG_VALUE),   WSTATE_WARN)    /*< [struct TPPConst *]. */
-WARNING(W_EXPECTED_STRING_AFTER_TPP_EXEC,  (WG_VALUE),   WSTATE_WARN)    /*< [struct TPPConst *]. */
-WARNING(W_EXPECTED_STRING_AFTER_TPP_SETF,  (WG_VALUE),   WSTATE_WARN)    /*< [struct TPPConst *]. */
-WARNING(W_EXPECTED_STRING_AFTER_TPP_STRAT, (WG_VALUE),   WSTATE_WARN)    /*< [struct TPPConst *]. */
-WARNING(W_EXPECTED_STRING_AFTER_TPP_CNTTOK,(WG_VALUE),   WSTATE_WARN)    /*< [struct TPPConst *]. */
-WARNING(W_EXPECTED_STRING_AFTER_PRGERROR,  (WG_VALUE),   WSTATE_WARN)    /*< [struct TPPConst *]. */
-WARNING(W_EXPECTED_STRING_AFTER_EXTENSION, (WG_VALUE),   WSTATE_WARN)    /*< [struct TPPConst *]. */
-WARNING(W_EXPECTED_STRING_AFTER_TPP_INCPTH,(WG_VALUE),   WSTATE_WARN)    /*< [struct TPPConst *]. */
-WARNING(W_MACRO_RECURSION_LIMIT_EXCEEDED,  (WG_LIMIT),   WSTATE_WARN)    /*< [struct TPPFile *]. */
-WARNING(W_INCLUDE_RECURSION_LIMIT_EXCEEDED,(WG_LIMIT),   WSTATE_WARN)    /*< [struct TPPFile *]. */
-WARNING(W_UNKNOWN_EXTENSION,               (WG_VALUE),   WSTATE_WARN)    /*< [char const *]. */
-WARNING(W_DEFINED_IN_MACRO_BODY,           (WG_EXPANSION_TO_DEFINED),WSTATE_WARN)
-WARNING(W_IDENT_SCCS_IGNORED,              (WG_DIRECTIVE),WSTATE_WARN)   /*< [struct TPPConst *]. */
-WARNING(W_EXPECTED_STRING_AFTER_IDENT,     (WG_VALUE),    WSTATE_WARN)   /*< [struct TPPConst *]. */
-WARNING(W_EXPECTED_KEYWORD_AFTER_ASSERT,   (WG_DIRECTIVE),WSTATE_WARN)   /*< . */
-WARNING(W_EXPECTED_KEYWORD_AFTER_PREDICATE,(WG_DIRECTIVE),WSTATE_WARN)   /*< [struct TPPKeyword *]. */
-WARNING(W_EXPECTED_KEYWORD_AFTER_EXPR_HASH,(WG_DIRECTIVE),WSTATE_WARN)   /*< . */
-WARNING(W_EXPECTED_KEYWORD_AFTER_EXPR_PRED,(WG_DIRECTIVE),WSTATE_WARN)   /*< . */
-WARNING(W_UNKNOWN_ASSERTION,               (WG_VALUE),   WSTATE_DISABLE) /*< [struct TPPKeyword *,struct TPPKeyword *]. */
-WARNING(W_EXPECTED_STRING_AFTER_GCC_DIAG,  (WG_VALUE),   WSTATE_WARN)    /*< [struct TPPConst *]. */
-WARNING(W_CANT_POP_EXTENSIONS,             (WG_VALUE),   WSTATE_WARN)    /*< . */
-WARNING(W_CANT_POP_INCLUDE_PATH,           (WG_VALUE),   WSTATE_WARN)    /*< . */
-WARNING(W_CONSIDER_PAREN_AROUND_LAND,      (WG_QUALITY), WSTATE_WARN)    /*< . */
-WARNING(W_INTEGRAL_OVERFLOW,               (WG_VALUE),   WSTATE_WARN)    /*< [int_t,int_t]. */
-WARNING(W_INTEGRAL_CLAMPED,                (WG_VALUE),   WSTATE_WARN)    /*< [int_t,int_t]. */
-WARNING(W_UNKNOWN_INCLUDE_PATH,            (WG_VALUE),   WSTATE_WARN)    /*< [char const *,size_t]. */
-WARNING(W_INCLUDE_PATH_ALREADY_EXISTS,     (WG_VALUE),   WSTATE_WARN)    /*< [char const *,size_t]. */
-WARNING(W_EXPECTED_ELSE_IN_EXPRESSION,     (WG_SYNTAX),  WSTATE_WARN)    /*< . */
-WARNING(W_STATEMENT_IN_EXPRESSION,         (WG_USAGE,WG_SYNTAX),WSTATE_WARN) /*< . */
-WARNING(W_TYPECAST_IN_EXPRESSION,          (WG_USAGE,WG_SYNTAX),WSTATE_WARN) /*< . */
-WARNING(W_EXPECTED_RPAREN_AFTER_CAST,      (WG_SYNTAX),  WSTATE_WARN)    /*< . */
-WARNING(W_EXPECTED_RBRACE_AFTER_STATEMENT, (WG_SYNTAX),  WSTATE_WARN)    /*< . */
-WARNING(W_EXPECTED_WARNING_NAMEORID,       (WG_VALUE),   WSTATE_WARN)    /*< [struct TPPConst *]. */
+DEF_WARNING(W_SLASHSTAR_INSIDE_OF_COMMENT,(WG_COMMENTS,WG_COMMENT),WSTATE_WARN,WARNF("'/" "*' repeated inside of comment")) /*< [char *]. */
+DEF_WARNING(W_LINE_COMMENT_CONTINUED,(WG_COMMENTS,WG_COMMENT),WSTATE_WARN,WARNF("Line-comment continued")) /*< . */
+DEF_WARNING(W_VA_KEYWORD_IN_REGULAR_MACRO,(WG_MACROS),WSTATE_WARN,WARNF("Variadic keyword '%s' used in regular macro",KWDNAME())) /*< [struct TPPKeyword *]. */
+DEF_WARNING(W_KEYWORD_MACRO_ALREADY_ONSTACK,(WG_MACROS),WSTATE_DISABLE,WARNF("Keyword-style macro '%s' is already being expanded",FILENAME())) /*< [struct TPPFile *]. */
+DEF_WARNING(W_FUNCTION_MACRO_ALREADY_ONSTACK,(WG_MACROS),WSTATE_DISABLE,WARNF("Function-style macro '%s' is expanded to the same text",FILENAME())) /*< [struct TPPFile *]. */
+DEF_WARNING(W_NOT_ENGOUH_MACRO_ARGUMENTS,(WG_MACROS),WSTATE_WARN,WARNF("Too enough arguments for '%s'",FILENAME())) /*< [struct TPPFile *]. */
+DEF_WARNING(W_CHARACTER_TOO_LONG,(WG_VALUE),WSTATE_WARN,WARNF("Character sequence is too long")) /*< . */
+DEF_WARNING(W_MULTICHAR_NOT_ALLOWED,(WG_VALUE),WSTATE_WARN,{ char *temp = ARG(char *); WARNF("The multi-character sequence '%.*s' is not not allowed",(int)ARG(size_t),temp); }) /*< [char const *,size_t]. */
+DEF_WARNING(W_INDEX_OUT_OF_BOUNDS,(WG_VALUE),WSTATE_DISABLE,{ ptrdiff_t temp = ARG(ptrdiff_t); WARNF("Index %ld is out-of-bounds of 0..%lu",temp,ARG(struct TPPString *)->s_size); }) /*< [struct TPPString *,ptrdiff_t]. */
+DEF_WARNING(W_STRING_TERMINATED_BY_LINEFEED,(WG_SYNTAX),WSTATE_WARN,WARNF("String was terminated by a linefeed")) /*< . */
+DEF_WARNING(W_STRING_TERMINATED_BY_EOF,(WG_SYNTAX),WSTATE_WARN,WARNF("String was terminated by EOF")) /*< . */
+DEF_WARNING(W_COMMENT_TERMINATED_BY_EOF,(WG_SYNTAX),WSTATE_WARN,WARNF("Comment was terminated by EOF")) /*< . */
+DEF_WARNING(W_ENCOUNTERED_TRIGRAPH,(WG_TRIGRAPHS),WSTATE_WARN,WARNF("Encountered trigraph character sequence '%.3s'",ARG(char *))) /*< [char (*)[3]]. */
+DEF_WARNING(W_EXPECTED_RBRACKET_IN_EXPRESSION,(WG_SYNTAX),WSTATE_WARN,WARNF("Expected ']' in expression, but got " TOK_S,TOK_A)) /*< . */
+DEF_WARNING(W_EXPECTED_COLLON_AFTER_WARNING,(WG_SYNTAX),WSTATE_WARN,WARNF("Expected ':' after #pragma warning, but got " TOK_S,TOK_A)) /*< . */
+DEF_WARNING(W_EXPECTED_COMMA,(WG_SYNTAX),WSTATE_WARN,WARNF("Expected ',', but got " TOK_S,TOK_A)) /*< . */
+DEF_WARNING(W_EXPECTED_STRING_IN_EXPRESSION,(WG_VALUE),WSTATE_WARN,WARNF("Expected string in expression, but got '%s'",CONST_STR())) /*< [struct TPPConst *]. */
+DEF_WARNING(W_EXPECTED_STRING_AFTER_MESSAGE,(WG_VALUE),WSTATE_WARN,WARNF("Expected string after message, but got '%s'",CONST_STR())) /*< [struct TPPConst *]. */
+DEF_WARNING(W_EXPECTED_STRING_AFTER_DEPRECATED,(WG_VALUE),WSTATE_WARN,WARNF("Expected string after deprecated, but got '%s'",CONST_STR())) /*< [struct TPPConst *]. */
+DEF_WARNING(W_EXPECTED_STRING_AFTER_TPP_EXEC,(WG_VALUE),WSTATE_WARN,WARNF("Expected string after tpp_exec, but got '%s'",CONST_STR())) /*< [struct TPPConst *]. */
+DEF_WARNING(W_EXPECTED_STRING_AFTER_TPP_SETF,(WG_VALUE),WSTATE_WARN,WARNF("Expected string after tpp_set_keyword_flags, but got '%s'",CONST_STR())) /*< [struct TPPConst *]. */
+DEF_WARNING(W_EXPECTED_STRING_AFTER_TPP_STRAT,(WG_VALUE),WSTATE_WARN,WARNF("Expected string after __TPP_STR_AT|__TPP_STR_SUBSTR, but got '%s'",CONST_STR())) /*< [struct TPPConst *]. */
+DEF_WARNING(W_EXPECTED_STRING_AFTER_TPP_CNTTOK,(WG_VALUE),WSTATE_WARN,WARNF("Expected string after __TPP_COUNT_TOKENS, but got '%s'",CONST_STR())) /*< [struct TPPConst *]. */
+DEF_WARNING(W_EXPECTED_STRING_AFTER_PRGERROR,(WG_VALUE),WSTATE_WARN,WARNF("Expected string after #pragma error, but got '%s'",CONST_STR())) /*< [struct TPPConst *]. */
+DEF_WARNING(W_EXPECTED_STRING_AFTER_EXTENSION,(WG_VALUE),WSTATE_WARN,WARNF("Expected string after #pragma extension, but got '%s'",CONST_STR())) /*< [struct TPPConst *]. */
+DEF_WARNING(W_EXPECTED_STRING_AFTER_TPP_INCPTH,(WG_VALUE),WSTATE_WARN,WARNF("Expected string after #pragma TPP include_path, but got '%s'",CONST_STR())) /*< [struct TPPConst *]. */
+DEF_WARNING(W_MACRO_RECURSION_LIMIT_EXCEEDED,(WG_LIMIT),WSTATE_WARN,WARNF("Macro recursion limit exceeded when expanding '%s' (Consider passing '-fno-macro-recursion')",FILENAME())) /*< [struct TPPFile *]. */
+DEF_WARNING(W_INCLUDE_RECURSION_LIMIT_EXCEEDED,(WG_LIMIT),WSTATE_WARN,WARNF("Include recursion limit exceeded when including '%s'",FILENAME())) /*< [struct TPPFile *]. */
+DEF_WARNING(W_UNKNOWN_EXTENSION,(WG_VALUE),WSTATE_WARN,{ char *temp = ARG(char *); WARNF("Unknown extension '%s' (Did you mean '%s'?)",temp,find_most_likely_extension(temp)); }) /*< [char const *]. */
+DEF_WARNING(W_DEFINED_IN_MACRO_BODY,(WG_EXPANSION_TO_DEFINED),WSTATE_WARN,WARNF("'defined' found in macro body"))
+DEF_WARNING(W_IDENT_SCCS_IGNORED,(WG_DIRECTIVE),WSTATE_WARN,WARNF("#ident/sccs with '%s' is ignored",CONST_STR())) /*< [struct TPPConst *]. */
+DEF_WARNING(W_EXPECTED_STRING_AFTER_IDENT,(WG_VALUE),WSTATE_WARN,WARNF("Expected string after #ident, but got '%s'",CONST_STR())) /*< [struct TPPConst *]. */
+DEF_WARNING(W_EXPECTED_KEYWORD_AFTER_ASSERT,(WG_DIRECTIVE),WSTATE_WARN,WARNF("Expected keyword after #assert, but got " TOK_S,TOK_A)) /*< . */
+DEF_WARNING(W_EXPECTED_KEYWORD_AFTER_PREDICATE,(WG_DIRECTIVE),WSTATE_WARN,WARNF("Expected keyword after predicate '%s' in #assert, but got " TOK_S,KWDNAME(),TOK_A)) /*< [struct TPPKeyword *]. */
+DEF_WARNING(W_EXPECTED_KEYWORD_AFTER_EXPR_HASH,(WG_DIRECTIVE),WSTATE_WARN,WARNF("Expected keyword after # in expression, but got " TOK_S,TOK_A)) /*< . */
+DEF_WARNING(W_EXPECTED_KEYWORD_AFTER_EXPR_PRED,(WG_DIRECTIVE),WSTATE_WARN,WARNF("Expected keyword after predicate '%s' in expression, but got " TOK_S,KWDNAME(),TOK_A)) /*< . */
+DEF_WARNING(W_UNKNOWN_ASSERTION,(WG_VALUE),WSTATE_DISABLE,{
+ /* [struct TPPKeyword *,struct TPPKeyword *]. */
+ char const *temp = KWDNAME();
+ WARNF("Assertion '%s' does not contain a predicate '%s'",temp,KWDNAME());
+})
+DEF_WARNING(W_EXPECTED_STRING_AFTER_GCC_DIAG,(WG_VALUE),WSTATE_WARN,WARNF("Expected string after #pragma GCC diagnostic <mode>, but got '%s'",CONST_STR())) /*< [struct TPPConst *]. */
+DEF_WARNING(W_CANT_POP_EXTENSIONS,(WG_VALUE),WSTATE_WARN,WARNF("Can't pop extensions")) /*< . */
+DEF_WARNING(W_CANT_POP_INCLUDE_PATH,(WG_VALUE),WSTATE_WARN,WARNF("Can't pop #include paths")) /*< . */
+DEF_WARNING(W_CONSIDER_PAREN_AROUND_LAND,(WG_QUALITY),WSTATE_WARN,WARNF("Consider adding parenthesis around '&&' to prevent confusion with '||'")) /*< . */
+DEF_WARNING(W_INTEGRAL_OVERFLOW,(WG_VALUE),WSTATE_WARN,WARNF("Integral constant overflow")) /*< [int_t,int_t]. */
+DEF_WARNING(W_INTEGRAL_CLAMPED,(WG_VALUE),WSTATE_WARN,WARNF("Integral constant clamped to fit")) /*< [int_t,int_t]. */
+DEF_WARNING(W_UNKNOWN_INCLUDE_PATH,(WG_VALUE),WSTATE_WARN,{ char *temp = ARG(char *); WARNF("Unknown system #include-path '%.*s'",(int)ARG(size_t),temp); }) /*< [char const *,size_t]. */
+DEF_WARNING(W_INCLUDE_PATH_ALREADY_EXISTS,(WG_VALUE),WSTATE_WARN,{ char *temp = ARG(char *); WARNF("System #include-path '%.*s' already exists",(int)ARG(size_t),temp); }) /*< [char const *,size_t]. */
+DEF_WARNING(W_EXPECTED_ELSE_IN_EXPRESSION,(WG_SYNTAX),WSTATE_WARN,WARNF("Expected 'else' in expression, but got " TOK_S,TOK_A)) /*< . */
+DEF_WARNING(W_STATEMENT_IN_EXPRESSION,(WG_USAGE,WG_SYNTAX),WSTATE_WARN,WARNF("GCC-style statement " TOK_S " in expression is not understood",TOK_A)) /*< . */
+DEF_WARNING(W_TYPECAST_IN_EXPRESSION,(WG_USAGE,WG_SYNTAX),WSTATE_WARN,WARNF("C-style type cast " TOK_S " in expression is not understood (Consider using bit-masks to narrow integral types)",TOK_A)) /*< . */
+DEF_WARNING(W_EXPECTED_RPAREN_AFTER_CAST,(WG_SYNTAX),WSTATE_WARN,WARNF("Expected ')' after casting type, but got " TOK_S,TOK_A)) /*< . */
+DEF_WARNING(W_EXPECTED_RBRACE_AFTER_STATEMENT,(WG_SYNTAX),WSTATE_WARN,WARNF("Expected '}' after statement, but got " TOK_S,TOK_A)) /*< . */
+DEF_WARNING(W_EXPECTED_WARNING_NAMEORID,(WG_VALUE),WSTATE_WARN,WARNF("Expected warning name or id, but got '%s'",CONST_STR())) /*< [struct TPPConst *]. */
 /* _always_ add new warnings here! */
+
+
+#ifdef TPP_USERDEFS
+#include TPP_USERDEFS
+#endif
 
 #undef TPP_PP_STR
 #undef TPP_PP_STR2
@@ -554,10 +642,15 @@ WARNING(W_EXPECTED_WARNING_NAMEORID,       (WG_VALUE),   WSTATE_WARN)    /*< [st
 #undef DEF_EXTENSION_IF
 #undef DEF_FEATURE_IF
 #undef DEF_BUILTIN_IF
+#undef DEF_WARNING
 #undef DEF_M_IF
 #undef DEF_M
 #undef DEF_K
 
+#ifdef TPP_DEFS_DEFINES_WARNING_MESSAGE
+#undef TPP_DEFS_DEFINES_WARNING_MESSAGE
+#undef WARNING_MESSAGE
+#endif
 #ifdef TPP_DEFS_DEFINES_BUILTIN_FUNCTION
 #undef TPP_DEFS_DEFINES_BUILTIN_FUNCTION
 #undef BUILTIN_FUNCTION
@@ -569,6 +662,10 @@ WARNING(W_EXPECTED_WARNING_NAMEORID,       (WG_VALUE),   WSTATE_WARN)    /*< [st
 #ifdef TPP_DEFS_DEFINES_MACRO
 #undef TPP_DEFS_DEFINES_MACRO
 #undef MACRO
+#endif
+#ifdef TPP_DEFS_DEFINES_WARNING_NAMESPACE
+#undef TPP_DEFS_DEFINES_WARNING_NAMESPACE
+#undef WARNING_NAMESPACE
 #endif
 #ifdef TPP_DEFS_DEFINES_WARNING
 #undef TPP_DEFS_DEFINES_WARNING

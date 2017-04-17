@@ -688,9 +688,19 @@ enum{
  TPP(WG_COUNT)
 };
 
-enum{
+enum{ /* Declare symbolic warning numbers and namespaces (or rather ID-spaces). */
 #define WARNING(name,groups,default) TPP(name),
+#define WARNING_NAMESPACE(name,start) TPP(name) = (start),TPP(_WNEXT_##name) = (start)-1,
 #include "tpp-defs.inl"
+#undef WARNING_NAMESPACE
+#undef WARNING
+};
+
+enum{ /* Figure out effective warning ID. */
+#define WARNING(name,groups,default)  TPP(_WID_##name),
+#define WARNING_NAMESPACE(name,start) TPP(_WID_##name##_START),TPP(_WID_##name##_NEXT) = TPP(_WID_##name##_START)-1,
+#include "tpp-defs.inl"
+#undef WARNING_NAMESPACE
 #undef WARNING
  TPP(W_COUNT)
 };

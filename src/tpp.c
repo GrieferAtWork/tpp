@@ -266,7 +266,6 @@ PUBLIC struct TPPLexer *TPPLexer_Current = NULL;
 #define current       (*TPPLexer_Current)
 #endif
 #define token         current.l_token
-#define keywords      current.l_keywords
 #define TOK           token.t_id
 #define yield_fetch() TPPLexer_Yield()
 
@@ -2673,7 +2672,8 @@ def_builtin_keyword(struct TPPKeyword *keyword) {
 #else
  keyword->k_hash = hashof(keyword->k_name,keyword->k_size);
 #endif
- bucket = &keywords.km_bucketv[keyword->k_hash % keywords.km_bucketc];
+ bucket = &current.l_keywords.km_bucketv[keyword->k_hash % 
+           current.l_keywords.km_bucketc];
  keyword->k_next = *bucket;
  *bucket = keyword;
 }
@@ -2928,23 +2928,38 @@ PRIVATE int set_wstate(int wid, wstate_t state) {
  return 1;
 }
 
+#define wid_isvalid(wid)  ((wid) < TPP_WARNING_TOTAL)
+PRIVATE unsigned int wnum2id(int wnum) {
+ int group_base = 0,group_start = WG_COUNT;
+#ifndef __INTELLISENSE__
+#define WARNING_NAMESPACE(name,id) \
+ if (wnum >= id) group_base = id,group_start = _WID_##name##_START+WG_COUNT;
+#include "tpp-defs.inl"
+#undef WARNING_NAMESPACE
+#endif
+ assert(wnum >= group_base);
+ wnum -= group_base;
+ wnum += group_start;
+ return (unsigned int)wnum;
+}
+
 PUBLIC wstate_t TPPLexer_GetWarning(int wnum) {
  struct TPPWarningState *curstate;
  uint8_t bitset_byte,byte_shift;
+ unsigned int wid = wnum2id(wnum);
  assert(TPPLexer_Current);
- if unlikely(wnum < 0 || wnum >= W_COUNT) return WSTATE_WARN;
+ if unlikely(!wid_isvalid(wid)) return WSTATE_WARN;
  curstate = current.l_warnings.w_curstate;
  assert(curstate);
  assert((curstate == &current.l_warnings.w_basestate) ==
         (curstate->ws_prev == NULL));
- wnum += WG_COUNT;
- assert(wnum < TPP_WARNING_TOTAL);
- bitset_byte = curstate->ws_state[wnum/(8/TPP_WARNING_BITS)];
- byte_shift  = (wnum%(8/TPP_WARNING_BITS))*TPP_WARNING_BITS;
+ bitset_byte = curstate->ws_state[wid/(8/TPP_WARNING_BITS)];
+ byte_shift  = (wid%(8/TPP_WARNING_BITS))*TPP_WARNING_BITS;
  return (wstate_t)((bitset_byte >> byte_shift)&3);
 }
 PUBLIC int TPPLexer_SetWarning(int wnum, wstate_t state) {
- return unlikely(wnum < 0 || wnum >= W_COUNT) ? 2 : set_wstate(wnum+WG_COUNT,state);
+ unsigned int wid = wnum2id(wnum);
+ return unlikely(!wid_isvalid(wid)) ? 2 : set_wstate(wid,state);
 }
 PUBLIC int TPPLexer_SetWarnings(char const *__restrict group, wstate_t state) {
  char const *const *iter;
@@ -2988,9 +3003,10 @@ PRIVATE wstate_t do_invoke_wid(int wid) {
 PUBLIC int TPPLexer_InvokeWarning(int wnum) {
  wstate_t state; int found_warn = 0;
  wgroup_t const *group_iter;
- if unlikely(wnum >= W_COUNT) return TPP_WARNINGMODE_WARN;
- state = do_invoke_wid(wnum+WG_COUNT);
- group_iter = w_associated_groups[wnum];
+ unsigned int wid = wnum2id(wnum);
+ if unlikely(!wid_isvalid(wnum)) return TPP_WARNINGMODE_WARN;
+ state = do_invoke_wid(wid);
+ group_iter = w_associated_groups[wid-WG_COUNT];
  for (;;) {
   if (state == WSTATE_SUPPRESS ||
       state == WSTATE_DISABLE) return TPP_WARNINGMODE_IGNORE;
@@ -3323,12 +3339,13 @@ rehash_keywords(size_t newsize) {
  struct TPPKeyword **newvec,*iter,*next,**bucket;
  struct TPPKeyword **bucket_iter,**bucket_end;
  assert(newsize);
- assert(keywords.km_bucketc);
- assert(keywords.km_bucketv);
- assert(newsize > keywords.km_bucketc);
+ assert(current.l_keywords.km_bucketc);
+ assert(current.l_keywords.km_bucketv);
+ assert(newsize > current.l_keywords.km_bucketc);
  newvec = (struct TPPKeyword **)calloc(newsize,sizeof(struct TPPKeyword *));
  if unlikely(!newvec) return; /* Ignore errors here. */
- bucket_end = (bucket_iter = keywords.km_bucketv)+keywords.km_bucketc;
+ bucket_end = (bucket_iter = current.l_keywords.km_bucketv)+
+                             current.l_keywords.km_bucketc;
  for (; bucket_iter != bucket_end; ++bucket_iter) {
   iter = *bucket_iter;
   while (iter) {
@@ -3340,9 +3357,9 @@ rehash_keywords(size_t newsize) {
    iter = next;
   }
  }
- free(keywords.km_bucketv);
- keywords.km_bucketc = newsize;
- keywords.km_bucketv = newvec;
+ free(current.l_keywords.km_bucketv);
+ current.l_keywords.km_bucketc = newsize;
+ current.l_keywords.km_bucketv = newvec;
 }
 
 PUBLIC struct TPPKeyword *
@@ -3353,12 +3370,13 @@ TPPLexer_LookupKeyword(char const *name, size_t namelen,
  assert(TPPLexer_Current);
  namehash = hashof(name,namelen);
  /* Try to rehash the keyword map. */
- if (TPPKeywordMap_SHOULDHASH(&keywords)) {
-  rehash_keywords(keywords.km_entryc);
+ if (TPPKeywordMap_SHOULDHASH(&current.l_keywords)) {
+  rehash_keywords(current.l_keywords.km_entryc);
  }
- assert(keywords.km_bucketc);
- assert(keywords.km_bucketv);
- bucket = &keywords.km_bucketv[namehash % keywords.km_bucketc];
+ assert(current.l_keywords.km_bucketc);
+ assert(current.l_keywords.km_bucketv);
+ bucket = &current.l_keywords.km_bucketv[namehash %
+           current.l_keywords.km_bucketc];
  kwd_entry = *bucket;
  while (kwd_entry) {
   if (kwd_entry->k_hash == namehash &&
@@ -3375,7 +3393,7 @@ TPPLexer_LookupKeyword(char const *name, size_t namelen,
  /* Setup the new keyword entry. */
  kwd_entry->k_rare     = NULL;
  kwd_entry->k_macro    = NULL;
- kwd_entry->k_id       = _KWD_BACK+(keywords.km_entryc++); /* Unique user-keyword ID. */
+ kwd_entry->k_id       = _KWD_BACK+(current.l_keywords.km_entryc++); /* Unique user-keyword ID. */
  kwd_entry->k_size     = namelen;
  kwd_entry->k_hash     = namehash;
  memcpy(kwd_entry->k_name,name,namelen*sizeof(char));
@@ -3393,7 +3411,8 @@ TPPLexer_LookupKeywordID(tok_t id) {
  if (!TPP_ISUSERKEYWORD(id)) return builtin_keywords[id-TOK_KEYWORD_BEGIN];
 #endif
  /* The slow way: Check _every_ keyword in the worst case. */
- bucket_end = (bucket_iter = keywords.km_bucketv)+keywords.km_bucketc;
+ bucket_end = (bucket_iter = current.l_keywords.km_bucketv)+
+                             current.l_keywords.km_bucketc;
  for (; bucket_iter != bucket_end; ++bucket_iter) {
   iter = *bucket_iter;
   while (iter) {
@@ -8590,12 +8609,10 @@ err:    return 0;
 #define WARNF(...) fprintf(stderr,__VA_ARGS__)
 PUBLIC int TPPLexer_Warn(int wnum, ...) {
  va_list args; char const *used_filename,*true_filename;
- char const *macro_name = NULL;
+ char const *macro_name = NULL; struct TPPKeyword *kwd;
  int macro_name_size,behavior; wgroup_t const *wgroups;
- struct TPPFile *textfile;
- struct TPPKeyword *kwd; char *temp;
- struct TPPIfdefStackSlot *ifdef_slot;
  struct TPPString *temp_string = NULL;
+ unsigned int wid;
  if (current.l_flags&TPPLEXER_FLAG_ERROR) return 0; /* Already in an error-state. */
  ++current.l_warncount; /* Always count warnings, even if they'll be dismissed. */
  if (current.l_flags&TPPLEXER_FLAG_NO_WARNINGS) return 1; /* Warnings are disabled. */
@@ -8606,7 +8623,7 @@ PUBLIC int TPPLexer_Warn(int wnum, ...) {
  if (behavior == TPP_WARNINGMODE_WARN) {
   /* Ignore warnings in system headers. */
   if (!(current.l_flags&TPPLEXER_FLAG_WSYSTEMHEADERS)) {
-   textfile = TPPLexer_Textfile(); /* Walk the chain of a cached #include file. */
+   struct TPPFile *textfile = TPPLexer_Textfile(); /* Walk the chain of a cached #include file. */
    if (textfile->f_textfile.f_flags&TPP_TEXTFILE_FLAG_SYSHEADER) return 1;
   }
   /* Turn warnings into errors. */
@@ -8629,13 +8646,16 @@ PUBLIC int TPPLexer_Warn(int wnum, ...) {
   true_filename = used_filename;
  }
  switch (wnum) {
+  { /* Special case for #if without #endif (display file/line of the #if) */
+   struct TPPIfdefStackSlot *ifdef_slot;
   case W_IF_WITHOUT_ENDIF:
    ifdef_slot = ARG(struct TPPIfdefStackSlot *);
    WARNF(current.l_flags&TPPLEXER_FLAG_MSVC_MESSAGEFORMAT
          ? "%s(%d) : " : "%s:%d: ",
          ifdef_slot->iss_file->f_name,ifdef_slot->iss_line+1);
    macro_name = NULL;
-   break;
+  } break;
+
   default:
    WARNF(current.l_flags&TPPLEXER_FLAG_MSVC_MESSAGEFORMAT
          ? "%s(%d,%d) : " : "%s:%d:%d: "
@@ -8645,162 +8665,26 @@ PUBLIC int TPPLexer_Warn(int wnum, ...) {
  if (macro_name) WARNF("In macro '%.*s': ",macro_name_size,macro_name);
  WARNF("%c%04d(",(behavior == TPP_WARNINGMODE_ERROR) ? 'E' : 'W',wnum);
  /* print a list of all groups associated with the warning. */
- wgroups = w_associated_groups[wnum];
+ wid = wnum2id(wnum);
+ if (wid_isvalid(wid)) {
+  wgroups = w_associated_groups[wid-WG_COUNT];
 #if 1
- if (*wgroups >= 0) WARNF("\"-W%s\"",wgroup_names[*wgroups]);
+  if (*wgroups >= 0) WARNF("\"-W%s\"",wgroup_names[*wgroups]);
 #else
- while (*wgroups >= 0) {
-  char const *name = wgroup_names[*wgroups++];
-  WARNF("\"-W%s\"%s",name,(*wgroups >= 0) ? "," : "");
- }
+  while (*wgroups >= 0) {
+   char const *name = wgroup_names[*wgroups++];
+   WARNF("\"-W%s\"%s",name,(*wgroups >= 0) ? "," : "");
+  }
 #endif
+ }
  WARNF("): ");
  switch (wnum) {
-  case W_STARSLASH_OUTSIDE_OF_COMMENT    : WARNF("'*" "/' outside of comment"); break;
-  case W_SLASHSTAR_INSIDE_OF_COMMENT     : WARNF("'/" "*' repeated inside of comment"); break;
-  case W_LINE_COMMENT_CONTINUED          : WARNF("Line-comment continued"); break;
-  case W_ENCOUNTERED_TRIGRAPH            : WARNF("Encountered trigraph character sequence '%.3s'",ARG(char *)); break;
-  case W_REDEFINING_MACRO                : {
-   kwd = ARG(struct TPPKeyword *);
-   WARNF("Redefining macro '%s'\n",kwd->k_name); 
-   assert(kwd->k_macro);
-   assert(kwd->k_macro->f_kind == TPPFILE_KIND_MACRO);
-   assert((kwd->k_macro->f_macro.m_flags&TPP_MACROFILE_KIND) != TPP_MACROFILE_KIND_EXPANDED);
-   textfile = kwd->k_macro->f_macro.m_deffile;
-   assert(textfile);
-   assert(textfile->f_kind == TPPFILE_KIND_TEXT);
-   WARNF(current.l_flags&TPPLEXER_FLAG_MSVC_MESSAGEFORMAT
-         ? "%s(%d) : " : "%s:%d: "
-         , textfile->f_textfile.f_usedname
-         ? textfile->f_textfile.f_usedname->s_text
-         : textfile->f_name,kwd->k_macro->f_macro.m_defline+1);
-   WARNF("See reference to previous definition"); 
-  } break;
-  case W_REDEFINING_BUILTIN_KEYWORD      : WARNF("Redefining builtin macro '%s'",KWDNAME()); break;
-  case W_SPECIAL_ARGUMENT_NAME           : WARNF("Special keyword '%s' used as argument name",KWDNAME()); break;
-  case W_VA_KEYWORD_IN_REGULAR_MACRO     : WARNF("Variadic keyword '%s' used in regular macro",KWDNAME()); break;
-  case W_DEFINED_IN_MACRO_BODY           : WARNF("'defined' found in macro body"); break;
-  case W_KEYWORD_MACRO_ALREADY_ONSTACK   : WARNF("Keyword-style macro '%s' is already being expanded",FILENAME()); break;
-  case W_FUNCTION_MACRO_ALREADY_ONSTACK  : WARNF("Function-style macro '%s' is expanded to the same text",FILENAME()); break;
-  case W_EOF_IN_MACRO_ARGUMENT_LIST      : WARNF("EOF in macro argument list"); break;
-  case W_TOO_MANY_MACRO_ARGUMENTS        : WARNF("Too many arguments for '%s'",FILENAME()); break;
-  case W_NOT_ENGOUH_MACRO_ARGUMENTS      : WARNF("Too enough arguments for '%s'",FILENAME()); break;
-  case W_CHARACTER_TOO_LONG              : WARNF("Character sequence is too long"); break;
-  case W_MULTICHAR_NOT_ALLOWED           : temp = ARG(char *),WARNF("The multi-character sequence '%.*s' is not not allowed",(int)ARG(size_t),temp); break;
-  case W_DIVIDE_BY_ZERO                  : WARNF("Divide by ZERO"); break;
-  case W_INDEX_OUT_OF_BOUNDS             : { ptrdiff_t temp2 = ARG(ptrdiff_t); WARNF("Index %ld is out-of-bounds of 0..%lu",temp2,ARG(struct TPPString *)->s_size); } break;
-  case W_EXPECTED_MACRO_ARGUMENT_NAME    : WARNF("Expected argument name"); break;
-  case W_ARGUMENT_NAMED_ALREADY_TAKEN    : WARNF("Argument name '%s' is already in use",TOK_NAME()); break;
-  case W_EXPECTED_COMMA_OR_ARGEND        : WARNF("Expected ',' or end of argument list, but got " TOK_S,TOK_A); break;
-  case W_EXPECTED_ARGEND_AFTER_VARARGS   : WARNF("Expected end of argument list after arg-args, but got " TOK_S,TOK_A); break;
-  case W_EXPECTED_KEYWORD_AFTER_DEFINE   : WARNF("Expected keyword after #define, but got " TOK_S,TOK_A); break;
-  case W_EXPECTED_KEYWORD_AFTER_UNDEF    : WARNF("Expected keyword after #undef, but got " TOK_S,TOK_A); break;
-  case W_MACRO_NOT_DEFINED               : WARNF("Macro '%s' is not defined",KWDNAME()); break;
-  case W_CANT_UNDEF_BUILTIN_MACRO        : WARNF("Cannot #undef builtin macro '%s'",KWDNAME()); break;
-  case W_UNKNOWN_PREPROCESSOR_DIRECTIVE  : WARNF("Unknown preprocessor directive " TOK_S,TOK_A); break;
-  case W_INVALID_INTEGER_SUFFIX          : temp = ARG(char *),WARNF("Invalid integer suffix '%.*s'",(int)ARG(size_t),temp); break;
-  case W_EXPECTED_COLLON_AFTER_QUESTION  : WARNF("Expected ':' after '?'"); break;
-  case W_STRING_TERMINATED_BY_LINEFEED   : WARNF("String was terminated by a linefeed"); break;
-  case W_STRING_TERMINATED_BY_EOF        : WARNF("String was terminated by EOF"); break;
-  case W_COMMENT_TERMINATED_BY_EOF       : WARNF("Comment was terminated by EOF"); break;
-  case W_UNKNOWN_TOKEN_IN_EXPR_IS_ZERO   : WARNF("Unrecognized token " TOK_S " is replaced with '0' in expression",TOK_A); break;
-  case W_EXPECTED_RPAREN_IN_EXPRESSION   : WARNF("Expected ')' in expression, but got " TOK_S,TOK_A); break;
-  case W_TYPECAST_IN_EXPRESSION          : WARNF("C-style type cast " TOK_S " in expression is not understood (Consider using bit-masks to narrow integral types)",TOK_A); break;
-  case W_STATEMENT_IN_EXPRESSION         : WARNF("GCC-style statement " TOK_S " in expression is not understood",TOK_A); break;
-  case W_EXPECTED_RPAREN_AFTER_CAST      : WARNF("Expected ')' after casting type, but got " TOK_S,TOK_A); break;
-  case W_EXPECTED_RBRACE_AFTER_STATEMENT : WARNF("Expected '}' after statement, but got " TOK_S,TOK_A); break;
-  case W_EXPECTED_RBRACKET_IN_EXPRESSION : WARNF("Expected ']' in expression, but got " TOK_S,TOK_A); break;
-  case W_EXPECTED_COLLON_AFTER_WARNING   : WARNF("Expected ':' after #pragma warning, but got " TOK_S,TOK_A); break;
-  case W_EXPECTED_KEYWORD_AFTER_IFDEF    : WARNF("Expected keyword after #ifdef, but got " TOK_S,TOK_A); break;
-  case W_EXPECTED_KEYWORD_AFTER_DEFINED  : WARNF("Expected keyword after 'defined', but got " TOK_S,TOK_A); break;
-  case W_EXPECTED_RPAREN_AFTER_DEFINED   : WARNF("Expected ')' after 'defined', but got " TOK_S,TOK_A); break;
-  case W_EXPECTED_LPAREN                 : WARNF("Expected '(', but got " TOK_S,TOK_A); break;
-  case W_EXPECTED_RPAREN                 : WARNF("Expected ')', but got " TOK_S,TOK_A); break;
-  case W_EXPECTED_COMMA                  : WARNF("Expected ',', but got " TOK_S,TOK_A); break;
-  case W_EXPECTED_STRING_AFTER_PRAGMA    : WARNF("Expected string after _Pragma, but got '%s'",CONST_STR()); break;
-  case W_EXPECTED_STRING_IN_EXPRESSION   : WARNF("Expected string in expression, but got '%s'",CONST_STR()); break;
-  case W_EXPECTED_STRING_AFTER_LINE      : WARNF("Expected string after #line, but got '%s'",CONST_STR()); break;
-  case W_EXPECTED_INCLUDE_STRING         : WARNF("Expected #include-string, but got " TOK_S,TOK_A); break;
-  case W_EXPECTED_STRING_AFTER_PUSHMACRO : WARNF("Expected string after push_macro, but got '%s'",CONST_STR()); break;
-  case W_EXPECTED_STRING_AFTER_MESSAGE   : WARNF("Expected string after message, but got '%s'",CONST_STR()); break;
-  case W_EXPECTED_STRING_AFTER_DEPRECATED: WARNF("Expected string after deprecated, but got '%s'",CONST_STR()); break;
-  case W_EXPECTED_STRING_AFTER_TPP_EXEC  : WARNF("Expected string after tpp_exec, but got '%s'",CONST_STR()); break;
-  case W_EXPECTED_STRING_AFTER_TPP_SETF  : WARNF("Expected string after tpp_set_keyword_flags, but got '%s'",CONST_STR()); break;
-  case W_EXPECTED_STRING_AFTER_TPP_STRD  : WARNF("Expected string after __TPP_STR_DECOMPILE, but got '%s'",CONST_STR()); break;
-  case W_EXPECTED_STRING_AFTER_TPP_STRAT : WARNF("Expected string after __TPP_STR_AT|__TPP_STR_SUBSTR, but got '%s'",CONST_STR()); break;
-  case W_EXPECTED_STRING_AFTER_PRGERROR  : WARNF("Expected string after #pragma error, but got '%s'",CONST_STR()); break;
-  case W_EXPECTED_STRING_AFTER_EXTENSION : WARNF("Expected string after #pragma extension, but got '%s'",CONST_STR()); break;
-  case W_EXPECTED_STRING_AFTER_GCC_DIAG  : WARNF("Expected string after #pragma GCC diagnostic <mode>, but got '%s'",CONST_STR()); break;
-  case W_EXPECTED_STRING_AFTER_TPP_INCPTH: WARNF("Expected string after #pragma TPP include_path, but got '%s'",CONST_STR()); break;
-  case W_FILE_NOT_FOUND                  : WARNF("File not found: '%s'",ARG(char *)); break;
-  case W_UNKNOWN_EXTENSION               : temp = ARG(char *),WARNF("Unknown extension '%s' (Did you mean '%s'?)",temp,find_most_likely_extension(temp)); break;
-  case W_NONPARTABLE_FILENAME_CASING     : { char *temp2; size_t temp3; temp = ARG(char *),temp2 = ARG(char *),temp3 = ARG(size_t); WARNF("Non-portable casing in '%s': '%.*s' should be '%s' instead",temp,(int)temp3,temp2,ARG(char *)); } break;
-  case W_ERROR                           : temp = ARG(char *),WARNF("ERROR : %.*s",(int)ARG(size_t),temp); break;
-  case W_WARNING                         : temp = ARG(char *),WARNF("WARNING : %.*s",(int)ARG(size_t),temp); break;
-  case W_INVALID_WARNING                 : {
-   struct TPPConst *c = ARG(struct TPPConst *);
-   if (c->c_kind == TPP_CONST_STRING) {
-    char const *wname = c->c_data.c_string->s_text;
-    if (*wname == '-') ++wname;
-    if (*wname == 'W') ++wname;
-    if (!memcmp(wname,"no-",3)) wname += 3;
-    WARNF("Invalid warning '%s' (Did you mean '%s')",wname,find_most_likely_warning(wname));
-   } else if (c->c_kind == TPP_CONST_FLOAT) {
-    WARNF("Invalid warning '%f'",(double)c->c_data.c_float);
-   } else if (c->c_kind == TPP_CONST_INTEGRAL) {
-#if TPP_HAVE_LONGLONG
-    WARNF("Invalid warning '%lld'",(long long)c->c_data.c_int);
-#else
-    WARNF("Invalid warning '%ld'",(long)c->c_data.c_int);
-#endif
-   } else {
-    WARNF("Invalid warning");
-   }
-  } break;
-  case W_CANT_POP_WARNINGS               : WARNF("Can't pop warnings"); break;
-  case W_CANT_POP_EXTENSIONS             : WARNF("Can't pop extensions"); break;
-  case W_MACRO_RECURSION_LIMIT_EXCEEDED  : WARNF("Macro recursion limit exceeded when expanding '%s' (Consider passing '-fno-macro-recursion')",FILENAME()); break;
-  case W_INCLUDE_RECURSION_LIMIT_EXCEEDED: WARNF("Include recursion limit exceeded when including '%s'",FILENAME()); break;
-  case W_ELSE_WITHOUT_IF                 : WARNF("#else without #if"); break;
-  case W_ELIF_WITHOUT_IF                 : WARNF("#elif without #if"); break;
-  case W_ELSE_AFTER_ELSE                 : WARNF("#else after #else\n");
-                                           ifdef_slot = ARG(struct TPPIfdefStackSlot *);
-                                           WARNF(current.l_flags&TPPLEXER_FLAG_MSVC_MESSAGEFORMAT
-                                                 ? "%s(%d) : " : "%s:%d: ",
-                                                 ifdef_slot->iss_file->f_name,ifdef_slot->iss_line+1);
-                                           WARNF("See reference to previous #else");
-                                           break;
-  case W_ELIF_AFTER_ELSE                 : WARNF("#elif after #else\n");
-                                           ifdef_slot = ARG(struct TPPIfdefStackSlot *);
-                                           WARNF(current.l_flags&TPPLEXER_FLAG_MSVC_MESSAGEFORMAT
-                                                 ? "%s(%d) : " : "%s:%d: ",
-                                                 ifdef_slot->iss_file->f_name,ifdef_slot->iss_line+1);
-                                           WARNF("See reference to #else");
-                                           break;
-  case W_IF_WITHOUT_ENDIF                : WARNF("#if without #endif"); break;
-  case W_ENDIF_WITHOUT_IF                : WARNF("#endif without #if"); break;
-  case W_DEPRECATED_IDENTIFIER           : WARNF("DEPRECATED : '%s'",KWDNAME()); break;
-  case W_IDENT_SCCS_IGNORED              : WARNF("#ident/sccs with '%s' is ignored",CONST_STR()); break;
-  case W_EXPECTED_KEYWORD_AFTER_ASSERT   : WARNF("Expected keyword after #assert, but got " TOK_S,TOK_A); break;
-  case W_EXPECTED_KEYWORD_AFTER_PREDICATE: WARNF("Expected keyword after predicate '%s' in #assert, but got " TOK_S,KWDNAME(),TOK_A); break;
-  case W_EXPECTED_KEYWORD_AFTER_EXPR_HASH: WARNF("Expected keyword after # in expression, but got " TOK_S,TOK_A); break;
-  case W_EXPECTED_KEYWORD_AFTER_EXPR_PRED: WARNF("Expected keyword after predicate '%s' in expression, but got " TOK_S,KWDNAME(),TOK_A); break;
-  case W_UNKNOWN_ASSERTION               : temp = KWDNAME(),WARNF("Assertion '%s' does not contain a predicate '%s'",temp,KWDNAME()); break;
-  case W_CONSIDER_PAREN_AROUND_LAND      : WARNF("Consider adding parenthesis around '&&' to prevent confusion with '||'"); break;
-  case W_INTEGRAL_OVERFLOW               : WARNF("Integral constant overflow"); break;
-  case W_INTEGRAL_CLAMPED                : WARNF("Integral constant clamped to fit"); break;
-  case W_INCLUDE_PATH_ALREADY_EXISTS     : temp = ARG(char *),WARNF("System #include-path '%.*s' already exists",(int)ARG(size_t),temp); break;
-  case W_UNKNOWN_INCLUDE_PATH            : temp = ARG(char *),WARNF("Unknown system #include-path '%.*s'",(int)ARG(size_t),temp); break;
-  case W_EXPECTED_ELSE_IN_EXPRESSION     : WARNF("Expected 'else' in expression, but got " TOK_S,TOK_A); break;
-  case W_EXPECTED_WARNING_NAMEORID       : WARNF("Expected warning name or id, but got '%s'",CONST_STR()); break;
-  { char const *use; /* Warn about non-boolean integral. */
-    if (FALSE) { case W_EXPECTED_BOOL           : use = ""; }
-    if (FALSE) { case W_EXPECTED_BOOL_UNARY     : use = " for operand"; }
-    if (FALSE) { case W_EXPECTED_BOOL_BINARY_LHS: use = " for left operand"; }
-    if (FALSE) { case W_EXPECTED_BOOL_BINARY_RHS: use = " for right operand"; }
-    WARNF("Expected boolean expression%s, but got %s",use,CONST_STR());
-  } break;
-  default                                : WARNF("? %d",wnum); break;
+#define DECLARE_WARNING_MESSAGES
+#define WARNING_MESSAGE(name,expr) case name: expr; break;
+#include "tpp-defs.inl"
+#undef WARNING_MESSAGE
+#undef DECLARE_WARNING_MESSAGES
+  default: WARNF("? %d",wnum); break;
  }
  if (temp_string) TPPString_Decref(temp_string);
 #undef FILENAME
