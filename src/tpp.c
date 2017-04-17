@@ -6916,7 +6916,8 @@ TPPConst_ToString(struct TPPConst const *__restrict self) {
  *    With this calling convention, the result-argument doesn't need to be
  *    re-push onto the stack every time the next lower level is called.
  */
-#if defined(__GNUC__) && defined(__i386__)
+#if defined(__GNUC__) && \
+   (defined(__i386__) || defined(__i386) || defined(i386))
 #define EVAL_CALL  __attribute__((__fastcall__))
 #elif defined(_MSC_VER)
 #define EVAL_CALL  __fastcall

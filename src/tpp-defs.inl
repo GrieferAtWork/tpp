@@ -276,6 +276,39 @@ PRIVATE int_t tpp_ffs(int_t i) {
  for (result = 1; !(i&1); ++result) i >>= 1;
  return result;
 }
+PRIVATE int_t tpp_clz(int_t i) {
+ int_t mask = ~(((int_t)-1)/2); /* Only set MSB (e.g.: '0x80000000'). */
+ int_t result = 0;
+ while (!(i&mask)) ++result,mask >>= 1;
+ return result;
+}
+PRIVATE int_t tpp_ctz(int_t i) {
+ int_t mask = 1; /* Only set LSB. */
+ int_t result = 0;
+ while (!(i&mask)) ++result,mask <<= 1;
+ return result;
+}
+PRIVATE int_t tpp_clrsb(int_t i) {
+ int_t mask = ~(((int_t)-1)/2); /* Only set MSB (e.g.: '0x80000000'). */
+ int_t result = 0;
+ int msb = !!(i&mask); /* Extract the MSB bit. */
+ for (;;) {
+  mask >>= 1;
+  if (!!(i&mask) != msb) break;
+  ++result;
+ }
+ return result;
+}
+PRIVATE int_t tpp_popcount(int_t i) {
+ int_t result = 0;
+ while (i) { if (i&1) ++result; i >>= 1; }
+ return result;
+}
+PRIVATE int_t tpp_parity(int_t i) {
+ int_t result = 0;
+ while (i) { if (i&1) result ^= 1; i >>= 1; }
+ return result;
+}
 #endif
 /* Special functions that require designated preprocessor support. */
 DEF_BUILTIN_IF(__builtin_constant_p,HAS_EXTENSION(TPPLEXER_EXTENSION_BUILTIN_FUNCTIONS))
@@ -295,27 +328,25 @@ PREDEFINED_BUILTIN_FUNCTION(__builtin_strncasecmp,3,{ RETURN_INT((IS_STRING(0) &
 //PREDEFINED_BUILTIN_FUNCTION(__builtin_strchr,2,{ RETURN_INT(IS_STRING(0) ? !!strchr(STRING(0)->s_text,(int)INT(1)) : 0); })
 //PREDEFINED_BUILTIN_FUNCTION(__builtin_strrchr,2,{ RETURN_INT(IS_STRING(0) ? !!strchr(STRING(0)->s_text,(int)INT(1)) : 0); })
 PREDEFINED_BUILTIN_FUNCTION(__builtin_expect,2,{ RETURN_COPY(A(0)); })
+PREDEFINED_BUILTIN_FUNCTION(__builtin_assume_aligned,2,{ RETURN_COPY(A(0)); })
 PREDEFINED_BUILTIN_FUNCTION(__builtin_abs,1,{ int_t x = INT(0)&((int)-1); RETURN_INT(x < 0 ? -x : x); })
 PREDEFINED_BUILTIN_FUNCTION(__builtin_labs,1,{ int_t x = INT(0)&((long)-1); RETURN_INT(x < 0 ? -x : x); })
 PREDEFINED_BUILTIN_FUNCTION(__builtin_llabs,1,{ int_t x = INT(0)&((llong_t)-1); RETURN_INT(x < 0 ? -x : x); })
-PREDEFINED_BUILTIN_FUNCTION(__builtin_assume_aligned,2,{ RETURN_COPY(A(0)); })
-// TODO: int __builtin_clz(unsigned int x);
-// TODO: int __builtin_ctz(unsigned int x);
-// TODO: int __builtin_clrsb(int x);
-// TODO: int __builtin_popcount(unsigned int x);
-// TODO: int __builtin_parity(unsigned int x);
-// TODO: int __builtin_ffsl(long);
-// TODO: int __builtin_clzl(unsigned long);
-// TODO: int __builtin_ctzl(unsigned long);
-// TODO: int __builtin_clrsbl(long);
-// TODO: int __builtin_popcountl(unsigned long);
-// TODO: int __builtin_parityl(unsigned long);
-// TODO: int __builtin_ffsll(long long);
-// TODO: int __builtin_clzll(unsigned long long);
-// TODO: int __builtin_ctzll(unsigned long long);
-// TODO: int __builtin_clrsbll(long long);
-// TODO: int __builtin_popcountll(unsigned long long);
-// TODO: int __builtin_parityll(unsigned long long);
+PREDEFINED_BUILTIN_FUNCTION(__builtin_clz,1,{ RETURN_INT(tpp_clz(INT(0)&((int)-1))); })
+PREDEFINED_BUILTIN_FUNCTION(__builtin_clzl,1,{ RETURN_INT(tpp_clz(INT(0)&((long)-1))); })
+PREDEFINED_BUILTIN_FUNCTION(__builtin_clzll,1,{ RETURN_INT(tpp_clz(INT(0)&((llong_t)-1))); })
+PREDEFINED_BUILTIN_FUNCTION(__builtin_ctz,1,{ RETURN_INT(tpp_ctz(INT(0)&((int)-1))); })
+PREDEFINED_BUILTIN_FUNCTION(__builtin_ctzl,1,{ RETURN_INT(tpp_ctz(INT(0)&((long)-1))); })
+PREDEFINED_BUILTIN_FUNCTION(__builtin_ctzll,1,{ RETURN_INT(tpp_ctz(INT(0)&((llong_t)-1))); })
+PREDEFINED_BUILTIN_FUNCTION(__builtin_clrsb,1,{ RETURN_INT(tpp_clrsb(INT(0)&((int)-1))); })
+PREDEFINED_BUILTIN_FUNCTION(__builtin_clrsbl,1,{ RETURN_INT(tpp_clrsb(INT(0)&((long)-1))); })
+PREDEFINED_BUILTIN_FUNCTION(__builtin_clrsbll,1,{ RETURN_INT(tpp_clrsb(INT(0)&((llong_t)-1))); })
+PREDEFINED_BUILTIN_FUNCTION(__builtin_popcount,1,{ RETURN_INT(tpp_popcount(INT(0)&((int)-1))); })
+PREDEFINED_BUILTIN_FUNCTION(__builtin_popcountl,1,{ RETURN_INT(tpp_popcount(INT(0)&((long)-1))); })
+PREDEFINED_BUILTIN_FUNCTION(__builtin_popcountll,1,{ RETURN_INT(tpp_popcount(INT(0)&((llong_t)-1))); })
+PREDEFINED_BUILTIN_FUNCTION(__builtin_parity,1,{ RETURN_INT(tpp_parity(INT(0)&((int)-1))); })
+PREDEFINED_BUILTIN_FUNCTION(__builtin_parityl,1,{ RETURN_INT(tpp_parity(INT(0)&((long)-1))); })
+PREDEFINED_BUILTIN_FUNCTION(__builtin_parityll,1,{ RETURN_INT(tpp_parity(INT(0)&((llong_t)-1))); })
 // TODO: __builtin_isfinite
 // TODO: __builtin_isinf
 // TODO: __builtin_isinff
