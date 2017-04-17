@@ -210,7 +210,10 @@ TPP_COMPILER
 struct tpp_extension {
  char const *e_name;
  size_t      e_size;
- uint64_t    e_flag;
+#if defined(__TPP_VERSION__) && \
+   (__SIZEOF_POINTER__ == 4 || __SIZEOF_POINTER__ == 8)
+ TPP(hash_t) e_hash;
+#endif
 };
 extern struct tpp_extension const tpp_extensions[];
 extern char const *const wgroup_names[TPP(WG_COUNT)+1];
@@ -220,7 +223,7 @@ void usage(char *appname, char *subject) {
   if (!strcmp(subject,"extensions")) {
    struct tpp_extension const *iter;
    for (iter = tpp_extensions; iter->e_name; ++iter) {
-    fprintf(stderr,"-f%s%s\n",(TPPLexer_Current->l_extensions&iter->e_flag) ? "" : "no-",iter->e_name);
+    fprintf(stderr,"-f%s%s\n",TPPLexer_HasExtension(iter-tpp_extensions) ? "" : "no-",iter->e_name);
    }
   } else if (!strcmp(subject,"warnings")) {
    char const *const *iter;
@@ -595,8 +598,7 @@ int main(int argc, char *argv[]) {
 #ifdef _WIN32
                                TPPLEXER_FLAG_MSVC_MESSAGEFORMAT|
 #endif
-                               TPPLEXER_FLAG_TERMINATE_STRING_LF|
-                               TPPLEXER_EXTENSION_RECMAC);
+                               TPPLEXER_FLAG_TERMINATE_STRING_LF);
 #if 1
 #define BACKWARDS(x)  x /* Backwards-compatibility with old TPP */
 #else
@@ -627,11 +629,11 @@ int main(int argc, char *argv[]) {
   else if (!strcmp(arg,"fline")) line_directives = 1;
   else if (!strcmp(arg,"fno-line") BACKWARDS(|| !strcmp(arg,"no-line"))) line_directives = 0;
   else if (!strcmp(arg,"fcpp-line")) line_directives = 2;
-  else if (!strcmp(arg,"trigraphs")) TPPLexer_Current->l_extensions |= TPPLEXER_EXTENSION_TRIGRAPHS;
+  else if (!strcmp(arg,"trigraphs")) TPPLexer_EnableExtension(EXT_TRIGRAPHS);
 #if !TPP_CONFIG_MINMACRO
-  else if (!strcmp(arg,"undef")) TPPLexer_Current->l_extensions &= ~(TPPLEXER_EXTENSION_CPU_MACROS|
-                                                                     TPPLEXER_EXTENSION_SYSTEM_MACROS|
-                                                                     TPPLEXER_EXTENSION_UTILITY_MACROS);
+  else if (!strcmp(arg,"undef")) TPPLexer_DisableExtension(EXT_CPU_MACROS),
+                                 TPPLexer_DisableExtension(EXT_SYSTEM_MACROS),
+                                 TPPLexer_DisableExtension(EXT_UTILITY_MACROS);
 #else /* !TPP_CONFIG_MINMACRO */
   else if (!strcmp(arg,"undef"));
 #endif /* TPP_CONFIG_MINMACRO */
@@ -646,9 +648,9 @@ int main(int argc, char *argv[]) {
   else if (!strcmp(arg,"MG")) TPPLexer_Current->l_callbacks.c_unknown_file = &pp_depunknown, /* Setup an unknown-file handler, assuming generated headers. */
                               TPPLexer_SetWarning(TPP(W_FILE_NOT_FOUND),TPP(WSTATE_DISABLE)), /* Disable file-not-found warnings (We're assuming generated headers). */
                               pp_mode = PPMODE_DEPENDENCY; /* Switch to dependency-only mode. */
-  else if (!strcmp(arg,"MP")) dep_emit_dummy = 1; /* Emit a dummy target for every dependecy. */
+  else if (!strcmp(arg,"MP")) dep_emit_dummy = 1; /* Emit a dummy target for every dependency. */
   else if (!strcmp(arg,"MF")) argc > 1 ? ((dep_outfile != TPP_STREAM_INVALID && dep_outfile != stdout_handle)
-                                           ? close_stream(dep_outfile) : 0, /* Close a previously opened dependecy output stream. */
+                                           ? close_stream(dep_outfile) : 0, /* Close a previously opened dependency output stream. */
                                            dep_outfile = open_out_file(argv[1]),++argv,--argc) : 0;
   else if (!strcmp(arg,"MT") || /* Specify a custom target name for dependencies. */
            !strcmp(arg,"MQ")) argc > 1 ? (dep_targetname = argv[1],++argv,--argc) : 0,

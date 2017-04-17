@@ -372,63 +372,63 @@ do{ tok_t              _old_tok_id    = token.t_id;\
 
 
 /* Active feature configurations. */
-#define HAVE_FEATURE_TRIGRAPHS           (current.l_extensions&TPPLEXER_EXTENSION_TRIGRAPHS)
-#define HAVE_FEATURE_DIGRAPHS            (current.l_extensions&TPPLEXER_EXTENSION_DIGRAPHS)
-#define HAVE_EXTENSION_GCC_VA_ARG        (current.l_extensions&TPPLEXER_EXTENSION_GCC_VA_ARGS)
-#define HAVE_EXTENSION_GCC_VA_COMMA      (current.l_extensions&TPPLEXER_EXTENSION_GCC_VA_COMMA)
-#define HAVE_EXTENSION_GCC_IFELSE        (current.l_extensions&TPPLEXER_EXTENSION_GCC_IFELSE)
-#define HAVE_EXTENSION_VA_COMMA          (current.l_extensions&TPPLEXER_EXTENSION_VA_COMMA)
-#define HAVE_EXTENSION_VA_NARGS          (current.l_extensions&TPPLEXER_EXTENSION_VA_NARGS)
-#define HAVE_EXTENSION_VA_ARGS           (current.l_extensions&TPPLEXER_EXTENSION_VA_ARGS)
-#define HAVE_EXTENSION_STR_E             (current.l_extensions&TPPLEXER_EXTENSION_STR_E)
-#define HAVE_EXTENSION_ALTMAC            (current.l_extensions&TPPLEXER_EXTENSION_ALTMAC)
-#define HAVE_EXTENSION_RECMAC            (current.l_extensions&TPPLEXER_EXTENSION_RECMAC)
-#define HAVE_EXTENSION_BININTEGRAL       (current.l_extensions&TPPLEXER_EXTENSION_BININTEGRAL)
-#define HAVE_EXTENSION_MSVC_PRAGMA       (current.l_extensions&TPPLEXER_EXTENSION_MSVC_PRAGMA)
-#define HAVE_EXTENSION_STRINGOPS         (current.l_extensions&TPPLEXER_EXTENSION_STRINGOPS)
-#define HAVE_EXTENSION_HASH_AT           (current.l_extensions&TPPLEXER_EXTENSION_HASH_AT)
-#define HAVE_EXTENSION_HASH_XCLAIM       (current.l_extensions&TPPLEXER_EXTENSION_HASH_XCLAIM)
-#define HAVE_EXTENSION_WARNING           (current.l_extensions&TPPLEXER_EXTENSION_WARNING)
-#define HAVE_EXTENSION_SHEBANG           (current.l_extensions&TPPLEXER_EXTENSION_SHEBANG)
-#define HAVE_EXTENSION_INCLUDE_NEXT      (current.l_extensions&TPPLEXER_EXTENSION_INCLUDE_NEXT)
-#define HAVE_EXTENSION_IMPORT            (current.l_extensions&TPPLEXER_EXTENSION_IMPORT)
-#define HAVE_EXTENSION_IDENT_SCCS        (current.l_extensions&TPPLEXER_EXTENSION_IDENT_SCCS)
-#define HAVE_EXTENSION_BASEFILE          (current.l_extensions&TPPLEXER_EXTENSION_BASEFILE)
-#define HAVE_EXTENSION_INCLUDE_LEVEL     (current.l_extensions&TPPLEXER_EXTENSION_INCLUDE_LEVEL)
-#define HAVE_EXTENSION_COUNTER           (current.l_extensions&TPPLEXER_EXTENSION_COUNTER)
-#define HAVE_EXTENSION_CLANG_FEATURES    (current.l_extensions&TPPLEXER_EXTENSION_CLANG_FEATURES)
-#define HAVE_EXTENSION_HAS_INCLUDE       (current.l_extensions&TPPLEXER_EXTENSION_HAS_INCLUDE)
-#define HAVE_EXTENSION_LXOR              (current.l_extensions&TPPLEXER_EXTENSION_LXOR)
-#define HAVE_EXTENSION_MULTICHAR_CONST   (current.l_extensions&TPPLEXER_EXTENSION_MULTICHAR_CONST)
-#define HAVE_EXTENSION_DATEUTILS         (current.l_extensions&TPPLEXER_EXTENSION_DATEUTILS)
-#define HAVE_EXTENSION_TIMEUTILS         (current.l_extensions&TPPLEXER_EXTENSION_TIMEUTILS)
-#define HAVE_EXTENSION_TIMESTAMP         (current.l_extensions&TPPLEXER_EXTENSION_TIMESTAMP)
-#define HAVE_EXTENSION_COLUMN            (current.l_extensions&TPPLEXER_EXTENSION_COLUMN)
-#define HAVE_EXTENSION_TPP_EVAL          (current.l_extensions&TPPLEXER_EXTENSION_TPP_EVAL)
-#define HAVE_EXTENSION_TPP_UNIQUE        (current.l_extensions&TPPLEXER_EXTENSION_TPP_UNIQUE)
-#define HAVE_EXTENSION_TPP_LOAD_FILE     (current.l_extensions&TPPLEXER_EXTENSION_TPP_LOAD_FILE)
-#define HAVE_EXTENSION_TPP_COUNTER       (current.l_extensions&TPPLEXER_EXTENSION_TPP_COUNTER)
-#define HAVE_EXTENSION_TPP_RANDOM        (current.l_extensions&TPPLEXER_EXTENSION_TPP_RANDOM)
-#define HAVE_EXTENSION_TPP_STR_DECOMPILE (current.l_extensions&TPPLEXER_EXTENSION_TPP_STR_DECOMPILE)
-#define HAVE_EXTENSION_TPP_STR_SUBSTR    (current.l_extensions&TPPLEXER_EXTENSION_TPP_STR_SUBSTR)
-#define HAVE_EXTENSION_TPP_STR_SIZE      (current.l_extensions&TPPLEXER_EXTENSION_TPP_STR_SIZE)
-#define HAVE_EXTENSION_TPP_STR_PACK      (current.l_extensions&TPPLEXER_EXTENSION_TPP_STR_PACK)
-#define HAVE_EXTENSION_TPP_COUNT_TOKENS  (current.l_extensions&TPPLEXER_EXTENSION_TPP_COUNT_TOKENS)
-#define HAVE_EXTENSION_DOLLAR_IS_ALPHA   (current.l_extensions&TPPLEXER_EXTENSION_DOLLAR_IS_ALPHA)
-#define HAVE_EXTENSION_ASSERTIONS        (current.l_extensions&TPPLEXER_EXTENSION_ASSERTIONS)
-#define HAVE_EXTENSION_CANONICAL_HEADERS (current.l_extensions&TPPLEXER_EXTENSION_CANONICAL_HEADERS)
-#define HAVE_EXTENSION_EXT_ARE_FEATURES  (current.l_extensions&TPPLEXER_EXTENSION_EXT_ARE_FEATURES)
-#define HAVE_EXTENSION_MSVC_FIXED_INT    (current.l_extensions&TPPLEXER_EXTENSION_MSVC_FIXED_INT)
-#define HAVE_EXTENSION_NO_EXPAND_DEFINED (current.l_extensions&TPPLEXER_EXTENSION_NO_EXPAND_DEFINED)
-#define HAVE_EXTENSION_IFELSE_IN_EXPR    (current.l_extensions&TPPLEXER_EXTENSION_IFELSE_IN_EXPR)
-#define HAVE_EXTENSION_EXTENDED_IDENTS   (current.l_extensions&TPPLEXER_EXTENSION_EXTENDED_IDENTS)
+#define HAVE_FEATURE_TRIGRAPHS           TPPLexer_HasExtension(EXT_TRIGRAPHS)
+#define HAVE_FEATURE_DIGRAPHS            TPPLexer_HasExtension(EXT_DIGRAPHS)
+#define HAVE_EXTENSION_GCC_VA_ARG        TPPLexer_HasExtension(EXT_GCC_VA_ARGS)
+#define HAVE_EXTENSION_GCC_VA_COMMA      TPPLexer_HasExtension(EXT_GCC_VA_COMMA)
+#define HAVE_EXTENSION_GCC_IFELSE        TPPLexer_HasExtension(EXT_GCC_IFELSE)
+#define HAVE_EXTENSION_VA_COMMA          TPPLexer_HasExtension(EXT_VA_COMMA)
+#define HAVE_EXTENSION_VA_NARGS          TPPLexer_HasExtension(EXT_VA_NARGS)
+#define HAVE_EXTENSION_VA_ARGS           TPPLexer_HasExtension(EXT_VA_ARGS)
+#define HAVE_EXTENSION_STR_E             TPPLexer_HasExtension(EXT_STR_E)
+#define HAVE_EXTENSION_ALTMAC            TPPLexer_HasExtension(EXT_ALTMAC)
+#define HAVE_EXTENSION_RECMAC            TPPLexer_HasExtension(EXT_RECMAC)
+#define HAVE_EXTENSION_BININTEGRAL       TPPLexer_HasExtension(EXT_BININTEGRAL)
+#define HAVE_EXTENSION_MSVC_PRAGMA       TPPLexer_HasExtension(EXT_MSVC_PRAGMA)
+#define HAVE_EXTENSION_STRINGOPS         TPPLexer_HasExtension(EXT_STRINGOPS)
+#define HAVE_EXTENSION_HASH_AT           TPPLexer_HasExtension(EXT_HASH_AT)
+#define HAVE_EXTENSION_HASH_XCLAIM       TPPLexer_HasExtension(EXT_HASH_XCLAIM)
+#define HAVE_EXTENSION_WARNING           TPPLexer_HasExtension(EXT_WARNING)
+#define HAVE_EXTENSION_SHEBANG           TPPLexer_HasExtension(EXT_SHEBANG)
+#define HAVE_EXTENSION_INCLUDE_NEXT      TPPLexer_HasExtension(EXT_INCLUDE_NEXT)
+#define HAVE_EXTENSION_IMPORT            TPPLexer_HasExtension(EXT_IMPORT)
+#define HAVE_EXTENSION_IDENT_SCCS        TPPLexer_HasExtension(EXT_IDENT_SCCS)
+#define HAVE_EXTENSION_BASEFILE          TPPLexer_HasExtension(EXT_BASEFILE)
+#define HAVE_EXTENSION_INCLUDE_LEVEL     TPPLexer_HasExtension(EXT_INCLUDE_LEVEL)
+#define HAVE_EXTENSION_COUNTER           TPPLexer_HasExtension(EXT_COUNTER)
+#define HAVE_EXTENSION_CLANG_FEATURES    TPPLexer_HasExtension(EXT_CLANG_FEATURES)
+#define HAVE_EXTENSION_HAS_INCLUDE       TPPLexer_HasExtension(EXT_HAS_INCLUDE)
+#define HAVE_EXTENSION_LXOR              TPPLexer_HasExtension(EXT_LXOR)
+#define HAVE_EXTENSION_MULTICHAR_CONST   TPPLexer_HasExtension(EXT_MULTICHAR_CONST)
+#define HAVE_EXTENSION_DATEUTILS         TPPLexer_HasExtension(EXT_DATEUTILS)
+#define HAVE_EXTENSION_TIMEUTILS         TPPLexer_HasExtension(EXT_TIMEUTILS)
+#define HAVE_EXTENSION_TIMESTAMP         TPPLexer_HasExtension(EXT_TIMESTAMP)
+#define HAVE_EXTENSION_COLUMN            TPPLexer_HasExtension(EXT_COLUMN)
+#define HAVE_EXTENSION_TPP_EVAL          TPPLexer_HasExtension(EXT_TPP_EVAL)
+#define HAVE_EXTENSION_TPP_UNIQUE        TPPLexer_HasExtension(EXT_TPP_UNIQUE)
+#define HAVE_EXTENSION_TPP_LOAD_FILE     TPPLexer_HasExtension(EXT_TPP_LOAD_FILE)
+#define HAVE_EXTENSION_TPP_COUNTER       TPPLexer_HasExtension(EXT_TPP_COUNTER)
+#define HAVE_EXTENSION_TPP_RANDOM        TPPLexer_HasExtension(EXT_TPP_RANDOM)
+#define HAVE_EXTENSION_TPP_STR_DECOMPILE TPPLexer_HasExtension(EXT_TPP_STR_DECOMPILE)
+#define HAVE_EXTENSION_TPP_STR_SUBSTR    TPPLexer_HasExtension(EXT_TPP_STR_SUBSTR)
+#define HAVE_EXTENSION_TPP_STR_SIZE      TPPLexer_HasExtension(EXT_TPP_STR_SIZE)
+#define HAVE_EXTENSION_TPP_STR_PACK      TPPLexer_HasExtension(EXT_TPP_STR_PACK)
+#define HAVE_EXTENSION_TPP_COUNT_TOKENS  TPPLexer_HasExtension(EXT_TPP_COUNT_TOKENS)
+#define HAVE_EXTENSION_DOLLAR_IS_ALPHA   TPPLexer_HasExtension(EXT_DOLLAR_IS_ALPHA)
+#define HAVE_EXTENSION_ASSERTIONS        TPPLexer_HasExtension(EXT_ASSERTIONS)
+#define HAVE_EXTENSION_CANONICAL_HEADERS TPPLexer_HasExtension(EXT_CANONICAL_HEADERS)
+#define HAVE_EXTENSION_EXT_ARE_FEATURES  TPPLexer_HasExtension(EXT_EXT_ARE_FEATURES)
+#define HAVE_EXTENSION_MSVC_FIXED_INT    TPPLexer_HasExtension(EXT_MSVC_FIXED_INT)
+#define HAVE_EXTENSION_NO_EXPAND_DEFINED TPPLexer_HasExtension(EXT_NO_EXPAND_DEFINED)
+#define HAVE_EXTENSION_IFELSE_IN_EXPR    TPPLexer_HasExtension(EXT_IFELSE_IN_EXPR)
+#define HAVE_EXTENSION_EXTENDED_IDENTS   TPPLexer_HasExtension(EXT_EXTENDED_IDENTS)
 #if TPP_CONFIG_GCCFUNC
-#define HAVE_EXTENSION_BUILTIN_FUNCTIONS (current.l_extensions&TPPLEXER_EXTENSION_BUILTIN_FUNCTIONS)
+#define HAVE_EXTENSION_BUILTIN_FUNCTIONS TPPLexer_HasExtension(EXT_BUILTIN_FUNCTIONS)
 #endif /* TPP_CONFIG_GCCFUNC */
 #if !TPP_CONFIG_MINMACRO
-#define HAVE_EXTENSION_CPU_MACROS        (current.l_extensions&TPPLEXER_EXTENSION_CPU_MACROS)
-#define HAVE_EXTENSION_SYSTEM_MACROS     (current.l_extensions&TPPLEXER_EXTENSION_SYSTEM_MACROS)
-#define HAVE_EXTENSION_UTILITY_MACROS    (current.l_extensions&TPPLEXER_EXTENSION_UTILITY_MACROS)
+#define HAVE_EXTENSION_CPU_MACROS        TPPLexer_HasExtension(EXT_CPU_MACROS)
+#define HAVE_EXTENSION_SYSTEM_MACROS     TPPLexer_HasExtension(EXT_SYSTEM_MACROS)
+#define HAVE_EXTENSION_UTILITY_MACROS    TPPLexer_HasExtension(EXT_UTILITY_MACROS)
 #endif /* !TPP_CONFIG_MINMACRO */
 
 
@@ -2162,13 +2162,7 @@ TPPFile_NewDefine(void) {
  switch (*curfile->f_pos) {
   case '(': argend_token = ')',macro_flags = TPP_MACROFILE_KIND_FUNCTION|TPP_MACROFILE_FUNC_START_LPAREN;
 common_function_macro:
-#if TPPLEXER_EXTENSION_RECMAC == TPP_MACROFILE_FLAG_FUNC_SELFEXPAND
-   macro_flags |= (current.l_extensions&TPPLEXER_EXTENSION_RECMAC);
-#else
-   if ((current.l_extensions&TPPLEXER_EXTENSION_RECMAC)) {
-    macro_flags |= TPP_MACROFILE_FLAG_FUNC_SELFEXPAND;
-   }
-#endif
+   if (HAVE_EXTENSION_RECMAC) macro_flags |= TPP_MACROFILE_FLAG_FUNC_SELFEXPAND;
    break;
   case '[': argend_token = ']',macro_flags = TPP_MACROFILE_KIND_FUNCTION|TPP_MACROFILE_FUNC_START_LBRACKET; goto common_call_extension;
   case '{': argend_token = '}',macro_flags = TPP_MACROFILE_KIND_FUNCTION|TPP_MACROFILE_FUNC_START_LBRACE; goto common_call_extension;
@@ -2347,7 +2341,7 @@ skip_argument_name:
  *result->f_end = '\0';
 
  /* Check for special case: Empty text block.
-  * >> We can optimize this case to remove a dependecy on the current file chunk,
+  * >> We can optimize this case to remove a dependency on the current file chunk,
   *    thus meaning that the file's chunk may be easier to deallocate when its
   *    no longer being used. */
  if (result->f_begin == result->f_end) {
@@ -2750,6 +2744,17 @@ err:
 #endif
 }
 
+PRIVATE struct {
+#define EXTENSION(name,str,default)  unsigned int s_##name : 1;
+#include "tpp-defs.inl"
+#undef EXTENSION
+} const default_extensions_state = {
+#define EXTENSION(name,str,default)  default,
+#include "tpp-defs.inl"
+#undef EXTENSION
+};
+
+
 /* Figure out the default state of warnings. */
 PRIVATE struct {
 #define WGROUP(name,str,default)     unsigned int s_##name : TPP_WARNING_BITS;
@@ -2838,26 +2843,25 @@ PUBLIC int TPPLexer_PopWarnings(void) {
 }
 
 PUBLIC int TPPLexer_PushExtensions(void) {
- uint64_t *newvec; size_t newalloc;
+ struct TPPExtState *state_copy;
  assert(TPPLexer_Current);
- newvec = current.l_extstack.es_stackv;
- if (            current.l_extstack.es_stackc ==
-    (newalloc = current.l_extstack.es_stacka)) {
-  if ((newalloc <<= 1) == 0) newalloc = 2;
-  newvec = (uint64_t *)realloc(newvec,newalloc*sizeof(uint64_t));
-  if (!newvec) return 0;
-  current.l_extstack.es_stackv = newvec;
-  current.l_extstack.es_stacka = newalloc;
- }
- newvec += current.l_extstack.es_stackc++;
- *newvec = current.l_extensions;
+ state_copy = (struct TPPExtState *)malloc(sizeof(struct TPPExtState));
+ if unlikely(!state_copy) return 0;
+ /* Create a copy of the current extension state. */
+ memcpy(state_copy,&current.l_extensions,sizeof(struct TPPExtState));
+ /* Link the copy we've just created. */
+ current.l_extensions.es_prev = state_copy;
  return 1;
 }
 PUBLIC int TPPLexer_PopExtensions(void) {
+ struct TPPExtState *prev_state;
  assert(TPPLexer_Current);
- if unlikely(!current.l_extstack.es_stackc) return 0;
- current.l_extensions = current.l_extstack.es_stackv[
-                      --current.l_extstack.es_stackc];
+ prev_state = current.l_extensions.es_prev;
+ if unlikely(!prev_state) return 0;
+ /* Restore the old extension state. */
+ memcpy(&current.l_extensions,prev_state,
+        sizeof(struct TPPExtState));
+ free(prev_state);
  return 1;
 }
 
@@ -3026,7 +3030,6 @@ PUBLIC int TPPLexer_Init(struct TPPLexer *__restrict self) {
  if (!load_builtin_keywords(&self->l_keywords)) return 0;
  self->l_flags      = TPPLEXER_FLAG_DEFAULT;
  self->l_extokens   = TPPLEXER_TOKEN_DEFAULT;
- self->l_extensions = TPPLEXER_EXTENSION_DEFAULT;
  TPPFile_Incref(&TPPFile_Empty);
  self->l_token.t_id        = TOK_EOF;
  self->l_token.t_num       = 0;
@@ -3050,13 +3053,13 @@ PUBLIC int TPPLexer_Init(struct TPPLexer *__restrict self) {
  self->l_warnings.w_basestate.ws_extendeda = 0;
  self->l_warnings.w_basestate.ws_extendedv = NULL;
  self->l_warnings.w_basestate.ws_prev      = NULL;
- self->l_extstack.es_stacka = 0;
- self->l_extstack.es_stackc = 0;
- self->l_extstack.es_stackv = NULL;
+ self->l_extensions.es_prev = NULL;
  assert(sizeof(default_warnings_state) >= TPP_WARNING_BITSETSIZE &&
         sizeof(default_warnings_state) <= TPP_OFFSETAFTER(struct TPPWarningState,ws_padding));
- memcpy(self->l_warnings.w_basestate.ws_state,
-        &default_warnings_state,TPP_WARNING_BITSETSIZE);
+ assert(sizeof(default_extensions_state) >= TPP_EXTENSIONS_BITSETSIZE &&
+        sizeof(default_extensions_state) <= TPP_OFFSETAFTER(struct TPPExtState,es_padding));
+ memcpy(self->l_extensions.es_bitset,&default_extensions_state,TPP_EXTENSIONS_BITSETSIZE);
+ memcpy(self->l_warnings.w_basestate.ws_state,&default_warnings_state,TPP_WARNING_BITSETSIZE);
  memset(&self->l_callbacks,0,sizeof(struct TPPCallbacks));
  assert(hashof("",0) == EMPTY_STRING_HASH);
 #if __SIZEOF_SIZE_T__ == 4
@@ -3144,7 +3147,15 @@ PUBLIC void TPPLexer_Quit(struct TPPLexer *__restrict self) {
    include_curr = include_prev;
   }
  }
- free(self->l_extstack.es_stackv);
+ {
+  struct TPPExtState *iter,*next;
+  iter = self->l_extensions.es_prev;
+  while (iter) {
+   next = iter->es_prev;
+   free(iter);
+   iter = next;
+  }
+ }
 }
 
 struct tpp_extension {
@@ -3154,63 +3165,63 @@ struct tpp_extension {
 };
 PRIVATE struct tpp_extension const tpp_extensions[] = {
 #define EXTENSION(name,flag) {name,COMPILER_STRLEN(name),flag}
- EXTENSION("trigraphs",TPPLEXER_EXTENSION_TRIGRAPHS),
- EXTENSION("digraphs",TPPLEXER_EXTENSION_DIGRAPHS),
- EXTENSION("named-varargs-in-macros",TPPLEXER_EXTENSION_GCC_VA_ARGS),
- EXTENSION("glue-comma-in-macros",TPPLEXER_EXTENSION_GCC_VA_COMMA),
- EXTENSION("if-else-optional-true",TPPLEXER_EXTENSION_GCC_IFELSE),
- EXTENSION("va-comma-in-macros",TPPLEXER_EXTENSION_VA_COMMA),
- EXTENSION("va-nargs-in-macros",TPPLEXER_EXTENSION_VA_NARGS),
- EXTENSION("va-args-in-macros",TPPLEXER_EXTENSION_VA_ARGS),
- EXTENSION("escape-e-in-strings",TPPLEXER_EXTENSION_STR_E),
- EXTENSION("alternative-macro-parenthesis",TPPLEXER_EXTENSION_ALTMAC),
- EXTENSION("macro-recursion",TPPLEXER_EXTENSION_RECMAC),
- EXTENSION("binary-literals",TPPLEXER_EXTENSION_BININTEGRAL),
- EXTENSION("msvc-pragma-support",TPPLEXER_EXTENSION_MSVC_PRAGMA),
- EXTENSION("strings-in-expressions",TPPLEXER_EXTENSION_STRINGOPS),
- EXTENSION("charize-macro-argument",TPPLEXER_EXTENSION_HASH_AT),
- EXTENSION("dont-expand-macro-argument",TPPLEXER_EXTENSION_HASH_XCLAIM),
- EXTENSION("warning-directives",TPPLEXER_EXTENSION_WARNING),
- EXTENSION("shebang-directives",TPPLEXER_EXTENSION_SHEBANG),
- EXTENSION("include-next-directives",TPPLEXER_EXTENSION_INCLUDE_NEXT),
- EXTENSION("import-directives",TPPLEXER_EXTENSION_IMPORT),
- EXTENSION("ident-directives",TPPLEXER_EXTENSION_IDENT_SCCS),
- EXTENSION("basefile-macro",TPPLEXER_EXTENSION_BASEFILE),
- EXTENSION("include-level-macro",TPPLEXER_EXTENSION_INCLUDE_LEVEL),
- EXTENSION("counter-macro",TPPLEXER_EXTENSION_COUNTER),
- EXTENSION("has-feature-macros",TPPLEXER_EXTENSION_CLANG_FEATURES),
- EXTENSION("has-include-macros",TPPLEXER_EXTENSION_HAS_INCLUDE),
- EXTENSION("logical-xor-in-expressions",TPPLEXER_EXTENSION_LXOR),
- EXTENSION("multichar-constants",TPPLEXER_EXTENSION_MULTICHAR_CONST),
- EXTENSION("numeric-date-macros",TPPLEXER_EXTENSION_DATEUTILS),
- EXTENSION("numeric-time-macros",TPPLEXER_EXTENSION_TIMEUTILS),
- EXTENSION("timestamp-macro",TPPLEXER_EXTENSION_TIMESTAMP),
- EXTENSION("column-macro",TPPLEXER_EXTENSION_COLUMN),
- EXTENSION("tpp-eval-macro",TPPLEXER_EXTENSION_TPP_EVAL),
- EXTENSION("tpp-unique-macro",TPPLEXER_EXTENSION_TPP_UNIQUE),
- EXTENSION("tpp-load-file-macro",TPPLEXER_EXTENSION_TPP_LOAD_FILE),
- EXTENSION("tpp-counter-macro",TPPLEXER_EXTENSION_TPP_COUNTER),
- EXTENSION("tpp-random-macro",TPPLEXER_EXTENSION_TPP_RANDOM),
- EXTENSION("tpp-str-decompile-macro",TPPLEXER_EXTENSION_TPP_STR_DECOMPILE),
- EXTENSION("tpp-str-substr-macro",TPPLEXER_EXTENSION_TPP_STR_SUBSTR),
- EXTENSION("tpp-str-pack-macro",TPPLEXER_EXTENSION_TPP_STR_PACK),
- EXTENSION("tpp-str-size-macro",TPPLEXER_EXTENSION_TPP_STR_SIZE),
- EXTENSION("tpp-count-tokens-macro",TPPLEXER_EXTENSION_TPP_COUNT_TOKENS),
- EXTENSION("dollars-in-identifiers",TPPLEXER_EXTENSION_DOLLAR_IS_ALPHA),
- EXTENSION("assertions",TPPLEXER_EXTENSION_ASSERTIONS),
- EXTENSION("canonical-system-headers",TPPLEXER_EXTENSION_CANONICAL_HEADERS),
- EXTENSION("extensions-are-features",TPPLEXER_EXTENSION_EXT_ARE_FEATURES),
- EXTENSION("fixed-length-integrals",TPPLEXER_EXTENSION_MSVC_FIXED_INT),
- EXTENSION("dont-expand-defined",TPPLEXER_EXTENSION_NO_EXPAND_DEFINED),
- EXTENSION("ifelse-in-expressions",TPPLEXER_EXTENSION_IFELSE_IN_EXPR),
- EXTENSION("extended-identifiers",TPPLEXER_EXTENSION_EXTENDED_IDENTS),
+ EXTENSION("trigraphs",EXT_TRIGRAPHS),
+ EXTENSION("digraphs",EXT_DIGRAPHS),
+ EXTENSION("named-varargs-in-macros",EXT_GCC_VA_ARGS),
+ EXTENSION("glue-comma-in-macros",EXT_GCC_VA_COMMA),
+ EXTENSION("if-else-optional-true",EXT_GCC_IFELSE),
+ EXTENSION("va-comma-in-macros",EXT_VA_COMMA),
+ EXTENSION("va-nargs-in-macros",EXT_VA_NARGS),
+ EXTENSION("va-args-in-macros",EXT_VA_ARGS),
+ EXTENSION("escape-e-in-strings",EXT_STR_E),
+ EXTENSION("alternative-macro-parenthesis",EXT_ALTMAC),
+ EXTENSION("macro-recursion",EXT_RECMAC),
+ EXTENSION("binary-literals",EXT_BININTEGRAL),
+ EXTENSION("msvc-pragma-support",EXT_MSVC_PRAGMA),
+ EXTENSION("strings-in-expressions",EXT_STRINGOPS),
+ EXTENSION("charize-macro-argument",EXT_HASH_AT),
+ EXTENSION("dont-expand-macro-argument",EXT_HASH_XCLAIM),
+ EXTENSION("warning-directives",EXT_WARNING),
+ EXTENSION("shebang-directives",EXT_SHEBANG),
+ EXTENSION("include-next-directives",EXT_INCLUDE_NEXT),
+ EXTENSION("import-directives",EXT_IMPORT),
+ EXTENSION("ident-directives",EXT_IDENT_SCCS),
+ EXTENSION("basefile-macro",EXT_BASEFILE),
+ EXTENSION("include-level-macro",EXT_INCLUDE_LEVEL),
+ EXTENSION("counter-macro",EXT_COUNTER),
+ EXTENSION("has-feature-macros",EXT_CLANG_FEATURES),
+ EXTENSION("has-include-macros",EXT_HAS_INCLUDE),
+ EXTENSION("logical-xor-in-expressions",EXT_LXOR),
+ EXTENSION("multichar-constants",EXT_MULTICHAR_CONST),
+ EXTENSION("numeric-date-macros",EXT_DATEUTILS),
+ EXTENSION("numeric-time-macros",EXT_TIMEUTILS),
+ EXTENSION("timestamp-macro",EXT_TIMESTAMP),
+ EXTENSION("column-macro",EXT_COLUMN),
+ EXTENSION("tpp-eval-macro",EXT_TPP_EVAL),
+ EXTENSION("tpp-unique-macro",EXT_TPP_UNIQUE),
+ EXTENSION("tpp-load-file-macro",EXT_TPP_LOAD_FILE),
+ EXTENSION("tpp-counter-macro",EXT_TPP_COUNTER),
+ EXTENSION("tpp-random-macro",EXT_TPP_RANDOM),
+ EXTENSION("tpp-str-decompile-macro",EXT_TPP_STR_DECOMPILE),
+ EXTENSION("tpp-str-substr-macro",EXT_TPP_STR_SUBSTR),
+ EXTENSION("tpp-str-pack-macro",EXT_TPP_STR_PACK),
+ EXTENSION("tpp-str-size-macro",EXT_TPP_STR_SIZE),
+ EXTENSION("tpp-count-tokens-macro",EXT_TPP_COUNT_TOKENS),
+ EXTENSION("dollars-in-identifiers",EXT_DOLLAR_IS_ALPHA),
+ EXTENSION("assertions",EXT_ASSERTIONS),
+ EXTENSION("canonical-system-headers",EXT_CANONICAL_HEADERS),
+ EXTENSION("extensions-are-features",EXT_EXT_ARE_FEATURES),
+ EXTENSION("fixed-length-integrals",EXT_MSVC_FIXED_INT),
+ EXTENSION("dont-expand-defined",EXT_NO_EXPAND_DEFINED),
+ EXTENSION("ifelse-in-expressions",EXT_IFELSE_IN_EXPR),
+ EXTENSION("extended-identifiers",EXT_EXTENDED_IDENTS),
 #if TPP_CONFIG_GCCFUNC
- EXTENSION("builtins-in-expressions",TPPLEXER_EXTENSION_BUILTIN_FUNCTIONS),
+ EXTENSION("builtins-in-expressions",EXT_BUILTIN_FUNCTIONS),
 #endif /* TPP_CONFIG_GCCFUNC */
 #if !TPP_CONFIG_MINMACRO
- EXTENSION("define-cpu-macros",TPPLEXER_EXTENSION_CPU_MACROS),
- EXTENSION("define-system-macros",TPPLEXER_EXTENSION_SYSTEM_MACROS),
- EXTENSION("define-utility-macros",TPPLEXER_EXTENSION_UTILITY_MACROS),
+ EXTENSION("define-cpu-macros",EXT_CPU_MACROS),
+ EXTENSION("define-system-macros",EXT_SYSTEM_MACROS),
+ EXTENSION("define-utility-macros",EXT_UTILITY_MACROS),
 #endif /* !TPP_CONFIG_MINMACRO */
 #undef EXTENSION
  {NULL,0,0},
@@ -3315,7 +3326,7 @@ PUBLIC int
 TPPLexer_SetExtension(char const *__restrict name,
                       int enabled) {
  struct tpp_extension const *iter;
- size_t name_size;
+ size_t name_size,id;
  assert(TPPLexer_Current);
  assert(name);
  name_size = strlen(name);
@@ -3323,9 +3334,10 @@ TPPLexer_SetExtension(char const *__restrict name,
  while (iter->e_name) {
   if (iter->e_size == name_size &&
      !memcmp(iter->e_name,name,name_size*sizeof(char))) {
+   id = (size_t)(iter-tpp_extensions);
    /* Found it! */
-   if (enabled) current.l_extensions |=  (iter->e_flag);
-   else         current.l_extensions &= ~(iter->e_flag);
+   if (enabled) TPPLexer_EnableExtension(id);
+   else         TPPLexer_DisableExtension(id);
    return 1;
   }
   ++iter;
@@ -5962,7 +5974,7 @@ predef_macro:
    case KWD___INTMAX_C: case KWD___UINTMAX_C:
     if (!HAVE_EXTENSION_UTILITY_MACROS) break;
     suffix = intc_suffix[TOK-KWD___INT8_C];
-    if (!(current.l_extensions&TPPLEXER_EXTENSION_MSVC_FIXED_INT)) suffix += strlen(suffix)+1;
+    if (!HAVE_EXTENSION_MSVC_FIXED_INT) suffix += strlen(suffix)+1;
     pushf();
     current.l_flags &= ~(TPPLEXER_FLAG_WANTCOMMENTS|
                          TPPLEXER_FLAG_WANTSPACE|

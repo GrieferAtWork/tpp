@@ -16,10 +16,6 @@
  *    misrepresented as being the original software.                          *
  * 3. This notice may not be removed or altered from any source distribution. *
  */
-#if defined(KWD_FLAGS) || defined(MACRO)
-#define HAS_EXTENSION(x) (TPPLexer_Current->l_extensions & (x))
-#endif
-
 #ifndef KWD
 #define TPP_DEFS_DEFINES_KWD
 #define KWD(name,str)
@@ -61,6 +57,10 @@
 #define TPP_DEFS_DEFINES_WARNING_MESSAGE
 #define WARNING_MESSAGE(name,expr)
 #endif
+#ifndef EXTENSION
+#define TPP_DEFS_DEFINES_EXTENSION
+#define EXTENSION(name,str,default)
+#endif
 
 
 #define DEF_K(name)         KWD(KWD_##name,#name)
@@ -80,8 +80,8 @@
 #define PREDEFINED_KWDFUNCTION(name,str,argc,expr)                KWD(name,str) BUILTIN_FUNCTION(name,argc,expr)
 #define PREDEFINED_FUNCTION_IF(name,if,argc,expr)                 PREDEFINED_KWDFUNCTION_IF(KWD_##name,#name,if,argc,expr)
 #define PREDEFINED_FUNCTION(name,argc,expr)                       PREDEFINED_KWDFUNCTION_IF(KWD_##name,#name,1,argc,expr)
-#define PREDEFINED_BUILTIN_KWDFUNCTION_IF(name,str,if,argc,expr)  KWD(name,str) KWD_FLAGS(name,(HAS_EXTENSION(TPPLEXER_EXTENSION_BUILTIN_FUNCTIONS) && (if)) ? (TPP_KEYWORDFLAG_HAS_BUILTIN|TPP_KEYWORDFLAG_HAS_TPP_BUILTIN) : 0) BUILTIN_FUNCTION(name,(if) ? (int)(argc) : -1,expr)
-#define PREDEFINED_BUILTIN_KWDFUNCTION(name,str,argc,expr)        KWD(name,str) KWD_FLAGS(name,HAS_EXTENSION(TPPLEXER_EXTENSION_BUILTIN_FUNCTIONS) ? (TPP_KEYWORDFLAG_HAS_BUILTIN|TPP_KEYWORDFLAG_HAS_TPP_BUILTIN) : 0) BUILTIN_FUNCTION(name,argc,expr)
+#define PREDEFINED_BUILTIN_KWDFUNCTION_IF(name,str,if,argc,expr)  KWD(name,str) KWD_FLAGS(name,(TPPLexer_HasExtension(EXT_BUILTIN_FUNCTIONS) && (if)) ? (TPP_KEYWORDFLAG_HAS_BUILTIN|TPP_KEYWORDFLAG_HAS_TPP_BUILTIN) : 0) BUILTIN_FUNCTION(name,(if) ? (int)(argc) : -1,expr)
+#define PREDEFINED_BUILTIN_KWDFUNCTION(name,str,argc,expr)        KWD(name,str) KWD_FLAGS(name,TPPLexer_HasExtension(EXT_BUILTIN_FUNCTIONS) ? (TPP_KEYWORDFLAG_HAS_BUILTIN|TPP_KEYWORDFLAG_HAS_TPP_BUILTIN) : 0) BUILTIN_FUNCTION(name,argc,expr)
 #define PREDEFINED_BUILTIN_FUNCTION_IF(name,if,argc,expr)         PREDEFINED_BUILTIN_KWDFUNCTION_IF(KWD_##name,#name,if,argc,expr)
 #define PREDEFINED_BUILTIN_FUNCTION(name,argc,expr)               PREDEFINED_BUILTIN_KWDFUNCTION_IF(KWD_##name,#name,1,argc,expr)
 
@@ -119,25 +119,25 @@ DEF_M(__FILE__)
 DEF_M(__LINE__)
 DEF_M(__TIME__)
 DEF_M(__DATE__)
-DEF_M_IF(__BASE_FILE__,    HAS_EXTENSION(TPPLEXER_EXTENSION_BASEFILE))
-DEF_M_IF(__INCLUDE_LEVEL__,HAS_EXTENSION(TPPLEXER_EXTENSION_INCLUDE_LEVEL))
-DEF_M_IF(__INCLUDE_DEPTH__,HAS_EXTENSION(TPPLEXER_EXTENSION_INCLUDE_LEVEL))
-DEF_M_IF(__COUNTER__,      HAS_EXTENSION(TPPLEXER_EXTENSION_COUNTER))
-DEF_M_IF(__TIMESTAMP__,    HAS_EXTENSION(TPPLEXER_EXTENSION_TIMESTAMP))
-DEF_M_IF(__COLUMN__,       HAS_EXTENSION(TPPLEXER_EXTENSION_COLUMN))
+DEF_M_IF(__BASE_FILE__,    TPPLexer_HasExtension(EXT_BASEFILE))
+DEF_M_IF(__INCLUDE_LEVEL__,TPPLexer_HasExtension(EXT_INCLUDE_LEVEL))
+DEF_M_IF(__INCLUDE_DEPTH__,TPPLexer_HasExtension(EXT_INCLUDE_LEVEL))
+DEF_M_IF(__COUNTER__,      TPPLexer_HasExtension(EXT_COUNTER))
+DEF_M_IF(__TIMESTAMP__,    TPPLexer_HasExtension(EXT_TIMESTAMP))
+DEF_M_IF(__COLUMN__,       TPPLexer_HasExtension(EXT_COLUMN))
 
-DEF_M_IF(__is_identifier,         HAS_EXTENSION(TPPLEXER_EXTENSION_CLANG_FEATURES))
-DEF_M_IF(__is_builtin_identifier, HAS_EXTENSION(TPPLEXER_EXTENSION_CLANG_FEATURES))
-DEF_M_IF(__is_deprecated,         HAS_EXTENSION(TPPLEXER_EXTENSION_CLANG_FEATURES))
-DEF_M_IF(__has_attribute,         HAS_EXTENSION(TPPLEXER_EXTENSION_CLANG_FEATURES))
-DEF_M_IF(__has_builtin,           HAS_EXTENSION(TPPLEXER_EXTENSION_CLANG_FEATURES))
-DEF_M_IF(__has_tpp_builtin,       HAS_EXTENSION(TPPLEXER_EXTENSION_CLANG_FEATURES))
-DEF_M_IF(__has_cpp_attribute,     HAS_EXTENSION(TPPLEXER_EXTENSION_CLANG_FEATURES))
-DEF_M_IF(__has_declspec_attribute,HAS_EXTENSION(TPPLEXER_EXTENSION_CLANG_FEATURES))
-DEF_M_IF(__has_extension,         HAS_EXTENSION(TPPLEXER_EXTENSION_CLANG_FEATURES))
-DEF_M_IF(__has_feature,           HAS_EXTENSION(TPPLEXER_EXTENSION_CLANG_FEATURES))
-DEF_M_IF(__has_include,           HAS_EXTENSION(TPPLEXER_EXTENSION_HAS_INCLUDE))
-DEF_M_IF(__has_include_next,      HAS_EXTENSION(TPPLEXER_EXTENSION_HAS_INCLUDE))
+DEF_M_IF(__is_identifier,         TPPLexer_HasExtension(EXT_CLANG_FEATURES))
+DEF_M_IF(__is_builtin_identifier, TPPLexer_HasExtension(EXT_CLANG_FEATURES))
+DEF_M_IF(__is_deprecated,         TPPLexer_HasExtension(EXT_CLANG_FEATURES))
+DEF_M_IF(__has_attribute,         TPPLexer_HasExtension(EXT_CLANG_FEATURES))
+DEF_M_IF(__has_builtin,           TPPLexer_HasExtension(EXT_CLANG_FEATURES))
+DEF_M_IF(__has_tpp_builtin,       TPPLexer_HasExtension(EXT_CLANG_FEATURES))
+DEF_M_IF(__has_cpp_attribute,     TPPLexer_HasExtension(EXT_CLANG_FEATURES))
+DEF_M_IF(__has_declspec_attribute,TPPLexer_HasExtension(EXT_CLANG_FEATURES))
+DEF_M_IF(__has_extension,         TPPLexer_HasExtension(EXT_CLANG_FEATURES))
+DEF_M_IF(__has_feature,           TPPLexer_HasExtension(EXT_CLANG_FEATURES))
+DEF_M_IF(__has_include,           TPPLexer_HasExtension(EXT_HAS_INCLUDE))
+DEF_M_IF(__has_include_next,      TPPLexer_HasExtension(EXT_HAS_INCLUDE))
 
 /* Helper keywords used to implement variadic macros & extensions.
  * HINT: '__VA_NARGS__' is something new I added when I began reviving TPP:
@@ -205,37 +205,37 @@ DEF_K(system_header)
 
 
 /* TPP extension macros. */
-DEF_M_IF(__TPP_EVAL,         HAS_EXTENSION(TPPLEXER_EXTENSION_TPP_EVAL))
-DEF_M_IF(__TPP_LOAD_FILE,    HAS_EXTENSION(TPPLEXER_EXTENSION_TPP_LOAD_FILE))
-DEF_M_IF(__TPP_COUNTER,      HAS_EXTENSION(TPPLEXER_EXTENSION_TPP_COUNTER))
-DEF_M_IF(__TPP_RANDOM,       HAS_EXTENSION(TPPLEXER_EXTENSION_TPP_RANDOM))
-DEF_M_IF(__TPP_STR_DECOMPILE,HAS_EXTENSION(TPPLEXER_EXTENSION_TPP_STR_DECOMPILE))
-DEF_M_IF(__TPP_STR_AT,       HAS_EXTENSION(TPPLEXER_EXTENSION_TPP_STR_SUBSTR))
-DEF_M_IF(__TPP_STR_SUBSTR,   HAS_EXTENSION(TPPLEXER_EXTENSION_TPP_STR_SUBSTR))
-DEF_M_IF(__TPP_STR_PACK,     HAS_EXTENSION(TPPLEXER_EXTENSION_TPP_STR_PACK))
-DEF_M_IF(__TPP_STR_SIZE,     HAS_EXTENSION(TPPLEXER_EXTENSION_TPP_STR_SIZE))
-DEF_M_IF(__TPP_UNIQUE,       HAS_EXTENSION(TPPLEXER_EXTENSION_TPP_UNIQUE))
-DEF_M_IF(__TPP_COUNT_TOKENS, HAS_EXTENSION(TPPLEXER_EXTENSION_TPP_COUNT_TOKENS))
+DEF_M_IF(__TPP_EVAL,         TPPLexer_HasExtension(EXT_TPP_EVAL))
+DEF_M_IF(__TPP_LOAD_FILE,    TPPLexer_HasExtension(EXT_TPP_LOAD_FILE))
+DEF_M_IF(__TPP_COUNTER,      TPPLexer_HasExtension(EXT_TPP_COUNTER))
+DEF_M_IF(__TPP_RANDOM,       TPPLexer_HasExtension(EXT_TPP_RANDOM))
+DEF_M_IF(__TPP_STR_DECOMPILE,TPPLexer_HasExtension(EXT_TPP_STR_DECOMPILE))
+DEF_M_IF(__TPP_STR_AT,       TPPLexer_HasExtension(EXT_TPP_STR_SUBSTR))
+DEF_M_IF(__TPP_STR_SUBSTR,   TPPLexer_HasExtension(EXT_TPP_STR_SUBSTR))
+DEF_M_IF(__TPP_STR_PACK,     TPPLexer_HasExtension(EXT_TPP_STR_PACK))
+DEF_M_IF(__TPP_STR_SIZE,     TPPLexer_HasExtension(EXT_TPP_STR_SIZE))
+DEF_M_IF(__TPP_UNIQUE,       TPPLexer_HasExtension(EXT_TPP_UNIQUE))
+DEF_M_IF(__TPP_COUNT_TOKENS, TPPLexer_HasExtension(EXT_TPP_COUNT_TOKENS))
 
-DEF_M_IF(__DATE_DAY__,  HAS_EXTENSION(TPPLEXER_EXTENSION_DATEUTILS))
-DEF_M_IF(__DATE_WDAY__, HAS_EXTENSION(TPPLEXER_EXTENSION_DATEUTILS))
-DEF_M_IF(__DATE_YDAY__, HAS_EXTENSION(TPPLEXER_EXTENSION_DATEUTILS))
-DEF_M_IF(__DATE_MONTH__,HAS_EXTENSION(TPPLEXER_EXTENSION_DATEUTILS))
-DEF_M_IF(__DATE_YEAR__, HAS_EXTENSION(TPPLEXER_EXTENSION_DATEUTILS))
-DEF_M_IF(__TIME_SEC__,  HAS_EXTENSION(TPPLEXER_EXTENSION_TIMEUTILS))
-DEF_M_IF(__TIME_MIN__,  HAS_EXTENSION(TPPLEXER_EXTENSION_TIMEUTILS))
-DEF_M_IF(__TIME_HOUR__, HAS_EXTENSION(TPPLEXER_EXTENSION_TIMEUTILS))
+DEF_M_IF(__DATE_DAY__,  TPPLexer_HasExtension(EXT_DATEUTILS))
+DEF_M_IF(__DATE_WDAY__, TPPLexer_HasExtension(EXT_DATEUTILS))
+DEF_M_IF(__DATE_YDAY__, TPPLexer_HasExtension(EXT_DATEUTILS))
+DEF_M_IF(__DATE_MONTH__,TPPLexer_HasExtension(EXT_DATEUTILS))
+DEF_M_IF(__DATE_YEAR__, TPPLexer_HasExtension(EXT_DATEUTILS))
+DEF_M_IF(__TIME_SEC__,  TPPLexer_HasExtension(EXT_TIMEUTILS))
+DEF_M_IF(__TIME_MIN__,  TPPLexer_HasExtension(EXT_TIMEUTILS))
+DEF_M_IF(__TIME_HOUR__, TPPLexer_HasExtension(EXT_TIMEUTILS))
 
 
-DEF_EXTENSION_IF(tpp_dollar_is_alpha,             HAS_EXTENSION(TPPLEXER_EXTENSION_DOLLAR_IS_ALPHA))
-DEF_EXTENSION_IF(tpp_va_args,                     HAS_EXTENSION(TPPLEXER_EXTENSION_VA_ARGS))
-DEF_EXTENSION_IF(tpp_named_va_args,               HAS_EXTENSION(TPPLEXER_EXTENSION_GCC_VA_ARGS))
-DEF_EXTENSION_IF(tpp_va_comma,                    HAS_EXTENSION(TPPLEXER_EXTENSION_VA_COMMA))
+DEF_EXTENSION_IF(tpp_dollar_is_alpha,             TPPLexer_HasExtension(EXT_DOLLAR_IS_ALPHA))
+DEF_EXTENSION_IF(tpp_va_args,                     TPPLexer_HasExtension(EXT_VA_ARGS))
+DEF_EXTENSION_IF(tpp_named_va_args,               TPPLexer_HasExtension(EXT_GCC_VA_ARGS))
+DEF_EXTENSION_IF(tpp_va_comma,                    TPPLexer_HasExtension(EXT_VA_COMMA))
 DEF_EXTENSION_IF(tpp_reemit_unknown_pragmas,      !(TPPLexer_Current->l_flags&TPPLEXER_FLAG_EAT_UNKNOWN_PRAGMA))
-DEF_EXTENSION_IF(tpp_msvc_integer_suffix,         HAS_EXTENSION(TPPLEXER_EXTENSION_MSVC_FIXED_INT))
-DEF_EXTENSION_IF(tpp_charize_operator,            HAS_EXTENSION(TPPLEXER_EXTENSION_HASH_AT))
-DEF_EXTENSION_IF(tpp_trigraphs,                   HAS_EXTENSION(TPPLEXER_EXTENSION_TRIGRAPHS))
-DEF_EXTENSION_IF(tpp_digraphs,                    HAS_EXTENSION(TPPLEXER_EXTENSION_DIGRAPHS))
+DEF_EXTENSION_IF(tpp_msvc_integer_suffix,         TPPLexer_HasExtension(EXT_MSVC_FIXED_INT))
+DEF_EXTENSION_IF(tpp_charize_operator,            TPPLexer_HasExtension(EXT_HASH_AT))
+DEF_EXTENSION_IF(tpp_trigraphs,                   TPPLexer_HasExtension(EXT_TRIGRAPHS))
+DEF_EXTENSION_IF(tpp_digraphs,                    TPPLexer_HasExtension(EXT_DIGRAPHS))
 DEF_EXTENSION_IF(tpp_pragma_push_macro,           TPP_PREPROCESSOR_VERSION >= 200)
 DEF_EXTENSION_IF(tpp_pragma_pop_macro,            TPP_PREPROCESSOR_VERSION >= 200)
 DEF_EXTENSION_IF(tpp_pragma_region,               TPP_PREPROCESSOR_VERSION >= 200)
@@ -247,23 +247,23 @@ DEF_EXTENSION_IF(tpp_pragma_once,                 TPP_PREPROCESSOR_VERSION >= 20
 DEF_EXTENSION_IF(tpp_pragma_tpp_exec,             TPP_PREPROCESSOR_VERSION >= 200)
 DEF_EXTENSION_IF(tpp_pragma_deprecated,           TPP_PREPROCESSOR_VERSION >= 200)
 DEF_EXTENSION_IF(tpp_pragma_tpp_set_keyword_flags,TPP_PREPROCESSOR_VERSION >= 200)
-DEF_EXTENSION_IF(tpp_directive_include_next,      HAS_EXTENSION(TPPLEXER_EXTENSION_INCLUDE_NEXT))
-DEF_EXTENSION_IF(tpp_directive_import,            HAS_EXTENSION(TPPLEXER_EXTENSION_IMPORT))
-DEF_EXTENSION_IF(tpp_directive_warning,           HAS_EXTENSION(TPPLEXER_EXTENSION_WARNING))
-DEF_EXTENSION_IF(tpp_lxor,                        HAS_EXTENSION(TPPLEXER_EXTENSION_LXOR))
+DEF_EXTENSION_IF(tpp_directive_include_next,      TPPLexer_HasExtension(EXT_INCLUDE_NEXT))
+DEF_EXTENSION_IF(tpp_directive_import,            TPPLexer_HasExtension(EXT_IMPORT))
+DEF_EXTENSION_IF(tpp_directive_warning,           TPPLexer_HasExtension(EXT_WARNING))
+DEF_EXTENSION_IF(tpp_lxor,                        TPPLexer_HasExtension(EXT_LXOR))
 DEF_EXTENSION_IF(tpp_token_tilde_tilde,           TPPLexer_Current->l_extokens&TPPLEXER_TOKEN_TILDETILDE)
 DEF_EXTENSION_IF(tpp_token_pow,                   TPPLexer_Current->l_extokens&TPPLEXER_TOKEN_STARSTAR)
 DEF_EXTENSION_IF(tpp_token_lxor,                  TPPLexer_Current->l_extokens&TPPLEXER_TOKEN_ROOFROOF)
 DEF_EXTENSION_IF(tpp_token_arrow,                 TPPLexer_Current->l_extokens&TPPLEXER_TOKEN_ARROW)
 DEF_EXTENSION_IF(tpp_token_collon_assign,         TPPLexer_Current->l_extokens&TPPLEXER_TOKEN_COLLONASSIGN)
 DEF_EXTENSION_IF(tpp_token_collon_collon,         TPPLexer_Current->l_extokens&TPPLEXER_TOKEN_COLLONCOLLON)
-DEF_EXTENSION_IF(tpp_macro_calling_conventions,   HAS_EXTENSION(TPPLEXER_EXTENSION_ALTMAC))
+DEF_EXTENSION_IF(tpp_macro_calling_conventions,   TPPLexer_HasExtension(EXT_ALTMAC))
 DEF_EXTENSION_IF(tpp_strict_whitespace,           (TPPLexer_Current->l_flags&TPPLEXER_FLAG_KEEP_ARG_WHITESPACE))
 DEF_EXTENSION_IF(tpp_strict_integer_overflow,     TPP_WSTATE_ISENABLED(TPPLexer_GetWarning(W_INTEGRAL_OVERFLOW)) ||
                                                   TPP_WSTATE_ISENABLED(TPPLexer_GetWarning(W_INTEGRAL_CLAMPED)))
 DEF_EXTENSION_IF(tpp_support_ansi_characters,     0) /* TODO: (Re-)add support for this. */
 DEF_EXTENSION_IF(tpp_emit_lf_after_directive,     (TPPLexer_Current->l_flags&TPPLEXER_FLAG_DIRECTIVE_NOOWN_LF))
-DEF_EXTENSION_IF(tpp_if_cond_expression,          HAS_EXTENSION(TPPLEXER_EXTENSION_IFELSE_IN_EXPR))
+DEF_EXTENSION_IF(tpp_if_cond_expression,          TPPLexer_HasExtension(EXT_IFELSE_IN_EXPR))
 DEF_EXTENSION_IF(tpp_debug,                       TPP_CONFIG_DEBUG)
 
 /* Predefined macros and their values.
@@ -321,8 +321,8 @@ PRIVATE int_t tpp_parity(int_t i) {
 }
 #endif
 /* Special functions that require designated preprocessor support. */
-DEF_BUILTIN_IF(__builtin_constant_p,HAS_EXTENSION(TPPLEXER_EXTENSION_BUILTIN_FUNCTIONS))
-DEF_BUILTIN_IF(__builtin_choose_expr,HAS_EXTENSION(TPPLEXER_EXTENSION_BUILTIN_FUNCTIONS))
+DEF_BUILTIN_IF(__builtin_constant_p,TPPLexer_HasExtension(EXT_BUILTIN_FUNCTIONS))
+DEF_BUILTIN_IF(__builtin_choose_expr,TPPLexer_HasExtension(EXT_BUILTIN_FUNCTIONS))
 /* Define regular builtin functions. */
 PREDEFINED_BUILTIN_FUNCTION(__builtin_ffs,1,{ RETURN_INT(tpp_ffs(INT(0)&((int)-1))); })
 PREDEFINED_BUILTIN_FUNCTION(__builtin_ffsl,1,{ RETURN_INT(tpp_ffs(INT(0)&((long)-1))); })
@@ -397,11 +397,70 @@ PREDEFINED_BUILTIN_FUNCTION(__builtin_isxdigit,1,{ RETURN_INT(isxdigit((int)INT(
 PREDEFINED_BUILTIN_FUNCTION(__builtin_toascii,1,{ RETURN_INT(toascii((int)INT(0))); })
 PREDEFINED_BUILTIN_FUNCTION(__builtin_tolower,1,{ RETURN_INT(tolower((int)INT(0))); })
 PREDEFINED_BUILTIN_FUNCTION(__builtin_toupper,1,{ RETURN_INT(toupper((int)INT(0))); })
-
-
 #endif /* TPP_CONFIG_GCCFUNC */
 
+/* Declare builtin extensions. */
+EXTENSION(EXT_TRIGRAPHS,        "trigraphs",                    0)
+EXTENSION(EXT_DIGRAPHS,         "digraphs",                     1)
+EXTENSION(EXT_GCC_VA_ARGS,      "named-varargs-in-macros",      1)
+EXTENSION(EXT_GCC_VA_COMMA,     "glue-comma-in-macros",         1)
+EXTENSION(EXT_GCC_IFELSE,       "if-else-optional-true",        1)
+EXTENSION(EXT_VA_COMMA,         "va-comma-in-macros",           1)
+EXTENSION(EXT_VA_NARGS,         "va-nargs-in-macros",           1)
+EXTENSION(EXT_VA_ARGS,          "va-args-in-macros",            1)
+EXTENSION(EXT_STR_E,            "escape-e-in-strings",          1)
+EXTENSION(EXT_ALTMAC,           "alternative-macro-parenthesis",1)
+EXTENSION(EXT_RECMAC,           "macro-recursion",              0)
+EXTENSION(EXT_BININTEGRAL,      "binary-literals",              1)
+EXTENSION(EXT_MSVC_PRAGMA,      "msvc-pragma-support",          1)
+EXTENSION(EXT_STRINGOPS,        "strings-in-expressions",       1)
+EXTENSION(EXT_HASH_AT,          "charize-macro-argument",       1)
+EXTENSION(EXT_HASH_XCLAIM,      "dont-expand-macro-argument",   1)
+EXTENSION(EXT_WARNING,          "warning-directives",           1)
+EXTENSION(EXT_SHEBANG,          "shebang-directives",           1)
+EXTENSION(EXT_INCLUDE_NEXT,     "include-next-directives",      1)
+EXTENSION(EXT_IMPORT,           "import-directives",            1)
+EXTENSION(EXT_IDENT_SCCS,       "ident-directives",             1)
+EXTENSION(EXT_BASEFILE,         "basefile-macro",               1)
+EXTENSION(EXT_INCLUDE_LEVEL,    "include-level-macro",          1)
+EXTENSION(EXT_COUNTER,          "counter-macro",                1)
+EXTENSION(EXT_CLANG_FEATURES,   "has-feature-macros",           1)
+EXTENSION(EXT_HAS_INCLUDE,      "has-include-macros",           1)
+EXTENSION(EXT_LXOR,             "logical-xor-in-expressions",   1)
+EXTENSION(EXT_MULTICHAR_CONST,  "multichar-constants",          1)
+EXTENSION(EXT_DATEUTILS,        "numeric-date-macros",          1)
+EXTENSION(EXT_TIMEUTILS,        "numeric-time-macros",          1)
+EXTENSION(EXT_TIMESTAMP,        "timestamp-macro",              1)
+EXTENSION(EXT_COLUMN,           "column-macro",                 1)
+EXTENSION(EXT_TPP_EVAL,         "tpp-eval-macro",               1)
+EXTENSION(EXT_TPP_UNIQUE,       "tpp-unique-macro",             1)
+EXTENSION(EXT_TPP_LOAD_FILE,    "tpp-load-file-macro",          1)
+EXTENSION(EXT_TPP_COUNTER,      "tpp-counter-macro",            1)
+EXTENSION(EXT_TPP_RANDOM,       "tpp-random-macro",             1)
+EXTENSION(EXT_TPP_STR_DECOMPILE,"tpp-str-decompile-macro",      1)
+EXTENSION(EXT_TPP_STR_SUBSTR,   "tpp-str-substr-macro",         1)
+EXTENSION(EXT_TPP_STR_PACK,     "tpp-str-pack-macro",           1)
+EXTENSION(EXT_TPP_STR_SIZE,     "tpp-str-size-macro",           1)
+EXTENSION(EXT_TPP_COUNT_TOKENS, "tpp-count-tokens-macro",       1)
+EXTENSION(EXT_DOLLAR_IS_ALPHA,  "dollars-in-identifiers",       1)
+EXTENSION(EXT_ASSERTIONS,       "assertions",                   1)
+EXTENSION(EXT_CANONICAL_HEADERS,"canonical-system-headers",     1)
+EXTENSION(EXT_EXT_ARE_FEATURES, "extensions-are-features",      1)
+EXTENSION(EXT_MSVC_FIXED_INT,   "fixed-length-integrals",       1)
+EXTENSION(EXT_NO_EXPAND_DEFINED,"dont-expand-defined",          1)
+EXTENSION(EXT_IFELSE_IN_EXPR,   "ifelse-in-expressions",        1)
+EXTENSION(EXT_EXTENDED_IDENTS,  "extended-identifiers",         1)
+#if TPP_CONFIG_GCCFUNC
+EXTENSION(EXT_BUILTIN_FUNCTIONS,"builtins-in-expressions",      1)
+#endif /* TPP_CONFIG_GCCFUNC */
+#if !TPP_CONFIG_MINMACRO
+EXTENSION(EXT_CPU_MACROS,       "define-cpu-macros",            1)
+EXTENSION(EXT_SYSTEM_MACROS,    "define-system-macros",         1)
+EXTENSION(EXT_UTILITY_MACROS,   "define-utility-macros",        1)
+#endif /* !TPP_CONFIG_MINMACRO */
 
+
+/* Declare builtin warning groups. */
 WGROUP(WG_COMMENT,             "comment",             WSTATE_ERROR)
 WGROUP(WG_COMMENTS,            "comments",            WSTATE_ERROR)
 WGROUP(WG_MACROS,              "macros",              WSTATE_ERROR)
@@ -647,6 +706,10 @@ DEF_WARNING(W_EXPECTED_WARNING_NAMEORID,(WG_VALUE),WSTATE_WARN,WARNF("Expected w
 #undef DEF_M
 #undef DEF_K
 
+#ifdef TPP_DEFS_DEFINES_EXTENSION
+#undef TPP_DEFS_DEFINES_EXTENSION
+#undef EXTENSION
+#endif
 #ifdef TPP_DEFS_DEFINES_WARNING_MESSAGE
 #undef TPP_DEFS_DEFINES_WARNING_MESSAGE
 #undef WARNING_MESSAGE
@@ -682,8 +745,4 @@ DEF_WARNING(W_EXPECTED_WARNING_NAMEORID,(WG_VALUE),WSTATE_WARN,WARNF("Expected w
 #ifdef TPP_DEFS_DEFINES_KWD
 #undef TPP_DEFS_DEFINES_KWD
 #undef KWD
-#endif
-
-#if defined(KWD_FLAGS) || defined(MACRO)
-#undef HAS_EXTENSION
 #endif
