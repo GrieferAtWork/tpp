@@ -3004,7 +3004,7 @@ PUBLIC int TPPLexer_InvokeWarning(int wnum) {
  wstate_t state; int found_warn = 0;
  wgroup_t const *group_iter;
  unsigned int wid = wnum2id(wnum);
- if unlikely(!wid_isvalid(wnum)) return TPP_WARNINGMODE_WARN;
+ if unlikely(!wid_isvalid(wid)) return TPP_WARNINGMODE_WARN;
  state = do_invoke_wid(wid);
  group_iter = w_associated_groups[wid-WG_COUNT];
  for (;;) {
