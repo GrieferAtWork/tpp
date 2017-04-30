@@ -42,6 +42,10 @@
 #define TPP_CONFIG_GCCFUNC    1
 #endif
 
+#ifndef TPP_CONFIG_MINGCCFUNC
+#define TPP_CONFIG_MINGCCFUNC 0
+#endif
+
 #define TPP_PREPROCESSOR_VERSION 200 /* Preprocessor version. */
 #define TPP_API_VERSION          200 /* Api version (Version of this api). */
 
@@ -448,6 +452,7 @@ struct TPPFile {
  } TPP_UNNAMED_UNION_DEF(f_specific);
 };
 
+TPPFUN struct TPPFile TPPFile_Empty;
 #define TPPFile_Incref(self)          (void)(++(self)->f_refcnt)
 #define TPPFile_Decref(self)          (void)(--(self)->f_refcnt || (TPPFile_Destroy(self),0))
 TPPFUN void TPPFile_Destroy(struct TPPFile *__restrict self);
@@ -550,6 +555,7 @@ TPPFUN size_t TPP_SizeofUnescape(char const *data, size_t size);
 TPPFUN size_t TPP_SizeofEscape(char const *data, size_t size);
 TPPFUN size_t TPP_SizeofItos(TPP(int_t) i);
 TPPFUN size_t TPP_SizeofFtos(TPP(float_t) f);
+TPPFUN TPP(hash_t) TPP_Hashof(void const *data, size_t size);
 
 enum{
  /* Special tokens. */
@@ -631,6 +637,7 @@ enum{
  TPP(TOK_RANGLE3),       /*< ">>>". */
  TPP(TOK_LANGLE3_EQUAL), /*< "<<<=". */
  TPP(TOK_RANGLE3_EQUAL), /*< ">>>=". */
+ TPP(TOK_LOGT),          /*< "<>". */
 
  TPP(TOK_KEYWORD_BEGIN), /* KEEP THIS THE LAST TOKEN! */
 
@@ -640,6 +647,8 @@ enum{
  TPP(TOK_LOWER)         = TPP(TOK_LANGLE),
  TPP(TOK_GREATER)       = TPP(TOK_RANGLE),
  TPP(TOK_COLLON_COLLON) = TPP(TOK_NAMESPACE),
+ TPP(TOK_LOWER_GREATER) = TPP(TOK_LOGT),
+ TPP(TOK_LANGLE_RANGLE) = TPP(TOK_LOGT),
  TPP(TOK_LANGLE1)       = TPP(TOK_LANGLE),
  TPP(TOK_LANGLE2)       = TPP(TOK_SHL),
  TPP(TOK_LANGLE_EQUAL)  = TPP(TOK_LOWER_EQUAL),
@@ -1007,20 +1016,20 @@ TPP_LOCAL TPP(col_t) TPPLexer_COLUMN(void) { struct TPPFile *f = TPPLexer_Textfi
 #define TPPLEXER_FLAG_TERMINATE_STRING_LF    0x00000040 /*< Terminate character/string sequences when a linefeed is detected (also emit a warning in that case). */
 #define TPPLEXER_FLAG_NO_MACROS              0x00000080 /*< Disable expansion of macros (user defined only; builtin must be disabled explicitly with 'TPPLEXER_FLAG_NO_BUILTIN_MACROS'). */
 #define TPPLEXER_FLAG_NO_DIRECTIVES          0x00000100 /*< Disable evaluation of preprocessor directives. */
-#define TPPLEXER_FLAG_ASM_COMMENTS           0x00000400 /*< Suppress warnings for unknown/invalid preprocessor directives. */
-#define TPPLEXER_FLAG_NO_BUILTIN_MACROS      0x00000800 /*< When set, don't expand builtin macros (such as __FILE__ and __LINE__). */
-#define TPPLEXER_FLAG_DIRECTIVE_NOOWN_LF     0x00001000 /*< Linefeeds terminating preprocessor directives are not part of those directives and are instead re-emit.
-                                                         *  WARNING: Using this flag is not recommended, as a freshly defined macro will re-use
+#define TPPLEXER_FLAG_ASM_COMMENTS           0x00000400 /*< Suppress warnings for unknown/invalid preprocessor directives, instead either emitting them as 'TOK_COMMENT' or ignoring them based on 'TPPLEXER_FLAG_WANTCOMMENTS'. */
+#define TPPLEXER_FLAG_NO_BUILTIN_MACROS      0x00000800 /*< When set, don't expand _any_ builtin macros (such as __FILE__ and __LINE__). */
+#define TPPLEXER_FLAG_DIRECTIVE_NOOWN_LF     0x00001000 /*< Linefeeds terminating preprocessor directives are not part of those directives and are instead re-emit (Meaningless without 'TPPLEXER_FLAG_WANTLF').
+                                                         *  WARNING: Using this flag is not recommended, as a freshly defined macro will modify
                                                          *           text from the file and set the first character of that linefeed to '\0'. */
-#define TPPLEXER_FLAG_COMMENT_NOOWN_LF       0x00002000 /*< Linefeeds terminating a '// foo'-style comment are not owned by that comment, but are re-emit. */
+#define TPPLEXER_FLAG_COMMENT_NOOWN_LF       0x00002000 /*< Linefeeds terminating a '// foo'-style comment are not owned by that comment, but are re-emit (Meaningless without 'TPPLEXER_FLAG_WANTLF'). */
 #define TPPLEXER_FLAG_MESSAGE_LOCATION       0x00004000 /*< Print the file+line location in messages from '#pragma message'. */
 #define TPPLEXER_FLAG_MESSAGE_NOLINEFEED     0x00008000 /*< Don't print a linefeed following the user-provided message in '#pragma message'. */
-#define TPPLEXER_FLAG_INCLUDESTRING          0x00010000 /*< Parse strings as #include strings (without \-escape sequences). */
-#define TPPLEXER_FLAG_KEEP_ARG_WHITESPACE    0x00020000 /*< When set, keep whitespace surrounding macro arguments. */
+#define TPPLEXER_FLAG_INCLUDESTRING          0x00010000 /*< Parse strings as #include strings (without \-escape sequences). (WARNING: system -style (<...>) strings must be handled manually by the caller) */
+#define TPPLEXER_FLAG_KEEP_ARG_WHITESPACE    0x00020000 /*< When set, keep whitespace surrounding macro arguments (WARNING: Also affects recursive macro expansion). */
 #define TPPLEXER_FLAG_NO_LEGACY_GUARDS       0x00040000 /*< Don't recognize legacy #include-guards
                                                          *  WARNING: Not setting this option may lead to whitespace and comments at the
                                                          *           start and end of a guarded file to not be emit on a second pass.
-                                                         *        >> Disable this option when either is important to your compiler. */
+                                                         *        >> Enable this option when either is important to your compiler. */
 #define TPPLEXER_FLAG_WERROR                 0x00080000 /*< All warnings are turned into errors (NOTE: less powerful than 'TPPLEXER_FLAG_WSYSTEMHEADERS'). */
 #define TPPLEXER_FLAG_WSYSTEMHEADERS         0x00100000 /*< Still emit warnings in system headers (alongside errors). */
 #define TPPLEXER_FLAG_NO_DEPRECATED          0x00200000 /*< Don't warn about deprecated keywords. */
@@ -1051,7 +1060,9 @@ TPP_LOCAL TPP(col_t) TPPLexer_COLUMN(void) { struct TPPFile *f = TPPLexer_Textfi
 #define TPPLEXER_TOKEN_CPP_COMMENT           0x00000800 /*< Enable recognition of '// comment' tokens. */
 #define TPPLEXER_TOKEN_ANGLE3                0x00001000 /*< Enable recognition of '<<<' and '>>>' tokens. */
 #define TPPLEXER_TOKEN_ANGLE3_EQUAL          0x00002000 /*< Enable recognition of '<<<=' and '>>>=' tokens. */
-#define TPPLEXER_TOKEN_DEFAULT               0xffffffff /*< Default set of extension tokens (enable all). */
+#define TPPLEXER_TOKEN_LOGT                  0x00004000 /*< Enable recognition of '<>' tokens. */
+#define TPPLEXER_TOKEN_DOLLAR                0x80000000 /*< Recognize '$' as its own token (Supersedes 'EXT_DOLLAR_IS_ALPHA'). */
+#define TPPLEXER_TOKEN_DEFAULT               0x0fffffff /*< Default set of extension tokens (enable all). */
 
 /* Predefined set of extension tokens for some languages.
  * WARNING: Most of these languages will also need additional tweaks to other flags. */
@@ -1157,9 +1168,8 @@ TPPFUN struct TPPFile *TPPLexer_OpenFile(int mode, char *filename, size_t filena
 // @return: NULL: [create_missing]  Not enough available memory.
 // @return: NULL: [!create_missing] No keyword with the given name.
 // @return: * :    The keyword entry associated with the given name.
-TPPFUN struct TPPKeyword *
-TPPLexer_LookupKeyword(char const *name, size_t namelen,
-                       int create_missing);
+TPPFUN struct TPPKeyword *TPPLexer_LookupKeyword(char const *name, size_t namelen, int create_missing);
+TPPFUN struct TPPKeyword *TPPLexer_LookupEscapedKeyword(char const *name, size_t namelen, int create_missing);
 
 //////////////////////////////////////////////////////////////////////////
 // Looks up a keyword, given its ID

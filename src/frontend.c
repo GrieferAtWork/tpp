@@ -630,6 +630,7 @@ int main(int argc, char *argv[]) {
   else if (!strcmp(arg,"fno-line") BACKWARDS(|| !strcmp(arg,"no-line"))) line_directives = 0;
   else if (!strcmp(arg,"fcpp-line")) line_directives = 2;
   else if (!strcmp(arg,"trigraphs")) TPPLexer_EnableExtension(EXT_TRIGRAPHS);
+  else if (!strcmp(arg,"Werror")) TPPLexer_Current->l_flags |= TPPLEXER_FLAG_WERROR;
 #if !TPP_CONFIG_MINMACRO
   else if (!strcmp(arg,"undef")) TPPLexer_DisableExtension(EXT_CPU_MACROS),
                                  TPPLexer_DisableExtension(EXT_SYSTEM_MACROS),

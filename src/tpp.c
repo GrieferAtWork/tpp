@@ -217,7 +217,7 @@ extern void __debugbreak(void);
 #define tpp_istrigraph(ch)      (chrattr[(uint8_t)(ch)]&CH_ISTRIGRAPH)
 #define tpp_ismultichar(ch)     (chrattr[(uint8_t)(ch)]&CH_ISMULTICHAR)
 
-static uint8_t const chrattr[256] = {
+PRIVATE uint8_t const chrattr[256] = {
 /*[[[deemon
 for (local i = 0; i < 256; ++i) {
   if ((i % 16) == 0) print "  ",;
@@ -229,7 +229,7 @@ for (local i = 0; i < 256; ++i) {
   if (i <= 32) flags |= CH_ISSPACE;
   if (i in ['=','(','/',')','\'','<','!','>','-','?']) flags |= CH_ISTRIGRAPH;
   if (i in ['<','>','=','!','.','+','-','*','/','%',
-            '&','|','^','#','~',':','@']) flags |= CH_ISMULTICHAR;
+            '&','|','^','#','~',':','@',]) flags |= CH_ISMULTICHAR;
   if (i in ['\r','\n']) flags |= CH_ISLF;
   if (i in ['\0']) flags |= CH_ISZERO;
   if (i >= 192) flags |= CH_ISANSI;
@@ -423,7 +423,11 @@ do{ tok_t              _old_tok_id    = token.t_id;\
 #define HAVE_EXTENSION_IFELSE_IN_EXPR    TPPLexer_HasExtension(EXT_IFELSE_IN_EXPR)
 #define HAVE_EXTENSION_EXTENDED_IDENTS   TPPLexer_HasExtension(EXT_EXTENDED_IDENTS)
 #if TPP_CONFIG_GCCFUNC
+#if TPP_CONFIG_MINGCCFUNC < 2
 #define HAVE_EXTENSION_BUILTIN_FUNCTIONS TPPLexer_HasExtension(EXT_BUILTIN_FUNCTIONS)
+#else
+#define HAVE_EXTENSION_BUILTIN_FUNCTIONS 1
+#endif
 #endif /* TPP_CONFIG_GCCFUNC */
 #if !TPP_CONFIG_MINMACRO
 #define HAVE_EXTENSION_CPU_MACROS        TPPLexer_HasExtension(EXT_CPU_MACROS)
@@ -546,11 +550,12 @@ funop_putarg(funop_t *piter, size_t arg) {
 #endif
 
 
-PRIVATE hash_t
-hashof(char const *data, size_t size) {
+#define hashof   TPP_Hashof
+PUBLIC hash_t
+TPP_Hashof(void const *data, size_t size) {
  hash_t result = 1;
  char const *iter,*end;
- end = (iter = data)+size;
+ end = (iter = (char const *)data)+size;
  for (; iter != end; ++iter)
   result = result*263+*iter;
  return result;
@@ -833,7 +838,7 @@ TPPFile_Destroy(struct TPPFile *__restrict self) {
 
 
 
-PRIVATE struct TPPFile TPPFile_Empty = {
+PUBLIC struct TPPFile TPPFile_Empty = {
  /* f_refcnt                 */0x80000000,
  /* f_kind                   */TPPFILE_KIND_TEXT,
  /* f_prev                   */NULL,
@@ -2556,11 +2561,14 @@ keyword_clrassert(struct TPPKeyword *__restrict self) {
 PUBLIC int
 TPP_ISBUILTINMACRO(tok_t id) {
  int result = 0;
- switch (id) {
+ /* Check if builtin macros are even enabled. */
+ if (!(current.l_flags&TPPLEXER_FLAG_NO_BUILTIN_MACROS)) {
+  switch (id) {
 #define MACRO(name,if) case name: result = !!(if); break;
 #include "tpp-defs.inl"
 #undef MACRO
-  default: break;
+   default: break;
+  }
  }
  return result;
 }
@@ -3159,72 +3167,15 @@ PUBLIC void TPPLexer_Quit(struct TPPLexer *__restrict self) {
 }
 
 struct tpp_extension {
+ int         e_flag;
  char const *e_name;
  size_t      e_size;
- uint64_t    e_flag;
 };
 PRIVATE struct tpp_extension const tpp_extensions[] = {
-#define EXTENSION(name,flag) {name,COMPILER_STRLEN(name),flag}
- EXTENSION("trigraphs",EXT_TRIGRAPHS),
- EXTENSION("digraphs",EXT_DIGRAPHS),
- EXTENSION("named-varargs-in-macros",EXT_GCC_VA_ARGS),
- EXTENSION("glue-comma-in-macros",EXT_GCC_VA_COMMA),
- EXTENSION("if-else-optional-true",EXT_GCC_IFELSE),
- EXTENSION("va-comma-in-macros",EXT_VA_COMMA),
- EXTENSION("va-nargs-in-macros",EXT_VA_NARGS),
- EXTENSION("va-args-in-macros",EXT_VA_ARGS),
- EXTENSION("escape-e-in-strings",EXT_STR_E),
- EXTENSION("alternative-macro-parenthesis",EXT_ALTMAC),
- EXTENSION("macro-recursion",EXT_RECMAC),
- EXTENSION("binary-literals",EXT_BININTEGRAL),
- EXTENSION("msvc-pragma-support",EXT_MSVC_PRAGMA),
- EXTENSION("strings-in-expressions",EXT_STRINGOPS),
- EXTENSION("charize-macro-argument",EXT_HASH_AT),
- EXTENSION("dont-expand-macro-argument",EXT_HASH_XCLAIM),
- EXTENSION("warning-directives",EXT_WARNING),
- EXTENSION("shebang-directives",EXT_SHEBANG),
- EXTENSION("include-next-directives",EXT_INCLUDE_NEXT),
- EXTENSION("import-directives",EXT_IMPORT),
- EXTENSION("ident-directives",EXT_IDENT_SCCS),
- EXTENSION("basefile-macro",EXT_BASEFILE),
- EXTENSION("include-level-macro",EXT_INCLUDE_LEVEL),
- EXTENSION("counter-macro",EXT_COUNTER),
- EXTENSION("has-feature-macros",EXT_CLANG_FEATURES),
- EXTENSION("has-include-macros",EXT_HAS_INCLUDE),
- EXTENSION("logical-xor-in-expressions",EXT_LXOR),
- EXTENSION("multichar-constants",EXT_MULTICHAR_CONST),
- EXTENSION("numeric-date-macros",EXT_DATEUTILS),
- EXTENSION("numeric-time-macros",EXT_TIMEUTILS),
- EXTENSION("timestamp-macro",EXT_TIMESTAMP),
- EXTENSION("column-macro",EXT_COLUMN),
- EXTENSION("tpp-eval-macro",EXT_TPP_EVAL),
- EXTENSION("tpp-unique-macro",EXT_TPP_UNIQUE),
- EXTENSION("tpp-load-file-macro",EXT_TPP_LOAD_FILE),
- EXTENSION("tpp-counter-macro",EXT_TPP_COUNTER),
- EXTENSION("tpp-random-macro",EXT_TPP_RANDOM),
- EXTENSION("tpp-str-decompile-macro",EXT_TPP_STR_DECOMPILE),
- EXTENSION("tpp-str-substr-macro",EXT_TPP_STR_SUBSTR),
- EXTENSION("tpp-str-pack-macro",EXT_TPP_STR_PACK),
- EXTENSION("tpp-str-size-macro",EXT_TPP_STR_SIZE),
- EXTENSION("tpp-count-tokens-macro",EXT_TPP_COUNT_TOKENS),
- EXTENSION("dollars-in-identifiers",EXT_DOLLAR_IS_ALPHA),
- EXTENSION("assertions",EXT_ASSERTIONS),
- EXTENSION("canonical-system-headers",EXT_CANONICAL_HEADERS),
- EXTENSION("extensions-are-features",EXT_EXT_ARE_FEATURES),
- EXTENSION("fixed-length-integrals",EXT_MSVC_FIXED_INT),
- EXTENSION("dont-expand-defined",EXT_NO_EXPAND_DEFINED),
- EXTENSION("ifelse-in-expressions",EXT_IFELSE_IN_EXPR),
- EXTENSION("extended-identifiers",EXT_EXTENDED_IDENTS),
-#if TPP_CONFIG_GCCFUNC
- EXTENSION("builtins-in-expressions",EXT_BUILTIN_FUNCTIONS),
-#endif /* TPP_CONFIG_GCCFUNC */
-#if !TPP_CONFIG_MINMACRO
- EXTENSION("define-cpu-macros",EXT_CPU_MACROS),
- EXTENSION("define-system-macros",EXT_SYSTEM_MACROS),
- EXTENSION("define-utility-macros",EXT_UTILITY_MACROS),
-#endif /* !TPP_CONFIG_MINMACRO */
+#define EXTENSION(name,str,default)  {name,str,COMPILER_STRLEN(str)},
+#include "tpp-defs.inl"
 #undef EXTENSION
- {NULL,0,0},
+ {0,NULL,0},
 };
 
 #ifdef tolower
@@ -3929,6 +3880,18 @@ lookup_escaped_keyword(char const *name, size_t namelen,
  if (buf != stack_buf) free(buf);
  return result;
 }
+PUBLIC struct TPPKeyword *
+TPPLexer_LookupEscapedKeyword(char const *name, size_t namelen,
+                              int create_missing) {
+ struct TPPKeyword *result;
+ size_t namelen_real = wraplf_memlen(name,namelen);
+ if (namelen == namelen_real) {
+  result = TPPLexer_LookupKeyword(name,namelen,create_missing);
+ } else {
+  result = lookup_escaped_keyword(name,namelen,namelen_real,create_missing);
+ }
+ return result;
+}
 
 
 PUBLIC uint32_t
@@ -4127,6 +4090,8 @@ parse_multichar:
     else ch = (ch == '<' ? TOK_SHL : TOK_SHR);
     goto settok;
    }
+   /* Check for lower-greater: '<>' */
+   if (*forward == '>' && ch == '<' && (current.l_extokens&TPPLEXER_TOKEN_LOGT)) { ch = TOK_LOGT; goto settok_forward1; }
    if (*forward == '=') { ch = (ch == '<' ? TOK_LOWER_EQUAL : TOK_GREATER_EQUAL); goto settok_forward1; }
    if (HAVE_FEATURE_DIGRAPHS && ch == '<') {
     if (*forward == '%') { ch = '{'; goto settok_forward1; } /* [<%] --> [{] */
@@ -4320,7 +4285,8 @@ set_comment:
    goto settok;
 
   case '$':
-   if (!HAVE_EXTENSION_DOLLAR_IS_ALPHA) goto settok;
+   if ((current.l_extokens&TPPLEXER_TOKEN_DOLLAR) ||
+       !HAVE_EXTENSION_DOLLAR_IS_ALPHA) goto settok;
   default:
    if (tpp_isalpha(ch) || (HAVE_EXTENSION_EXTENDED_IDENTS && tpp_isansi(ch))) {
     struct TPPKeyword *kwd_entry;
@@ -5956,6 +5922,7 @@ err_substr:  TPPString_Decref(basestring);
 #undef BUILTIN_MACRO
     ;
 predef_macro:
+    if (!TPP_ISBUILTINMACRO(TOK)) break;
     predefined_macro->f_pos = predefined_macro->f_begin;
     pushfile((struct TPPFile *)predefined_macro);
     goto again;
@@ -7212,6 +7179,11 @@ PUBLIC int TPP_PrintComment(printer_t printer, void *closure) {
 #undef DECLARE_BUILTIN_FUNCTIONS
 #endif
 
+#ifdef _MSC_VER
+#pragma warning(push)
+#pragma warning(disable: 4065)
+#endif
+
 PRIVATE int get_builtin_argc(tok_t function) {
  int result = -1;
  switch (function) {
@@ -7224,6 +7196,23 @@ PRIVATE int get_builtin_argc(tok_t function) {
  }
  return result;
 }
+
+#ifdef _MSC_VER
+#pragma warning(pop)
+#endif
+
+#ifdef __GNUC__
+#define UNUSED_LABEL  __attribute__((__unused__))
+#else
+#define UNUSED_LABEL  /* nothing */
+#endif
+
+#ifdef _MSC_VER
+#pragma warning(push)
+#pragma warning(disable: 4065)
+#pragma warning(disable: 4102)
+#pragma warning(disable: 4702)
+#endif
 
 PRIVATE int EVAL_CALL
 eval_call_builtin(struct TPPConst *__restrict result) {
@@ -7282,16 +7271,20 @@ eval_call_builtin(struct TPPConst *__restrict result) {
    TPPConst_ZERO(result);
    break;
 #endif
-set_int_common:    result->c_kind = TPP_CONST_INTEGRAL; break;
-//set_float_common:  result->c_kind = TPP_CONST_FLOAT; break;
-set_string_common: result->c_kind = TPP_CONST_STRING; break;
+set_int_common:    UNUSED_LABEL; result->c_kind = TPP_CONST_INTEGRAL; break;
+set_float_common:  UNUSED_LABEL; result->c_kind = TPP_CONST_FLOAT; break;
+set_string_common: UNUSED_LABEL; result->c_kind = TPP_CONST_STRING; break;
  }
-success:     retval = 1;
-err_argv:    iter = argv+argc;
-err_iter:    while (iter-- != argv) TPPConst_Quit(iter);
-ret:         return retval;
-seterr_argv: TPPLexer_SetErr(); goto err_argv;
+success:     UNUSED_LABEL; retval = 1;
+err_argv:    UNUSED_LABEL; iter = argv+argc;
+err_iter:    UNUSED_LABEL; while (iter-- != argv) TPPConst_Quit(iter);
+ret:         UNUSED_LABEL; return retval;
+seterr_argv: UNUSED_LABEL; TPPLexer_SetErr(); goto err_argv;
 }
+#undef UNUSED_LABEL
+#ifdef _MSC_VER
+#pragma warning(pop)
+#endif
 #endif /* TPP_CONFIG_GCCFUNC */
 
 
@@ -8667,6 +8660,9 @@ PUBLIC int TPPLexer_Warn(int wnum, ...) {
          ifdef_slot->iss_file->f_name,ifdef_slot->iss_line+1);
    macro_name = NULL;
   } break;
+#ifdef TPP_USERLINES
+  TPP_USERLINES
+#endif
 
   default:
    WARNF(current.l_flags&TPPLEXER_FLAG_MSVC_MESSAGEFORMAT

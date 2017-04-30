@@ -80,8 +80,13 @@
 #define PREDEFINED_KWDFUNCTION(name,str,argc,expr)                KWD(name,str) BUILTIN_FUNCTION(name,argc,expr)
 #define PREDEFINED_FUNCTION_IF(name,if,argc,expr)                 PREDEFINED_KWDFUNCTION_IF(KWD_##name,#name,if,argc,expr)
 #define PREDEFINED_FUNCTION(name,argc,expr)                       PREDEFINED_KWDFUNCTION_IF(KWD_##name,#name,1,argc,expr)
+#if TPP_CONFIG_MINGCCFUNC < 2
 #define PREDEFINED_BUILTIN_KWDFUNCTION_IF(name,str,if,argc,expr)  KWD(name,str) KWD_FLAGS(name,(TPPLexer_HasExtension(EXT_BUILTIN_FUNCTIONS) && (if)) ? (TPP_KEYWORDFLAG_HAS_BUILTIN|TPP_KEYWORDFLAG_HAS_TPP_BUILTIN) : 0) BUILTIN_FUNCTION(name,(if) ? (int)(argc) : -1,expr)
 #define PREDEFINED_BUILTIN_KWDFUNCTION(name,str,argc,expr)        KWD(name,str) KWD_FLAGS(name,TPPLexer_HasExtension(EXT_BUILTIN_FUNCTIONS) ? (TPP_KEYWORDFLAG_HAS_BUILTIN|TPP_KEYWORDFLAG_HAS_TPP_BUILTIN) : 0) BUILTIN_FUNCTION(name,argc,expr)
+#else
+#define PREDEFINED_BUILTIN_KWDFUNCTION_IF(name,str,if,argc,expr)  KWD(name,str) KWD_FLAGS(name,(if) ? (TPP_KEYWORDFLAG_HAS_BUILTIN|TPP_KEYWORDFLAG_HAS_TPP_BUILTIN) : 0) BUILTIN_FUNCTION(name,(if) ? (int)(argc) : -1,expr)
+#define PREDEFINED_BUILTIN_KWDFUNCTION(name,str,argc,expr)        KWD(name,str) KWD_FLAGS(name,TPP_KEYWORDFLAG_HAS_BUILTIN|TPP_KEYWORDFLAG_HAS_TPP_BUILTIN) BUILTIN_FUNCTION(name,argc,expr)
+#endif
 #define PREDEFINED_BUILTIN_FUNCTION_IF(name,if,argc,expr)         PREDEFINED_BUILTIN_KWDFUNCTION_IF(KWD_##name,#name,if,argc,expr)
 #define PREDEFINED_BUILTIN_FUNCTION(name,argc,expr)               PREDEFINED_BUILTIN_KWDFUNCTION_IF(KWD_##name,#name,1,argc,expr)
 
@@ -170,8 +175,12 @@ DEF_K(tpp_set_keyword_flags)
 DEF_K(extension)
 
 /* Argument keywords for #pragma warning. */
+#ifndef TPP_CONFIG_USERDEFINED_KWD_PUSH
 DEF_K(push)
+#endif
+#ifndef TPP_CONFIG_USERDEFINED_KWD_POP
 DEF_K(pop)
+#endif
 DEF_K(disable)
 DEF_K(enable)
 DEF_K(suppress)
@@ -278,6 +287,7 @@ PREDEFINED_MACRO(__TPP_VERSION__,TPP_PP_STR(TPP_PREPROCESSOR_VERSION))
 #endif /* !TPP_CONFIG_MINMACRO */
 
 #if TPP_CONFIG_GCCFUNC
+#if !TPP_CONFIG_MINGCCFUNC
 /* Builtin functions recognized in expressions. */
 #ifdef DECLARE_BUILTIN_FUNCTIONS
 PRIVATE int_t tpp_ffs(int_t i) {
@@ -320,9 +330,16 @@ PRIVATE int_t tpp_parity(int_t i) {
  return result;
 }
 #endif
-/* Special functions that require designated preprocessor support. */
+#endif /* !TPP_CONFIG_MINGCCFUNC */
+
+#if TPP_CONFIG_MINGCCFUNC < 2
+/* Special functions that require designated preprocessor support.
+ * NOTE: These are not part of the min-gcc-func configuration. */
 HAS_BUILTIN_IF(__builtin_constant_p,TPPLexer_HasExtension(EXT_BUILTIN_FUNCTIONS))
 HAS_BUILTIN_IF(__builtin_choose_expr,TPPLexer_HasExtension(EXT_BUILTIN_FUNCTIONS))
+#endif
+
+#if !TPP_CONFIG_MINGCCFUNC
 /* Define regular builtin functions. */
 PREDEFINED_BUILTIN_FUNCTION(__builtin_ffs,1,{ RETURN_INT(tpp_ffs(INT(0)&((int)-1))); })
 PREDEFINED_BUILTIN_FUNCTION(__builtin_ffsl,1,{ RETURN_INT(tpp_ffs(INT(0)&((long)-1))); })
@@ -397,6 +414,7 @@ PREDEFINED_BUILTIN_FUNCTION(__builtin_isxdigit,1,{ RETURN_INT(isxdigit((int)INT(
 PREDEFINED_BUILTIN_FUNCTION(__builtin_toascii,1,{ RETURN_INT(toascii((int)INT(0))); })
 PREDEFINED_BUILTIN_FUNCTION(__builtin_tolower,1,{ RETURN_INT(tolower((int)INT(0))); })
 PREDEFINED_BUILTIN_FUNCTION(__builtin_toupper,1,{ RETURN_INT(toupper((int)INT(0))); })
+#endif /* !TPP_CONFIG_MINGCCFUNC */
 #endif /* TPP_CONFIG_GCCFUNC */
 
 /* Declare builtin extensions. */
@@ -450,6 +468,7 @@ EXTENSION(EXT_MSVC_FIXED_INT,   "fixed-length-integrals",       1)
 EXTENSION(EXT_NO_EXPAND_DEFINED,"dont-expand-defined",          1)
 EXTENSION(EXT_IFELSE_IN_EXPR,   "ifelse-in-expressions",        1)
 EXTENSION(EXT_EXTENDED_IDENTS,  "extended-identifiers",         1)
+#if TPP_CONFIG_MINGCCFUNC < 2
 #if TPP_CONFIG_GCCFUNC
 EXTENSION(EXT_BUILTIN_FUNCTIONS,"builtins-in-expressions",      1)
 #endif /* TPP_CONFIG_GCCFUNC */
@@ -458,6 +477,7 @@ EXTENSION(EXT_CPU_MACROS,       "define-cpu-macros",            1)
 EXTENSION(EXT_SYSTEM_MACROS,    "define-system-macros",         1)
 EXTENSION(EXT_UTILITY_MACROS,   "define-utility-macros",        1)
 #endif /* !TPP_CONFIG_MINMACRO */
+#endif
 
 
 /* Declare builtin warning groups. */
@@ -476,6 +496,7 @@ WGROUP(WG_TRIGRAPHS,           "trigraphs",           WSTATE_DISABLE)
 WGROUP(WG_EXPANSION_TO_DEFINED,"expansion-to-defined",WSTATE_DISABLE)
 WGROUP(WG_DIRECTIVE,           "directive",           WSTATE_ERROR)
 WGROUP(WG_QUALITY,             "quality",             WSTATE_ERROR)
+WGROUP(WG_DEPRECATED,          "deprecated",          WSTATE_ERROR)
 
 /* NOTE: These warnings are arranged to mirror those from the old TPP. */
 /* 0*/DEF_WARNING(W_EXPECTED_KEYWORD_AFTER_DEFINE,(WG_SYNTAX),WSTATE_WARN,WARNF("Expected keyword after #define, but got " TOK_S,TOK_A)) /*< OLD(TPPWarn_ExpectedKeywordAfterDefine). */
@@ -589,7 +610,7 @@ WGROUP(WG_QUALITY,             "quality",             WSTATE_ERROR)
 /*57*/WARNING(W_UNUSED_14,(WG_VALUE),WSTATE_DISABLE) /*< OLD(TPPWarn_ExpectedRParenAfterTPPStrDecompile). */
 /*58*/DEF_WARNING(W_EXPECTED_LPAREN,(WG_SYNTAX),WSTATE_WARN,WARNF("Expected '(', but got " TOK_S,TOK_A)) /*< OLD(TPPWarn_ExpectedLParen). */
 /*59*/DEF_WARNING(W_EXPECTED_RPAREN,(WG_SYNTAX),WSTATE_WARN,WARNF("Expected ')', but got " TOK_S,TOK_A)) /*< OLD(TPPWarn_ExpectedRParen). */
-/*60*/DEF_WARNING(W_DEPRECATED_IDENTIFIER,(WG_USER),WSTATE_WARN,WARNF("DEPRECATED : '%s'",KWDNAME())) /*< [struct TPPKeyword *] OLD(TPPWarn_DeprecatedKeyword). */
+/*60*/DEF_WARNING(W_DEPRECATED_IDENTIFIER,(WG_DEPRECATED),WSTATE_WARN,WARNF("DEPRECATED : '%s'",KWDNAME())) /*< [struct TPPKeyword *] OLD(TPPWarn_DeprecatedKeyword). */
 /*61*/DEF_WARNING(W_NONPARTABLE_FILENAME_CASING,(WG_ENVIRON),WSTATE_WARN,{
  /* [char const *,char const *,size_t,char const *]. (path,wrong_begin,wrong_size,corrent_begin)
   *  OLD(TPPWarn_InvalidPathCasing). */
