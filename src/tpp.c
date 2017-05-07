@@ -5136,7 +5136,7 @@ PRIVATE char const date_month_names[12][4] = {
 PRIVATE char const date_wday_names[7][4] = {
  "Sun","Mon","Tue","Wed","Thu","Fri","Sat"};
 
-#if !TPP_CONFIG_MINMACRO
+#if !TPP_CONFIG_MINMACRO || TPP_CONFIG_MINGCCFUNC >= 2
 static char const *const intc_suffix[] = {
  /* __INT8_C    */"i8\0",
  /* __INT16_C   */"i16\0",
@@ -5928,7 +5928,7 @@ predef_macro:
     goto again;
    } break;
 
-#if !TPP_CONFIG_MINMACRO
+#if !TPP_CONFIG_MINMACRO || TPP_CONFIG_MINGCCFUNC >= 2
    { /* Builtin macro functions for generating integral constants. */
     char const *suffix;
     struct TPPString *argstring;
@@ -5939,7 +5939,9 @@ predef_macro:
    case KWD___INT32_C:  case KWD___UINT32_C:
    case KWD___INT64_C:  case KWD___UINT64_C:
    case KWD___INTMAX_C: case KWD___UINTMAX_C:
+#ifdef HAVE_EXTENSION_UTILITY_MACROS
     if (!HAVE_EXTENSION_UTILITY_MACROS) break;
+#endif
     suffix = intc_suffix[TOK-KWD___INT8_C];
     if (!HAVE_EXTENSION_MSVC_FIXED_INT) suffix += strlen(suffix)+1;
     pushf();
@@ -7025,7 +7027,7 @@ PUBLIC int TPP_Atoi(int_t *__restrict pint) {
   else break;
   if unlikely(more >= numsys) break;
   new_intval = intval*numsys+more;
-  if unlikely(new_intval < intval) {
+  if unlikely((uint64_t)new_intval < (uint64_t)intval) {
    /* Warn about overflow: */
    if unlikely(!TPPLexer_Warn(W_INTEGRAL_OVERFLOW,intval,new_intval)) goto err;
   }

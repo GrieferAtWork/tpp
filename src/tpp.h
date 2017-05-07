@@ -1066,13 +1066,16 @@ TPP_LOCAL TPP(col_t) TPPLexer_COLUMN(void) { struct TPPFile *f = TPPLexer_Textfi
 
 /* Predefined set of extension tokens for some languages.
  * WARNING: Most of these languages will also need additional tweaks to other flags. */
-#define TPPLEXER_TOKEN_LANG_C       (TPPLEXER_TOKEN_ARROW)
+#define TPPLEXER_TOKEN_LANG_C       (TPPLEXER_TOKEN_ARROW|TPPLEXER_TOKEN_C_COMMENT|\
+                                     TPPLEXER_TOKEN_CPP_COMMENT)
 #define TPPLEXER_TOKEN_LANG_CPP     (TPPLEXER_TOKEN_COLLONCOLLON|TPPLEXER_TOKEN_ARROW|\
-                                     TPPLEXER_TOKEN_ARROWSTAR|TPPLEXER_TOKEN_DOTSTAR)
-#define TPPLEXER_TOKEN_LANG_JAVA    (TPPLEXER_TOKEN_NONE)
+                                     TPPLEXER_TOKEN_ARROWSTAR|TPPLEXER_TOKEN_DOTSTAR|\
+                                     TPPLEXER_TOKEN_C_COMMENT|TPPLEXER_TOKEN_CPP_COMMENT)
+#define TPPLEXER_TOKEN_LANG_JAVA    (TPPLEXER_TOKEN_C_COMMENT|TPPLEXER_TOKEN_CPP_COMMENT)
 #define TPPLEXER_TOKEN_LANG_DEEMON  (TPPLEXER_TOKEN_ROOFROOF|TPPLEXER_TOKEN_COLLONCOLLON|\
                                      TPPLEXER_TOKEN_COLLONASSIGN|TPPLEXER_TOKEN_STARSTAR|\
-                                     TPPLEXER_TOKEN_ARROW)
+                                     TPPLEXER_TOKEN_ARROW|TPPLEXER_TOKEN_C_COMMENT|\
+                                     TPPLEXER_TOKEN_CPP_COMMENT)
 
 struct TPPLexer {
  struct TPPToken       l_token;      /*< The current token. */
