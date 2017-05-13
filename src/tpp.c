@@ -8620,7 +8620,7 @@ PUBLIC int TPPLexer_Warn(int wnum, ...) {
  int macro_name_size,behavior; wgroup_t const *wgroups;
  struct TPPString *temp_string = NULL;
  unsigned int wid;
- if (current.l_flags&TPPLEXER_FLAG_ERROR) return 0; /* Already in an error-state. */
+ //if (current.l_flags&TPPLEXER_FLAG_ERROR) return 0; /* Already in an error-state. */
  ++current.l_warncount; /* Always count warnings, even if they'll be dismissed. */
  if (current.l_flags&TPPLEXER_FLAG_NO_WARNINGS) return 1; /* Warnings are disabled. */
  /* Check for per-warning behavior, as configured by the current lexer. */

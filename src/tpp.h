@@ -121,7 +121,7 @@
 // [__TPP_STR_SUBSTR]    __TPP_STR_SUBSTR("foo",x,[y=1])             /*< Returns 'y' characters from the given string, escaped and surrounded by '\"', starting at index 'x'. */
 // [__TPP_STR_PACK]      __TPP_STR_PACK(0x13 0x10 0x43)              /*< Returns a string consisting of the string of packed integral expressions, where each expression describes the next character (The example is equivalent to "\x13\x10\x43"; aka. "\r\nC"). */
 // [__TPP_STR_SIZE]      __TPP_STR_SIZE("foo")                       /*< Returns the integral representation for the length of the given string (equivalent to '__TPP_EVAL(#(str))' and only kept for backwards-compatibility). */
-// [__TPP_UNIQUE]        __TPP_UNIQUE(keyword)                       /*< A unique integral number associated with 'keyword'; new keywords have greater numbers. */
+// [__TPP_UNIQUE]        __TPP_UNIQUE(keyword)                       /*< A unique integral number associated with 'keyword', that remains consistent within the same token stream; new keywords have greater numbers. */
 // [__TPP_COUNT_TOKENS]  __TPP_COUNT_TOKENS("->*")                   /*< Expand to the integral representation of the number of tokens within the given string (NOTE: tokens inside the string are not macro-expanded). */
 // [...]                 Various cpu-specific macros, such as '__i386__' or '__arm__'
 // [...]                 Various system-specific macros, such as '_WIN32' or '__unix__'
