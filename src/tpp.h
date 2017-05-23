@@ -330,6 +330,7 @@ struct TPPTextFile {
                                           *  >> #endif
                                           */
 #define TPP_TEXTFILE_FLAG_SYSHEADER 0x02 /*< This file is a system-header and all non-error warnings are suppressed. */
+#define TPP_TEXTFILE_FLAG_INTERNAL  0x80 /*< This file is internal, meaning it shouldn't ~really~ represent a line/col number. */
  unsigned char            f_flags;       /*< A set of 'TPP_TEXTFILE_FLAG_*' */
  TPP(encoding_t)          f_encoding;    /*< Encoding determined to-be used by this file. */
  char                     f_padding[1];  /*< Padding data... */
@@ -1048,6 +1049,8 @@ TPP_LOCAL TPP(col_t) TPPLexer_COLUMN(void) { struct TPPFile *f = TPPLexer_Textfi
  * WARNING: Most of these languages will also need additional tweaks to other flags. */
 #define TPPLEXER_TOKEN_LANG_C       (TPPLEXER_TOKEN_ARROW|TPPLEXER_TOKEN_C_COMMENT|\
                                      TPPLEXER_TOKEN_CPP_COMMENT)
+#define TPPLEXER_TOKEN_LANG_ASM     (TPPLEXER_TOKEN_DOLLAR|TPPLEXER_TOKEN_LOGT|\
+                                     TPPLEXER_TOKEN_C_COMMENT|TPPLEXER_TOKEN_CPP_COMMENT)
 #define TPPLEXER_TOKEN_LANG_CPP     (TPPLEXER_TOKEN_COLLONCOLLON|TPPLEXER_TOKEN_ARROW|\
                                      TPPLEXER_TOKEN_ARROWSTAR|TPPLEXER_TOKEN_DOTSTAR|\
                                      TPPLEXER_TOKEN_C_COMMENT|TPPLEXER_TOKEN_CPP_COMMENT)
