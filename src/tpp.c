@@ -3575,7 +3575,8 @@ TPPLexer_LookupKeywordID(tok_t id) {
 
 PRIVATE char *
 do_fix_filename(char *filename, size_t *pfilename_size) {
- char *text_iter,*text_end,*slash; size_t filename_size;
+ char *text_iter,*text_end,*slash,*base;
+ size_t filename_size;
  filename_size = *pfilename_size;
  /* General filename sanitizations. */
  while (tpp_isspace(*filename) && filename_size) ++filename,--filename_size;
@@ -3617,20 +3618,17 @@ do_fix_filename(char *filename, size_t *pfilename_size) {
  }
 
  /* Resolve . and .. references if possible. */
- for (text_iter = filename;;) {
+ for (text_iter = base = filename;;) {
   size_t partsize;
   slash = strchr(text_iter,SEP);
   if (!slash) slash = text_end;
   partsize = (size_t)(slash-text_iter);
   if (partsize >= 1 && *text_iter == '.') switch (partsize) {
-   case 2: if (text_iter[1] == '.' && (text_iter-2) > filename) {
+   case 2: if (text_iter[1] == '.' && (text_iter-2) > base) {
     char *prev_folder_start;
     /* Try to remove a '..' path reference. */
-    prev_folder_start = (char *)memrchr(filename,SEP,(size_t)((text_iter-2)-filename));
-    if (!prev_folder_start) {
-     prev_folder_start = filename;
-     if (slash != text_end) ++slash;
-    }
+    prev_folder_start = (char *)memrchr(base,SEP,(size_t)((text_iter-2)-base));
+    if (!prev_folder_start) { base = slash+1; break; }
     /* Move everything from 'slash' to 'prev_folder_start'. */
     if (text_end == slash) *prev_folder_start = '\0';
     else memmove(prev_folder_start,slash,(size_t)((text_end-slash)+1)*sizeof(char));
@@ -8860,7 +8858,7 @@ PRIVATE void tpp_warnf(char const *fmt, ...) {
 #endif
 
 PUBLIC int TPPLexer_Warn(int wnum, ...) {
- va_list args; char const *used_filename,*true_filename;
+ va_list args; char const *true_filename;
  char const *macro_name = NULL; struct TPPKeyword *kwd;
  int macro_name_size,behavior; wgroup_t const *wgroups;
  struct TPPString *temp_string = NULL;
@@ -8893,15 +8891,12 @@ PUBLIC int TPPLexer_Warn(int wnum, ...) {
 #define TOK_NAME()   (kwd = TPPLexer_LookupKeywordID(ARG(tok_t)),kwd ? kwd->k_name : "??" "?")
 #define CONST_STR()  (temp_string = TPPConst_ToString(ARG(struct TPPConst *)),temp_string ? temp_string->s_text : NULL)
  effective_file = TPPLexer_Textfile();
- used_filename = TPPFile_Filename(effective_file,NULL);
  if (token.t_file->f_kind == TPPFILE_KIND_MACRO) {
   macro_name = token.t_file->f_name;
   macro_name_size = (int)token.t_file->f_namesize;
   effective_file = TPPLexer_Current->l_token.t_file;
-  true_filename = TPPFile_Filename(effective_file,NULL);
- } else {
-  true_filename = used_filename;
  }
+ true_filename = TPPFile_Filename(effective_file,NULL);
  TPP_TEXTFILE_FLAG_INTERNAL;
  switch (wnum) {
   { /* Special case for #if without #endif (display file/line of the #if) */
@@ -8975,7 +8970,8 @@ PUBLIC int TPPLexer_Warn(int wnum, ...) {
  if (macro_name) {
   WARNF(current.l_flags&TPPLEXER_FLAG_MSVC_MESSAGEFORMAT
         ? "%s(%d,%d) : " : "%s:%d:%d: ",
-        used_filename,TPPLexer_LINE()+1,TPPLexer_COLUMN()+1);
+        TPPLexer_FILE(NULL),TPPLexer_LINE()+1,
+        TPPLexer_COLUMN()+1);
   WARNF("See reference to effective code location\n");
  }
  fflush(stderr);
