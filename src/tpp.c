@@ -8838,7 +8838,7 @@ err:    return 0;
 #pragma warning(disable: 4701)
 #endif
 
-#ifdef _WIN32
+#if TPP_CONFIG_DEBUG && (defined(_WIN32) || defined(WIN32))
 PRIVATE void tpp_warnf(char const *fmt, ...) {
  char buffer[1024];
  va_list args;
@@ -8922,8 +8922,7 @@ PUBLIC int TPPLexer_Warn(int wnum, ...) {
    if (effective_file->f_kind == TPPFILE_KIND_TEXT &&
       (effective_file->f_textfile.f_flags&TPP_TEXTFILE_FLAG_INTERNAL)) {
     /* Don't display line/col information! */
-    WARNF(current.l_flags&TPPLEXER_FLAG_MSVC_MESSAGEFORMAT
-          ? "%s : " : "%s: ",true_filename);
+    WARNF("%s: ",true_filename);
    } else
 #if 1
    /* For better compatibility with custom parsers,
