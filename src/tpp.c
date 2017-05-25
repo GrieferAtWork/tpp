@@ -552,8 +552,8 @@ funop_putarg(funop_t *piter, size_t arg) {
 PUBLIC hash_t
 TPP_Hashof(void const *data, size_t size) {
  hash_t result = 1;
- char const *iter,*end;
- end = (iter = (char const *)data)+size;
+ unsigned char const *iter,*end;
+ end = (iter = (unsigned char const *)data)+size;
  for (; iter != end; ++iter)
   result = result*263+*iter;
  return result;
@@ -842,7 +842,7 @@ PUBLIC struct TPPFile TPPFile_Empty = {
  /* f_refcnt                 */0x80000000,
  /* f_kind                   */TPPFILE_KIND_TEXT,
  /* f_prev                   */NULL,
- /* f_name                   */"<NULL>",
+ /* f_name                   */(char *)"<NULL>",
  /* f_namesize               */6,
 #if __SIZEOF_SIZE_T__ == 4
  /* f_namehash               */2699259396lu,
@@ -8894,11 +8894,19 @@ PUBLIC int TPPLexer_Warn(int wnum, ...) {
 #define KWDNAME()    (ARG(struct TPPKeyword *)->k_name)
 #define TOK_NAME()   (kwd = TPPLexer_LookupKeywordID(ARG(tok_t)),kwd ? kwd->k_name : "??" "?")
 #define CONST_STR()  (temp_string = TPPConst_ToString(ARG(struct TPPConst *)),temp_string ? temp_string->s_text : NULL)
- effective_file = TPPLexer_Textfile();
- if (token.t_file->f_kind == TPPFILE_KIND_MACRO) {
-  macro_name = token.t_file->f_name;
-  macro_name_size = (int)token.t_file->f_namesize;
-  effective_file = TPPLexer_Current->l_token.t_file;
+ {
+  struct TPPFile *macro_file;
+  effective_file = NULL;
+  macro_file = token.t_file;
+  while (macro_file->f_kind == TPPFILE_KIND_EXPLICIT &&
+         macro_file->f_prev) macro_file = macro_file->f_prev;
+  if (macro_file->f_kind == TPPFILE_KIND_MACRO) {
+   macro_name = macro_file->f_name;
+   macro_name_size = (int)macro_file->f_namesize;
+   effective_file = macro_file;
+  } else {
+   effective_file = TPPLexer_Textfile();
+  }
  }
  true_filename = TPPFile_Filename(effective_file,NULL);
  TPP_TEXTFILE_FLAG_INTERNAL;
