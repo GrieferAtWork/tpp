@@ -1074,6 +1074,8 @@ TPP_LOCAL TPP(col_t) TPPLexer_COLUMN(void) { struct TPPFile *f = TPPLexer_Textfi
 #define TPPLEXER_TOKEN_ANGLE3                0x00001000 /*< Enable recognition of '<<<' and '>>>' tokens. */
 #define TPPLEXER_TOKEN_ANGLE3_EQUAL          0x00002000 /*< Enable recognition of '<<<=' and '>>>=' tokens. */
 #define TPPLEXER_TOKEN_LOGT                  0x00004000 /*< Enable recognition of '<>' tokens. */
+#define TPPLEXER_TOKEN_EQUALBINOP            0x00008000 /*< Enable recognition of '=+', '=-', '=*', '=/', '=%', '=&', '=|', '=^', '=<<', '=>>', '=>>>', '=<<<', '=@' and '=**' tokens (NOTE: These are all aliasing the regular inplace versions).
+                                                         *  NOTE: Special token such as '=@' or '=<<<' are only available when other token extensions are enabled as well! */
 #define TPPLEXER_TOKEN_DOLLAR                0x80000000 /*< Recognize '$' as its own token (Supersedes 'EXT_DOLLAR_IS_ALPHA'). */
 #define TPPLEXER_TOKEN_DEFAULT               0x0fffffff /*< Default set of extension tokens (enable all). */
 
@@ -1137,12 +1139,15 @@ TPPFUN struct TPPLexer *TPPLexer_Current;
 #endif
 
 /* Initialize/Finalize the given TPP Lexer object.
+ * NOTE: These functions can (obviously) be called when
+ *      'TPPLexer_Current' is NULL, or not initialized.
  * @return: 1: Successfully initialized the given lexer.
  * @return: 0: Not enough available memory to setup builtin keywords. */
 TPPFUN int  TPPLexer_Init(struct TPPLexer *__restrict self);
 TPPFUN void TPPLexer_Quit(struct TPPLexer *__restrict self);
 
 /* Reset certain parts of the lexer.
+ * NOTE: This function can be called when 'TPPLexer_Current' is NULL, or not initialized.
  * @param: flags: Set of 'TPPLEXER_RESET_*' */
 TPPFUN void TPPLexer_Reset(struct TPPLexer *__restrict self, uint32_t flags);
 #define TPPLEXER_RESET_NONE       0x00000000
@@ -1451,6 +1456,9 @@ TPPFUN int TPP_PrintToken(TPP(printer_t) printer, void *closure);
 TPPFUN int TPP_PrintComment(TPP(printer_t) printer, void *closure);
 
 
+/* Helper macros to initialize/finalize the global TPP context.
+ * NOTE: These macros can (obviously) be called when
+ *      'TPPLexer_Current' is NULL, or not initialized. */
 #if TPP_CONFIG_ONELEXER
 #define TPP_INITIALIZE() TPPLexer_Init(&TPPLexer_Global)
 #define TPP_FINALIZE()   TPPLexer_Quit(&TPPLexer_Global)

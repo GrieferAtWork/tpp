@@ -96,11 +96,16 @@
 #if defined(__CYGWIN__) || defined(__MINGW32__)
 #include <Windows.h>
 #endif
-#include <alloca.h>
 #include <endian.h>
 #include <fcntl.h>
 #include <unistd.h>
 #define stream_close(fd) close(fd)
+#endif
+
+#ifdef _MSC_VER
+#include <malloc.h>
+#else
+#include <alloca.h>
 #endif
 
 #ifdef _MSC_VER
@@ -1795,12 +1800,12 @@ TPP_Unescape(char *buf, char const *data, size_t size) {
       unsigned char partval;
       if (iter == end) goto abort_hex;
       ch = *iter;
-           if (ch >= '0' && ch <= '9') partval = ch-'0';
-      else if (ch >= 'a' && ch <= 'f') partval = ch-'a';
-      else if (ch >= 'A' && ch <= 'F') partval = ch-'A';
+           if (ch >= '0' && ch <= '9') partval = (unsigned char)(ch-'0');
+      else if (ch >= 'a' && ch <= 'f') partval = (unsigned char)(ch-'a');
+      else if (ch >= 'A' && ch <= 'F') partval = (unsigned char)(ch-'A');
       else if (!ith) {abort_hex: iter = start_iter; goto def_putch; }
       else break;
-      val = (val << 4)|partval;
+      val = (unsigned char)((val << 4)|partval);
       ++iter;
      }
      *buf++ = val;
@@ -1814,11 +1819,11 @@ TPP_Unescape(char *buf, char const *data, size_t size) {
     default:
      if (ch >= '0' && ch <= '7') {
       char *maxend;
-      val = ch-'0';
+      val = (unsigned char)(ch-'0');
       if ((maxend = iter+2) > end) maxend = end;
       while (iter != maxend &&
             (ch = *iter,ch >= '0' && ch <= '7')
-             ) val = (val << 3)|(ch-'0'),++iter;
+             ) val = (unsigned char)((val << 3)|(ch-'0')),++iter;
       *buf++ = val;
      } else {
 def_putch:
@@ -1916,15 +1921,15 @@ escape_ch:
    default:
     if (ch < 32) {
      *buf++ = '\\';
-     if (ch >= 010) *buf++ = '0'+(ch/010);
-     *buf++ = '0'+(ch%010);
+     if (ch >= 010) *buf++ = (char)('0'+(ch/010));
+     *buf++ = (char)('0'+(ch%010));
     } else if (ch >= 127) {
      *buf++ = '\\';
      *buf++ = 'x';
-     temp = (ch & 0xf0) >> 4;
-     *buf++ = temp >= 10 ? 'A'+(temp-10) : '0'+temp;
-     temp = (ch & 0x0f);
-     *buf++ = temp >= 10 ? 'A'+(temp-10) : '0'+temp;
+     temp = (unsigned char)((ch & 0xf0) >> 4);
+     *buf++ = (char)(temp >= 10 ? 'A'+(temp-10) : '0'+temp);
+     temp = (unsigned char)(ch & 0x0f);
+     *buf++ = (char)(temp >= 10 ? 'A'+(temp-10) : '0'+temp);
     } else {
      *buf++ = (char)ch;
     }
@@ -1943,7 +1948,7 @@ TPP_SizeofEscape(char const *data, size_t size) {
   ch = *iter;
   switch (ch) {
    case '\033':
-    result += HAVE_EXTENSION_STR_E ? 1 : 2; /* '\e' vs. '\33' */
+    result += HAVE_EXTENSION_STR_E ? 1u : 2u; /* '\e' vs. '\33' */
     break;
    case '\a': case '\b': case '\f':
    case '\n': case '\r': case '\t':
@@ -1952,7 +1957,7 @@ TPP_SizeofEscape(char const *data, size_t size) {
     break;
    default:
     if (ch < 32) {
-     result += ch >= 010 ? 2 : 1;
+     result += ch >= 010 ? 2u : 1u;
     } else if (ch >= 127) {
      result += 3;
     }
@@ -1967,7 +1972,7 @@ TPP_Itos(char *buf, int_t i) {
  char *result;
  if (i < 0) *buf++ = '-',i = -i;
  result = (buf += TPP_SizeofItos(i));
- do *--buf = '0'+(i % 10);
+ do *--buf = (char)('0'+(i % 10));
  while ((i /= 10) != 0);
  return result;
 }
@@ -2210,7 +2215,7 @@ strop_normal:
      *       as the TPP equivalent for:
      *    >> #define is_defined(x)  defined(#!x)
      *       With that in mind, implement that extension here.
-     * NOTE: I thought GCC did this and think I even remember seeing something use it (may the linux kernel?)
+     * NOTE: I thought GCC did this and think I even remember seeing something use it (maybe the linux kernel?)
      *       Anyways... ' guess that's Mandella for ya (And I'm from a parallel reality where GCC did do this!)
      *    >> I still implemented this as an extension though,
      *       simply because it feels like a good idea, that may
@@ -2387,7 +2392,7 @@ add_macro_argument:
     new_arginfo_v->ai_id = argument_name;
 #if TPP_CONFIG_DEBUG
     if (argument_name == KWD___VA_ARGS__) {
-     new_arginfo_v->ai_name     = "__VA_ARGS__";
+     new_arginfo_v->ai_name     = (char *)"__VA_ARGS__";
      new_arginfo_v->ai_namesize = 11;
     } else {
      assert(token.t_kwd);
@@ -3049,7 +3054,7 @@ PRIVATE int set_wstate(int wid, wstate_t state) {
  while (iter != end && iter->wse_wid < wid) ++iter;
  assert(iter == end || iter->wse_wid >= wid);
  bitset_byte = &curstate->ws_state[wid/(8/TPP_WARNING_BITS)];
- byte_shift  = (wid%(8/TPP_WARNING_BITS))*TPP_WARNING_BITS;
+ byte_shift  = (uint8_t)((wid%(8/TPP_WARNING_BITS))*TPP_WARNING_BITS);
  assert(byte_shift == 0 || byte_shift == 2 ||
         byte_shift == 4 || byte_shift == 6);
  if (state == WSTATE_SUPPRESS) {
@@ -3126,7 +3131,7 @@ PUBLIC wstate_t TPPLexer_GetWarning(int wnum) {
  assert((curstate == &current.l_warnings.w_basestate) ==
         (curstate->ws_prev == NULL));
  bitset_byte = curstate->ws_state[wid/(8/TPP_WARNING_BITS)];
- byte_shift  = (wid%(8/TPP_WARNING_BITS))*TPP_WARNING_BITS;
+ byte_shift  = (uint8_t)((wid%(8/TPP_WARNING_BITS))*TPP_WARNING_BITS);
  return (wstate_t)((bitset_byte >> byte_shift)&3);
 }
 PUBLIC int TPPLexer_SetWarning(int wnum, wstate_t state) {
@@ -3154,7 +3159,7 @@ PRIVATE wstate_t do_invoke_wid(int wid) {
         (curstate->ws_prev == NULL));
  assert(wid < TPP_WARNING_TOTAL);
  bitset_byte = &curstate->ws_state[wid/(8/TPP_WARNING_BITS)];
- byte_shift  = (wid%(8/TPP_WARNING_BITS))*TPP_WARNING_BITS;
+ byte_shift  = (uint8_t)((wid%(8/TPP_WARNING_BITS))*TPP_WARNING_BITS);
  assert(byte_shift == 0 || byte_shift == 2 ||
         byte_shift == 4 || byte_shift == 6);
  state = (wstate_t)((*bitset_byte >> byte_shift) & 3);
@@ -3522,7 +3527,7 @@ PRIVATE struct tpp_extension const tpp_extensions[] = {
 #ifdef tolower
 #undef tolower
 #endif
-#define tolower(c) ((c) >= 'A' && (c) <= 'Z' ? ((c)+('a'-'A')) : (c))
+#define tolower(c) (char)((c) >= 'A' && (c) <= 'Z' ? ((c)+('a'-'A')) : (c))
 
 #if 0
 /* Fuzzy match two strings */
@@ -4268,7 +4273,7 @@ again:
  switch (self->k_id) {
   /* Lookup dynamic flags. */
 #ifndef __INTELLISENSE__
-#define KWD_FLAGS(name,flags)  case name: result = flags; break;
+#define KWD_FLAGS(name,flags)  case name: result = (uint32_t)(flags); break;
 #include "tpp-defs.inl"
 #undef KWD_FLAGS
 #endif
@@ -4466,7 +4471,49 @@ parse_multichar:
 
   case '=':
    if (*forward == '=') { ch = TOK_EQUAL; goto settok_forward1; }
-   goto settok;
+   if (!(current.l_extokens&TPPLEXER_TOKEN_EQUALBINOP)) goto settok;
+   /*< '=<<', '=>>', '=>>>', '=<<<', '=@' and '=**' */
+   switch (*forward) {
+   case '+': ch = TOK_ADD_EQUAL; break;
+   case '-': ch = TOK_SUB_EQUAL; break;
+   case '/': ch = TOK_DIV_EQUAL; break;
+   case '%': ch = TOK_MOD_EQUAL; break;
+   case '&': ch = TOK_AND_EQUAL; break;
+   case '|': ch = TOK_OR_EQUAL; break;
+   case '^': ch = TOK_XOR_EQUAL; break;
+   case '*':
+    if (current.l_extokens&TPPLEXER_TOKEN_STARSTAR) {
+     char *forward2 = forward+1;
+     while (SKIP_WRAPLF(forward2,end));
+     if (*forward2 == '*') { iter = ++forward2; ch = TOK_POW_EQUAL; goto settok; }
+    }
+    ch = TOK_MUL_EQUAL;
+    break;
+   case '@': if (!(current.l_extokens&TPPLEXER_TOKEN_ATEQUAL)) goto settok; ch = TOK_XOR_EQUAL; break;
+   {
+    char *forward2;
+   case '<': case '>':
+    forward2 = forward+1;
+    while (SKIP_WRAPLF(forward2,end));
+    if (*forward2 == *forward) {
+     iter = ++forward2;
+     ch = (*forward2 == '<') ? TOK_LANGLE2_EQUAL : TOK_RANGLE2_EQUAL;
+     if (current.l_extokens&TPPLEXER_TOKEN_ANGLE3_EQUAL) {
+      /* Check for 3-range inplace tokens. */
+      while (SKIP_WRAPLF(forward2,end));
+      if (*forward2 == ch) {
+       iter = ++forward2;
+       ch = (ch == '<') ? TOK_LANGLE3_EQUAL : TOK_RANGLE3_EQUAL;
+      }
+     }
+    }
+    goto settok;
+   } break;
+
+   default: goto settok;
+   }
+   goto settok_forward1;
+   
 
   case '!':
    if (*forward == '=') { ch = TOK_NOT_EQUAL; goto settok_forward1; }
@@ -4883,7 +4930,7 @@ PRIVATE int parse_include_string(char **begin, char **end) {
   if (!*end) *end = token.t_end;
   else {
    token.t_file->f_pos = *end;
-   *--end;
+   --end;
   }
   assert(*end > *begin);
  } else {
@@ -6215,7 +6262,7 @@ err_substr:  TPPString_Decref(basestring);
      subindex = (size_t)val.c_data.c_int;
     }
     if (TOK != ',') {
-     sublen = basestring->s_size ? 1 : 0;
+     sublen = basestring->s_size ? 1u : 0u;
     } else {
      yield_fetch();
      if unlikely(!TPPLexer_Eval(&val)) goto err_substrf;
@@ -6988,8 +7035,8 @@ at_next_non_whitespace:
                   ) ++paren_recursion[RECURSION_BRACE];
               break;
     case TOK_LOWER_EQUAL:   /* '<=' */
-    case TOK_SHL_EQUAL:     /* '<<=' */
-    case TOK_LANGLE3_EQUAL: /* '<<<=' */
+    case TOK_SHL_EQUAL:     /* '<<=' / '=<<' */
+    case TOK_LANGLE3_EQUAL: /* '<<<=' / '=<<<' */
      if (calling_conv >= RECURSION_ANGLE &&
         !paren_recursion[RECURSION_PAREN] &&
         !paren_recursion[RECURSION_BRACKET] &&
@@ -6997,7 +7044,9 @@ at_next_non_whitespace:
       paren_recursion[RECURSION_ANGLE] += TOK == TOK_LANGLE3_EQUAL ? 3 :
                                           TOK == TOK_SHL_EQUAL ? 2 : 1;
       arguments_file->f_pos = token.t_end-1;
-      assert(*arguments_file->f_pos == '=');
+      assert(*arguments_file->f_pos == '=' ||
+             *arguments_file->f_pos == '<');
+      if (*arguments_file->f_pos == '<') ++arguments_file->f_pos;
      }
      break;
     case '<':         /* '<' */
@@ -7021,11 +7070,11 @@ at_next_non_whitespace:
                                 paren_recursion[RECURSION_BRACKET] ||
                                 paren_recursion[RECURSION_PAREN]) break;
                             --paren_recursion[RECURSION_BRACE]; }
-     if (FALSE) { case TOK_SHR:
-                  case TOK_SHR_EQUAL:
-                  case TOK_GREATER_EQUAL:
-                  case TOK_RANGLE3:
-                  case TOK_RANGLE3_EQUAL:
+     if (FALSE) { case TOK_SHR:           /* '>>' */
+                  case TOK_SHR_EQUAL:     /* '>>=' / '=>>' */
+                  case TOK_GREATER_EQUAL: /* '>=' */
+                  case TOK_RANGLE3:       /* '>>>' */
+                  case TOK_RANGLE3_EQUAL: /* '>>>=' / '=>>>' */
                   case '>': if (calling_conv < RECURSION_ANGLE ||
                                 paren_recursion[RECURSION_BRACE] ||
                                 paren_recursion[RECURSION_BRACKET] ||
@@ -7037,13 +7086,15 @@ at_next_non_whitespace:
                               --paren_recursion[RECURSION_ANGLE];
                               --arguments_file->f_pos; /* Parse the '=' again. */
                               break;
-                             case TOK_SHR:
-                             case TOK_SHR_EQUAL:
+                             case TOK_SHR:       /* '>>' */
+                             case TOK_SHR_EQUAL: /* '>>=' / '=>>' */
                               if (paren_recursion[RECURSION_ANGLE] >= 2) {
                                paren_recursion[RECURSION_ANGLE] -= 2;
                                if (TOK == TOK_SHR_EQUAL) {
-                                assert(arguments_file->f_pos[-1] == '=');
-                                --arguments_file->f_pos; /* Parse the '=' again. */
+                                assert(arguments_file->f_pos[-1] == '=' ||
+                                       arguments_file->f_pos[-1] == '>');
+                                if (arguments_file->f_pos[-1] == '=')
+                                  --arguments_file->f_pos; /* Parse the '=' again. */
                                }
                                ++token.t_begin;
                               } else {
@@ -7052,19 +7103,32 @@ at_next_non_whitespace:
                                 assert(arguments_file->f_pos[-1] == '>');
                                 --arguments_file->f_pos; /* Parse the second '>' again. */
                                } else {
-                                assert(arguments_file->f_pos[-1] == '=');
-                                assert(token.t_begin[0] == '>');
-                                arguments_file->f_pos = token.t_begin+1; /* Parse everything after the first '>' again. */
+                                assert(arguments_file->f_pos[-1] == '=' ||
+                                       arguments_file->f_pos[-1] == '>');
+                                assert(token.t_begin[0] == '>' ||
+                                       token.t_begin[0] == '=');
+                                /* Parse everything after the first '>' again. */
+                                if (token.t_begin[0] != '=') {
+                                 arguments_file->f_pos = token.t_begin+1;
+                                } else {
+                                 arguments_file->f_pos = token.t_begin+1;
+                                 while (SKIP_WRAPLF(arguments_file->f_pos,
+                                                    arguments_file->f_end));
+                                 assert(arguments_file->f_pos[0] == '>');;
+                                 ++arguments_file->f_pos;
+                                }
                                }
                               }
                               break;
-                             case TOK_RANGLE3:
-                             case TOK_RANGLE3_EQUAL:
+                             case TOK_RANGLE3:       /* '>>>' */
+                             case TOK_RANGLE3_EQUAL: /* '>>>=' = '=>>>' */
                               if (paren_recursion[RECURSION_ANGLE] >= 3) {
                                paren_recursion[RECURSION_ANGLE] -= 3;
                                if (TOK == TOK_RANGLE3_EQUAL) {
-                                assert(arguments_file->f_pos[-1] == '=');
-                                --arguments_file->f_pos; /* Parse the '=' again. */
+                                assert(arguments_file->f_pos[-1] == '=' ||
+                                       arguments_file->f_pos[-1] == '>');
+                                if (arguments_file->f_pos[-1] == '=')
+                                  --arguments_file->f_pos; /* Parse the '=' again. */
                                }
                                ++token.t_begin;
                                while (SKIP_WRAPLF(token.t_begin,token.t_end));
@@ -7073,11 +7137,14 @@ at_next_non_whitespace:
                               } else if (paren_recursion[RECURSION_ANGLE] >= 2) {
                                paren_recursion[RECURSION_ANGLE] -= 2;
                                if (TOK == TOK_RANGLE3_EQUAL) {
-                                assert(arguments_file->f_pos[-1] == '=');
+                                assert(arguments_file->f_pos[-1] == '=' ||
+                                       arguments_file->f_pos[-1] == '>');
                                 --arguments_file->f_pos; /* Parse the '=' again. */
-                                while (SKIP_WRAPLF_REV(arguments_file->f_pos,arguments_file->f_begin));
-                                assert(arguments_file->f_pos[-1] == '>');
-                                --arguments_file->f_pos; /* Parse the '>=' again. */
+                                if (arguments_file->f_pos[0] != '>') {
+                                 while (SKIP_WRAPLF_REV(arguments_file->f_pos,arguments_file->f_begin));
+                                 assert(arguments_file->f_pos[-1] == '>');
+                                 --arguments_file->f_pos; /* Parse the '>=' again. */
+                                }
                                } else {
                                 assert(arguments_file->f_pos[-1] == '>');
                                 --arguments_file->f_pos; /* Parse the '>' again. */
@@ -7085,8 +7152,14 @@ at_next_non_whitespace:
                                ++token.t_begin;
                                assert(*token.t_begin == '>');
                               } else {
+                               assert(*token.t_begin == '>' ||
+                                      *token.t_begin == '=');
+                               if (*token.t_begin == '=') {
+                                ++token.t_begin;
+                                while (SKIP_WRAPLF(token.t_begin,arguments_file->f_end));
+                               }
                                --paren_recursion[RECURSION_ANGLE];
-                               arguments_file->f_pos = token.t_begin+1; /* Parse the '>>' / '>>=' again. */
+                               arguments_file->f_pos = token.t_begin+1; /* Parse the '>>' / '>>=' / '>' / '>>' again. */
                               }
                               break;
                             }
@@ -7358,7 +7431,7 @@ PUBLIC int TPP_Atoi(int_t *__restrict pint) {
    while (TPP_SizeofUnescape(begin,size) > sizeof(int_t));
   }
   *pint = 0;
-  size = TPP_Unescape((char *)pint,begin,size)-(char *)pint;
+  size = (size_t)(TPP_Unescape((char *)pint,begin,size)-(char *)pint);
 #if TPP_BYTEORDER == 4321
   /* Adjust for big endian. */
   *pint >>= (sizeof(int_t)-size)*8;
@@ -7999,7 +8072,6 @@ restore_warnings:
    if (result) {
     if (!TPPConst_IsBool(result)) TPPLexer_Warn(W_EXPECTED_BOOL,result);
     is_true = TPPConst_IsTrue(result);
-    is_true = 1;
     TPPConst_Quit(result);
    }
    if unlikely(TOK != ',') TPPLexer_Warn(W_EXPECTED_COMMA);
@@ -9050,7 +9122,7 @@ PUBLIC int TPPLexer_Warn(int wnum, ...) {
 #define ARG(T)        va_arg(args,T)
 #define FILENAME()   (ARG(struct TPPFile *)->f_name)
 #define KWDNAME()    (ARG(struct TPPKeyword *)->k_name)
-#define TOK_NAME()   (kwd = TPPLexer_LookupKeywordID(ARG(tok_t)),kwd ? kwd->k_name : "??" "?")
+#define TOK_NAME()   (kwd = TPPLexer_LookupKeywordID(ARG(tok_t)),kwd ? kwd->k_name : (char *)"??" "?")
 #define CONST_STR()  (temp_string = TPPConst_ToString(ARG(struct TPPConst *)),temp_string ? temp_string->s_text : NULL)
  {
   struct TPPFile *macro_file;
