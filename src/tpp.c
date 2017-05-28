@@ -284,6 +284,13 @@ do{uint32_t const _oldflags = current.l_flags
    current.l_flags = _oldflags|(current.l_flags&TPPLEXER_FLAG_MERGEMASK);\
 }while(FALSE)
 
+/* Similar to 'popf', but flags part of 'mask' are not restored. */
+#define breakff(mask) \
+  (void)(current.l_flags = (_oldflags&~(mask))|(current.l_flags&(TPPLEXER_FLAG_MERGEMASK|(mask))))
+#define popff(mask) \
+         current.l_flags = (_oldflags&~(mask))|(current.l_flags&(TPPLEXER_FLAG_MERGEMASK|(mask)));\
+}while(FALSE)
+
 #define pusheob() \
 do{struct TPPFile *const _oldeob = current.l_eob_file;\
    current.l_eob_file            = token.t_file
@@ -5046,7 +5053,11 @@ def_skip_until_lf:
     if (pragma_error) goto def_skip_until_lf;
     /* Must re-emit this #pragma. */
     breakeob();
+#if TPPLEXER_FLAG_PRAGMA_KEEPMASK
+    breakff(TPPLEXER_FLAG_PRAGMA_KEEPMASK);
+#else
     breakf();
+#endif
     return TPPLexer_YieldRaw();
    } break;
 
@@ -5663,7 +5674,11 @@ again:
      while (token.t_file != current.l_eof_file) popfile();
      popeof();
     }
+#if TPPLEXER_FLAG_PRAGMA_KEEPMASK
+    popff(TPPLEXER_FLAG_PRAGMA_KEEPMASK);
+#else
     popf();
+#endif
     if (!pragma_error) {
      token.t_file->f_pos = old_filepos; /* Restore the old file pointer. */
     } else {
@@ -6014,7 +6029,11 @@ create_int_file:
     }
     if (!pragma_error) token.t_file->f_pos = old_filepos; /* Restore the old file pointer. */
     popeof();
+#if TPPLEXER_FLAG_PRAGMA_KEEPMASK
+    popff(TPPLEXER_FLAG_PRAGMA_KEEPMASK);
+#else
     popf();
+#endif
     if (!pragma_error) TPPLexer_YieldPP(); /* Don't parse pragmas again to prevent infinite recursion. */
     else if (!TOK) goto again; /* If we managed to parse the pragma, continue parsing afterwards. */
     result = TOK;
