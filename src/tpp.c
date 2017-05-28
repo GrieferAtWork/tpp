@@ -4185,11 +4185,11 @@ nextfile:
  }
  /* Search system folders for this file. */
  {
-  struct TPPString **iter,**end,*elem;
-  end = (iter = current.l_syspaths.il_pathv)+
-                current.l_syspaths.il_pathc;
+  struct TPPString **iter,**begin,*elem;
+  iter = (begin = current.l_syspaths.il_pathv)+
+                  current.l_syspaths.il_pathc;
 next_syspath:
-  for (; iter != end; ++iter) {
+  while (iter-- != begin) {
    elem = *iter;
    if (elem->s_size == 1 && elem->s_text[0] == '.') {
     /* Special case: CWD path. */
