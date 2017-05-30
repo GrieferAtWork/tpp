@@ -433,6 +433,7 @@ do{ tok_t              _old_tok_id    = token.t_id;\
 #define HAVE_EXTENSION_NO_EXPAND_DEFINED TPPLexer_HasExtension(EXT_NO_EXPAND_DEFINED)
 #define HAVE_EXTENSION_IFELSE_IN_EXPR    TPPLexer_HasExtension(EXT_IFELSE_IN_EXPR)
 #define HAVE_EXTENSION_EXTENDED_IDENTS   TPPLexer_HasExtension(EXT_EXTENDED_IDENTS)
+#define HAVE_EXTENSION_TRADITIONAL       TPPLexer_HasExtension(EXT_TRADITIONAL)
 #if TPP_CONFIG_GCCFUNC
 #if TPP_CONFIG_MINGCCFUNC < 2
 #define HAVE_EXTENSION_BUILTIN_FUNCTIONS TPPLexer_HasExtension(EXT_BUILTIN_FUNCTIONS)
@@ -2078,8 +2079,159 @@ LOCAL int codewriter_put2(struct codewriter *self, funop_t op, size_t a1, size_t
 }
 
 
+PRIVATE struct TPPKeyword *
+lookup_escaped_keyword(char const *name, size_t namelen,
+                       size_t unescaped_size, int create_missing);
 
 #define func self->f_macro.m_function
+
+/* Performs traditional parsing of a function-style macro.
+ * @return: * : Text-pointer to the end of the function block.
+ * @return: NULL: An error occurred and a lexer error was set. */
+PRIVATE char *
+macro_function_scan_block_traditional(struct TPPFile *self) {
+ struct codewriter writer = CODEWRITER_INIT;
+ struct arginfo_t *argv_iter,*argv_begin,*argv_end;
+ char *iter,*end,ch,*last_text_pointer;
+ assert(self);
+ assert(self->f_kind == TPPFILE_KIND_MACRO);
+ assert((self->f_macro.m_flags&TPP_MACROFILE_KIND) == TPP_MACROFILE_KIND_FUNCTION);
+ func.f_deltotal  = 0;
+ func.f_n_vacomma = 0;
+ func.f_n_vanargs = 0;
+ argv_end = (argv_begin = func.f_arginfo)+func.f_argc;
+ iter = self->f_begin,end = self->f_end;
+ last_text_pointer = iter;
+ /* Do custom old-style macro parsing: */
+ // #define CAT(a,b) a/**/b
+ // #define STR(x)   "x"
+ /* Basically, old-style macros didn't have tokens.
+  * >> The scanner went through and simply deleted
+  *    comments and replace function-style arguments
+  *    and always expanding them while ignoring where
+  *    strings start or stop. */
+next:
+ while (iter != end) {
+  ch = *iter;
+  if (ch == '/' && (current.l_extokens&TPPLEXER_TOKEN_C_COMMENT)) {
+   char *comment_start = iter++;
+   while (SKIP_WRAPLF(iter,end));
+   if (*iter == '*') {
+    if likely(iter != end) ++iter;
+    /* Remove comments. */
+skipcom:
+    while (iter != end && *iter++ != '*');
+    while (SKIP_WRAPLF(iter,end));
+    if (iter != end && *iter != '/') goto skipcom;
+    if likely(iter != end) ++iter;
+    /* Delete a comment string from 'comment_start..iter' */
+    assert(last_text_pointer <= comment_start);
+    if (last_text_pointer != comment_start) {
+     if unlikely(!codewriter_put1(&writer,TPP_FUNOP_ADV,
+                                 (size_t)(comment_start-last_text_pointer))
+                 ) goto seterr;
+    }
+    if unlikely(!codewriter_put1(&writer,TPP_FUNOP_DEL,
+                                (size_t)(iter-comment_start))
+                ) goto seterr;
+    func.f_deltotal += (size_t)(iter-comment_start);
+    last_text_pointer = iter;
+   }
+   goto next;
+  }
+  if (tpp_isalpha(ch) || (HAVE_EXTENSION_EXTENDED_IDENTS && tpp_isansi(ch))
+                      || (HAVE_EXTENSION_DOLLAR_IS_ALPHA && ch == '$')) {
+   /* Scan an identifier. */
+   struct TPPKeyword *arg_name;
+   char *keyword_begin = iter++;
+   size_t name_escapesize,name_size = 1;
+   uint8_t chflags = CH_ISALPHA|CH_ISDIGIT;
+   /* Set the ANSI flag if we're supporting those characters. */
+   if (HAVE_EXTENSION_EXTENDED_IDENTS) chflags |= CH_ISANSI;
+   /* keyword: scan until a non-alnum character is found. */
+   if (HAVE_EXTENSION_DOLLAR_IS_ALPHA) for (;;) {
+    while (SKIP_WRAPLF(iter,end));
+    if (!(chrattr[*iter]&chflags)) break;
+    ++iter,++name_size;
+   } else for (;;) {
+    while (SKIP_WRAPLF(iter,end));
+    if (!(chrattr[*iter]&chflags) || *iter == '$') break;
+    ++iter,++name_size;
+   }
+   name_escapesize = (size_t)(iter-keyword_begin);
+   /* Lookup the argument keyword.
+    * NOTE: If we don't find it, we already know that
+    *       this isn't an argument, as the name does not
+    *       appear as a previously recognized keyword. */
+   if (name_size == name_escapesize)
+        arg_name = TPPLexer_LookupKeyword(keyword_begin,name_size,0);
+   else arg_name = lookup_escaped_keyword(keyword_begin,name_escapesize,name_size,0);
+   if (arg_name) {
+    tok_t arg_id = arg_name->k_id;
+    /* Start of identifier. - Check if this is a keyword. */
+    for (argv_iter = argv_begin; argv_iter != argv_end; ++argv_iter) {
+     if (argv_iter->ai_id == arg_id) {
+      /* It does! */
+      if (keyword_begin != last_text_pointer) {
+       /* Advance the text pointer to cover the gap. */
+       if unlikely(!codewriter_put1(&writer,TPP_FUNOP_ADV,
+                                   (size_t)(keyword_begin-last_text_pointer))
+                   ) goto seterr;
+      }
+      /* Always insert argument with expansion. */
+      if unlikely(!codewriter_put2(&writer,TPP_FUNOP_INS_EXP,
+                                  (size_t)(argv_iter-argv_begin),
+                                  (size_t)(iter-keyword_begin))
+                  ) goto seterr;
+      func.f_deltotal += (size_t)(iter-keyword_begin);
+      last_text_pointer = iter;
+      ++argv_iter->ai_ins_exp;
+      goto next;
+     }
+    }
+    /* Still support VA-extensions in traditional macro functions. */
+    if ((arg_id == KWD___VA_COMMA__ && HAVE_EXTENSION_VA_COMMA) ||
+        (arg_id == KWD___VA_NARGS__ && HAVE_EXTENSION_VA_NARGS)) {
+     if (!(self->f_macro.m_flags&TPP_MACROFILE_FLAG_FUNC_VARIADIC)) {
+      if unlikely(!TPPLexer_Warn(W_VA_KEYWORD_IN_REGULAR_MACRO,arg_name)) goto err;
+     } else {
+      if (keyword_begin != last_text_pointer) {
+       if unlikely(!codewriter_put1(&writer,TPP_FUNOP_ADV,
+                                   (size_t)(keyword_begin-last_text_pointer))
+                   ) goto seterr;
+      }
+      if (arg_id == KWD___VA_COMMA__) {
+       /* Replace __VA_COMMA__ with ',' if necessary. */
+       if unlikely(!codewriter_put1(&writer,TPP_FUNOP_VA_COMMA,
+                                   (size_t)(iter-keyword_begin))
+                   ) goto seterr;
+       ++func.f_n_vacomma;
+      } else {
+       /* Replace __VA_NARGS__ with the integral representation of the argument argument size. */
+       if unlikely(!codewriter_put1(&writer,TPP_FUNOP_VA_NARGS,
+                                   (size_t)(iter-keyword_begin))
+                   ) goto seterr;
+       ++func.f_n_vanargs;
+      }
+      func.f_deltotal += (size_t)(iter-keyword_begin);
+      last_text_pointer = iter;
+     }
+    }
+   }
+   goto next;
+  }
+  /* Skip escaped linefeeds. */
+  if (ch == '\\') while (SKIP_WRAPLF(iter,end));
+  if (tpp_islforzero(ch)) break;
+  ++iter;
+ }
+ func.f_expand = codewriter_pack(&writer);
+ if (!func.f_expand) func.f_expand = (funop_t *)empty_code;
+done:
+ return iter;
+seterr: TPPLexer_SetErr();
+err: iter = NULL; codewriter_quit(&writer); goto done;
+}
 PRIVATE int
 macro_function_scan_block(struct TPPFile *self) {
  struct codewriter writer = CODEWRITER_INIT;
@@ -2102,8 +2254,8 @@ macro_function_scan_block(struct TPPFile *self) {
   *       to calculate text pointer offsets, we also
   *       need the original file pointers instead of
   *       the better readable keyword pointers. */
- current.l_flags |= TPPLEXER_FLAG_TERMINATE_STRING_LF|
-                    TPPLEXER_FLAG_NO_SEEK_ON_EOB;
+ current.l_flags |= (TPPLEXER_FLAG_TERMINATE_STRING_LF|
+                     TPPLEXER_FLAG_NO_SEEK_ON_EOB);
  current.l_flags &= ~(TPPLEXER_FLAG_WANTCOMMENTS);
  func.f_deltotal = 0;
  func.f_n_vacomma = 0;
@@ -2135,12 +2287,14 @@ strop_normal:
       if (strop_begin != last_text_pointer) {
        /* Advance the text pointer to cover the gap. */
        if unlikely(!codewriter_put1(&writer,TPP_FUNOP_ADV,
-                  (size_t)(strop_begin-last_text_pointer))) goto seterr;
+                                   (size_t)(strop_begin-last_text_pointer))
+                   ) goto seterr;
       }
       last_was_glue = 0;
       if unlikely(!codewriter_put2(&writer,strop,
-                 (size_t)(iter-begin),
-                 (size_t)(token.t_end-strop_begin))) goto seterr;
+                                  (size_t)(iter-begin),
+                                  (size_t)(token.t_end-strop_begin))
+                  ) goto seterr;
       func.f_deltotal += (size_t)(token.t_end-strop_begin);
       last_text_pointer = token.t_end;
       if (strop != TPP_FUNOP_INS) ++iter->ai_ins_str;
@@ -2160,7 +2314,8 @@ strop_normal:
      if (token.t_begin != last_text_pointer) {
       /* Advance the text pointer to cover the gap. */
       if unlikely(!codewriter_put1(&writer,TPP_FUNOP_ADV,
-                 (size_t)(token.t_begin-last_text_pointer))) goto seterr;
+                                  (size_t)(token.t_begin-last_text_pointer))
+                  ) goto seterr;
      }
      namesize = (size_t)(token.t_end-token.t_begin);
      last_text_pointer = token.t_end;
@@ -2198,17 +2353,20 @@ strop_normal:
     } else {
      if (token.t_begin != last_text_pointer) {
       if unlikely(!codewriter_put1(&writer,TPP_FUNOP_ADV,
-                 (size_t)(token.t_begin-last_text_pointer))) goto seterr;
+                                  (size_t)(token.t_begin-last_text_pointer))
+                  ) goto seterr;
      }
      if (TOK == KWD___VA_COMMA__) {
       /* Replace __VA_COMMA__ with ',' if necessary. */
       if unlikely(!codewriter_put1(&writer,TPP_FUNOP_VA_COMMA,
-                 (size_t)(token.t_end-token.t_begin))) goto seterr;
+                                  (size_t)(token.t_end-token.t_begin))
+                  ) goto seterr;
       ++func.f_n_vacomma;
      } else {
       /* Replace __VA_NARGS__ with the integral representation of the argument argument size. */
       if unlikely(!codewriter_put1(&writer,TPP_FUNOP_VA_NARGS,
-                 (size_t)(token.t_end-token.t_begin))) goto seterr;
+                                  (size_t)(token.t_end-token.t_begin))
+                  ) goto seterr;
       ++func.f_n_vanargs;
      }
      func.f_deltotal += (size_t)(token.t_end-token.t_begin);
@@ -2277,22 +2435,26 @@ begin_glue:
     /* Create a GCC-style __VA_COMMA__: ',##__VA_ARGS__' */
     if (preglue_begin != last_text_pointer) {
      if unlikely(!codewriter_put1(&writer,TPP_FUNOP_ADV,
-                (size_t)(preglue_begin-last_text_pointer))) goto seterr;
+                                 (size_t)(preglue_begin-last_text_pointer))
+                 ) goto seterr;
     }
     /* Insert a __VA_COMMA__ and override the ',' and '##'
      * tokens up to the start of whatever follows. */
     if unlikely(!codewriter_put1(&writer,TPP_FUNOP_VA_COMMA,
-               (size_t)(token.t_begin-preglue_begin))) goto seterr;
+                                (size_t)(token.t_begin-preglue_begin))
+                ) goto seterr;
     func.f_deltotal += (size_t)(token.t_begin-preglue_begin);
     ++func.f_n_vacomma;
    } else {
     if (preglue_end != last_text_pointer) {
      /* Delete characters between 'preglue_end' and 'token.t_begin' */
      if unlikely(!codewriter_put1(&writer,TPP_FUNOP_ADV,
-                (size_t)(preglue_end-last_text_pointer))) goto seterr;
+                                 (size_t)(preglue_end-last_text_pointer))
+                 ) goto seterr;
     }
     if unlikely(!codewriter_put1(&writer,TPP_FUNOP_DEL,
-               (size_t)(token.t_begin-preglue_end))) goto seterr;
+                                (size_t)(token.t_begin-preglue_end))
+                ) goto seterr;
     func.f_deltotal += (size_t)(token.t_begin-preglue_end);
    }
    last_text_pointer = token.t_begin;
@@ -2458,10 +2620,23 @@ skip_argument_name:
    result->f_begin = token.t_begin;
   }
   result->f_macro.m_function.f_expansions = 0;
-  /* Scan the entirety of the macro's text block. */
-  if unlikely(!macro_function_scan_block(result)) goto err_arginfo;
-  assert(curfile == token.t_file);
-  result->f_end = token.t_begin;
+  /* Scan the entirety of the macro's text block.
+   * NOTE: If requested to, use traditional scanning. */
+  if (HAVE_EXTENSION_TRADITIONAL) {
+   char *macro_end;
+   result->f_end = curfile->f_end;
+   macro_end = macro_function_scan_block_traditional(result);
+   if unlikely(!macro_end) goto err_arginfo;
+   result->f_end = macro_end;
+   assert(curfile == token.t_file);
+   token.t_file->f_pos = macro_end;
+   /* Yield the next token after the macro. */
+   TPPLexer_YieldRaw();
+  } else {
+   if unlikely(!macro_function_scan_block(result)) goto err_arginfo;
+   assert(curfile == token.t_file);
+   result->f_end = token.t_begin;
+  }
   /* NOTE: Because the scan_block function disabled chunk transitions,
    *       it is possible that the token now describes a symbolic EOF.
    *       >> In that case, simply try yielding another token

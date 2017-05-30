@@ -469,6 +469,7 @@ EXTENSION(EXT_MSVC_FIXED_INT,   "fixed-length-integrals",       1)
 EXTENSION(EXT_NO_EXPAND_DEFINED,"dont-expand-defined",          1)
 EXTENSION(EXT_IFELSE_IN_EXPR,   "ifelse-in-expressions",        1)
 EXTENSION(EXT_EXTENDED_IDENTS,  "extended-identifiers",         1)
+EXTENSION(EXT_TRADITIONAL,      "traditional",                  0) /* Traditional macro expansion rules. */
 #if TPP_CONFIG_MINGCCFUNC < 2
 #if TPP_CONFIG_GCCFUNC
 EXTENSION(EXT_BUILTIN_FUNCTIONS,"builtins-in-expressions",      1)
