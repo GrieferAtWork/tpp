@@ -631,7 +631,7 @@ int main(int argc, char *argv[]) {
   else if (!memcmp(arg,"ftabstop=",9*sizeof(char))) TPPLexer_Current->l_tabsize = (size_t)atol(arg+9);
   else if (!strcmp(arg,"trigraphs")) TPPLexer_EnableExtension(EXT_TRIGRAPHS);
   else if (!strcmp(arg,"traditional") ||
-           !strcmp(arg,"traditional-cpp")) TPPLexer_Current->l_flags    |= TPPLEXER_FLAG_TRADITIONAL_MACROS,
+           !strcmp(arg,"traditional-cpp")) TPPLexer_EnableExtension(EXT_TRADITIONAL_MACRO),
                                            TPPLexer_Current->l_extokens |= TPPLEXER_TOKEN_EQUALBINOP;
   else if (!strcmp(arg,"Werror")) TPPLexer_Current->l_flags |= TPPLEXER_FLAG_WERROR;
 #if !TPP_CONFIG_MINMACRO
