@@ -5,3 +5,4 @@ lib/*
 .vs/*.suo
 .vs/*.opensdf
 *.exe
+*.dat
