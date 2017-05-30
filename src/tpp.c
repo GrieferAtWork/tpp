@@ -3564,38 +3564,47 @@ TPPLexer_Reset(struct TPPLexer *__restrict self, uint32_t flags) {
   /* Clear the #ifdef-stack. */
   self->l_ifdef.is_slotc = 0;
  }
- if (flags&TPPLEXER_RESET_EXTENSIONS) {
-  /* Reset extensions. */
+ if (flags&TPPLEXER_RESET_ESTATE) {
+  /* Reset the extension state. */
+  memcpy(self->l_extensions.es_bitset,
+        &default_extensions_state,
+         TPP_EXTENSIONS_BITSETSIZE);
+ }
+ if (flags&TPPLEXER_RESET_ESTACK) {
+  /* Clear the extension stack. */
   struct TPPExtState *iter,*next;
   iter = self->l_extensions.es_prev;
+  self->l_extensions.es_prev = NULL;
   while (iter) {
    next = iter->es_prev;
    assert(iter != next);
    free(iter);
    iter = next;
   }
-  memcpy(self->l_extensions.es_bitset,
-        &default_extensions_state,
-         TPP_EXTENSIONS_BITSETSIZE);
-  self->l_extensions.es_prev = NULL;
  }
- if (flags&TPPLEXER_RESET_WARNINGS) {
-  /* Reset warnings. */
+ if (flags&TPPLEXER_RESET_WSTATE) {
+  /* Reset the warning state. */
+  memcpy(self->l_warnings.w_basestate.ws_state,
+        &default_warnings_state,
+         TPP_WARNING_BITSETSIZE);
+  self->l_warnings.w_basestate.ws_extendeda = 0;
+  free(self->l_warnings.w_basestate.ws_extendedv);
+  self->l_warnings.w_basestate.ws_extendedv = NULL;
+  self->l_warnings.w_basestate.ws_prev      = NULL;
+ }
+ if (flags&TPPLEXER_RESET_WSTACK) {
+  /* Clear the warning stack. */
   struct TPPWarningState *iter,*next;
   iter = self->l_warnings.w_curstate;
   while (iter) {
    next = iter->ws_prev;
    assert(iter != next);
-   free(iter->ws_extendedv);
-   if (iter != &self->l_warnings.w_basestate) free(iter);
+   if (iter != &self->l_warnings.w_basestate) {
+    free(iter->ws_extendedv);
+    free(iter);
+   }
    iter = next;
   }
-  memcpy(self->l_warnings.w_basestate.ws_state,
-        &default_warnings_state,
-         TPP_WARNING_BITSETSIZE);
-  self->l_warnings.w_basestate.ws_extendeda = 0;
-  self->l_warnings.w_basestate.ws_extendedv = NULL;
-  self->l_warnings.w_basestate.ws_prev      = NULL;
   self->l_warnings.w_curstate = &self->l_warnings.w_basestate;
  }
  if (flags&TPPLEXER_RESET_SYSPATHS) {

@@ -1230,22 +1230,27 @@ TPPFUN void TPPLexer_Reset(struct TPPLexer *__restrict self, uint32_t flags);
                                               * NOTE: Also resets the 'l_eob_file' and 'l_eof_file' special
                                               *       file pointers, as well as setting 'l_noerror' to EOF
                                               *       and 'l_warncount' to ZERO(0). */
-#define TPPLEXER_RESET_EXTENSIONS 0x00000002 /* Reset enabled extensions to mirror the default-state. */
-#define TPPLEXER_RESET_WARNINGS   0x00000004 /* Reset enabled warnings to mirror the default-state. */
-#define TPPLEXER_RESET_SYSPATHS   0x00000008 /* Clears all system #include-paths. */
-#define TPPLEXER_RESET_MACRO      0x00000010 /* Reset user-defined macros.
+#define TPPLEXER_RESET_ESTATE     0x00000002 /* Reset the current extensions state to mirror the default. */
+#define TPPLEXER_RESET_ESTACK     0x00000004 /* Clear all previously pushed extension states. */
+#define TPPLEXER_RESET_WSTATE     0x00000008 /* Reset the current warning state to mirror the default. */
+#define TPPLEXER_RESET_WSTACK     0x00000010 /* Clear all previously pushed warning states. */
+#define TPPLEXER_RESET_SYSPATHS   0x00000020 /* Clears all system #include-paths. */
+#define TPPLEXER_RESET_MACRO      0x00000040 /* Reset user-defined macros.
                                               * The original definitions of runtime builtin macros are restored,
                                               * unless the 'TPPLEXER_RESET_NORESTOREMACROS' flag is set. */
-#define TPPLEXER_RESET_ASSERT     0x00000020 /* Reset user-defined assertions. */
-#define TPPLEXER_RESET_KWDFLAGS   0x00000040 /* Reset user-defined keyword flags. */
-#define TPPLEXER_RESET_COUNTER    0x00000080 /* Reset __COUNTER__ and __TPP_COUNTER for all keywords. */
-#define TPPLEXER_RESET_FONCE      0x00000100 /* Clear all '#pragma once' descriptors. */
-#define TPPLEXER_RESET_KEYWORDS   0x00000200 /* Clear all keywords, but keep all predefined.
+#define TPPLEXER_RESET_ASSERT     0x00000080 /* Reset user-defined assertions. */
+#define TPPLEXER_RESET_KWDFLAGS   0x00000100 /* Reset user-defined keyword flags. */
+#define TPPLEXER_RESET_COUNTER    0x00000200 /* Reset __COUNTER__ and __TPP_COUNTER for all keywords. */
+#define TPPLEXER_RESET_FONCE      0x00000400 /* Clear all '#pragma once' descriptors. */
+#define TPPLEXER_RESET_KEYWORDS   0x00000800 /* Clear all keywords, but keep all predefined.
                                               * NOTE: When set, this flag implies 'TPPLEXER_RESET_MACRO',
                                               *       'TPPLEXER_RESET_ASSERT', 'TPPLEXER_RESET_KWDFLAGS',
                                               *       'TPPLEXER_RESET_COUNTER' and 'TPPLEXER_RESET_FONCE'.
                                               * NOTE: It also implies 'TPPLEXER_RESET_NORESTOREMACROS' */
-#define TPPLEXER_RESET_NORESTOREMACROS 0x00000400 /* When used with 'TPPLEXER_RESET_MACRO': Don't restore builtin macro definitions. */
+#define TPPLEXER_RESET_NORESTOREMACROS 0x00001000 /* When used with 'TPPLEXER_RESET_MACRO': Don't restore builtin macro definitions. */
+
+#define TPPLEXER_RESET_EXTENSIONS (TPPLEXER_RESET_ESTATE|TPPLEXER_RESET_ESTACK)
+#define TPPLEXER_RESET_WARNINGS   (TPPLEXER_RESET_WSTATE|TPPLEXER_RESET_WSTACK)
 
 /* Push/Pop the current extension state.
  * @return: 0: [TPPLexer_PushExtensions] Not enough available memory.
