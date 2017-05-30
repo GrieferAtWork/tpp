@@ -3307,12 +3307,11 @@ PRIVATE unsigned int wnum2id(int wnum) {
  return (unsigned int)wnum;
 }
 
-PUBLIC wstate_t TPPLexer_GetWarning(int wnum) {
+PRIVATE wstate_t get_wstate(unsigned int wid) {
  struct TPPWarningState *curstate;
  uint8_t bitset_byte,byte_shift;
- unsigned int wid = wnum2id(wnum);
  assert(TPPLexer_Current);
- if unlikely(!wid_isvalid(wid)) return WSTATE_UNKNOWN;
+ assert(wid_isvalid(wid));
  curstate = current.l_warnings.w_curstate;
  assert(curstate);
  assert((curstate == &current.l_warnings.w_basestate) ==
@@ -3321,9 +3320,21 @@ PUBLIC wstate_t TPPLexer_GetWarning(int wnum) {
  byte_shift  = (uint8_t)((wid%(8/TPP_WARNING_BITS))*TPP_WARNING_BITS);
  return (wstate_t)((bitset_byte >> byte_shift)&3);
 }
+PUBLIC wstate_t TPPLexer_GetWarning(int wnum) {
+ unsigned int wid = wnum2id(wnum);
+ if unlikely(!wid_isvalid(wid)) return WSTATE_UNKNOWN;
+ return get_wstate(wid);
+}
 PUBLIC int TPPLexer_SetWarning(int wnum, wstate_t state) {
  unsigned int wid = wnum2id(wnum);
  return unlikely(!wid_isvalid(wid)) ? 2 : set_wstate(wid,state);
+}
+PUBLIC wstate_t TPPLexer_GetWarningGroup(int wgrp) {
+ if unlikely((unsigned int)wgrp >= WG_COUNT) return WSTATE_UNKNOWN;
+ return get_wstate((unsigned int)wgrp);
+}
+PUBLIC int TPPLexer_SetWarningGroup(int wgrp, wstate_t state) {
+ return unlikely((unsigned int)wgrp >= WG_COUNT) ? 2 : set_wstate((unsigned int)wgrp,state);
 }
 PUBLIC int TPPLexer_SetWarnings(char const *__restrict group, wstate_t state) {
  char const *const *iter;

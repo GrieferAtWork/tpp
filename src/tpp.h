@@ -873,7 +873,9 @@ TPPFUN int TPPLexer_PopWarnings(void);
  * @return: 1: Successfully set the given warning number.
  * @return: 2: The given warning number is unknown. */
 TPPFUN int TPPLexer_SetWarning(int wnum, TPP(wstate_t) state);
+TPPFUN int TPPLexer_SetWarningGroup(int wgrp, TPP(wstate_t) state);
 TPPFUN TPP(wstate_t) TPPLexer_GetWarning(int wnum);
+TPPFUN TPP(wstate_t) TPPLexer_GetWarningGroup(int wgrp);
 
 /* Similar to 'TPPLexer_SetWarning', but set the state of all warnings from a given group.
  * NOTES:
