@@ -433,7 +433,7 @@ do{ tok_t              _old_tok_id    = token.t_id;\
 #define HAVE_EXTENSION_NO_EXPAND_DEFINED TPPLexer_HasExtension(EXT_NO_EXPAND_DEFINED)
 #define HAVE_EXTENSION_IFELSE_IN_EXPR    TPPLexer_HasExtension(EXT_IFELSE_IN_EXPR)
 #define HAVE_EXTENSION_EXTENDED_IDENTS   TPPLexer_HasExtension(EXT_EXTENDED_IDENTS)
-#define HAVE_EXTENSION_TRADITIONAL       TPPLexer_HasExtension(EXT_TRADITIONAL)
+#define HAVE_EXTENSION_TRADITIONAL_MACRO TPPLexer_HasExtension(EXT_TRADITIONAL_MACRO)
 #if TPP_CONFIG_GCCFUNC
 #if TPP_CONFIG_MINGCCFUNC < 2
 #define HAVE_EXTENSION_BUILTIN_FUNCTIONS TPPLexer_HasExtension(EXT_BUILTIN_FUNCTIONS)
@@ -2622,7 +2622,7 @@ skip_argument_name:
   result->f_macro.m_function.f_expansions = 0;
   /* Scan the entirety of the macro's text block.
    * NOTE: If requested to, use traditional scanning. */
-  if (HAVE_EXTENSION_TRADITIONAL) {
+  if (HAVE_EXTENSION_TRADITIONAL_MACRO) {
    char *macro_end;
    result->f_end = curfile->f_end;
    macro_end = macro_function_scan_block_traditional(result);
