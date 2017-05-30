@@ -139,8 +139,11 @@ DEF_M_IF(__has_builtin,           TPPLexer_HasExtension(EXT_CLANG_FEATURES))
 DEF_M_IF(__has_tpp_builtin,       TPPLexer_HasExtension(EXT_CLANG_FEATURES))
 DEF_M_IF(__has_cpp_attribute,     TPPLexer_HasExtension(EXT_CLANG_FEATURES))
 DEF_M_IF(__has_declspec_attribute,TPPLexer_HasExtension(EXT_CLANG_FEATURES))
-DEF_M_IF(__has_extension,         TPPLexer_HasExtension(EXT_CLANG_FEATURES))
 DEF_M_IF(__has_feature,           TPPLexer_HasExtension(EXT_CLANG_FEATURES))
+DEF_M_IF(__has_extension,         TPPLexer_HasExtension(EXT_CLANG_FEATURES)) /* __has_extension(name) / __has_extension("-fname"): Query the state of an extension (returns 0 for disabled/unknown extensions). */
+DEF_M_IF(__has_warning,           TPPLexer_HasExtension(EXT_CLANG_FEATURES)) /* __has_warning("-Wname"): Query the state of a warning (returns 0 for unknown warnings). */
+DEF_M_IF(__has_known_extension,   TPPLexer_HasExtension(EXT_CLANG_FEATURES)) /* __has_known_extension("-fname"): Returns 0/1 if 'name' is a known extension. */
+DEF_M_IF(__has_known_warning,     TPPLexer_HasExtension(EXT_CLANG_FEATURES)) /* __has_known_warning(id) / __has_known_warning("-Wname"): Returns 0/1 if 'id'/'name' is a known warning. */
 DEF_M_IF(__has_include,           TPPLexer_HasExtension(EXT_HAS_INCLUDE))
 DEF_M_IF(__has_include_next,      TPPLexer_HasExtension(EXT_HAS_INCLUDE))
 

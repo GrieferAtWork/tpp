@@ -761,6 +761,7 @@ typedef enum { /* Warning states. */
  TPP(WSTATE_WARN)     = 2,
  TPP(WSTATE_SUPPRESS) = 3, /*< Can be set multiple times for recursion. */
  TPP(WSTATE_DEFAULT)  = 4,
+ TPP(WSTATE_UNKNOWN)  = 4, /*< May not be used as state. - May be returned by 'TPPLexer_GetWarning(s)' */
 } TPP(wstate_t);
 #define TPP_WSTATE_ISENABLED(s) ((6 >> (s))&1) /* WSTATE_ERROR|WSTATE_WARN */
 
@@ -890,6 +891,7 @@ TPPFUN TPP(wstate_t) TPPLexer_GetWarning(int wnum);
  * @return: 1: Successfully set the given warning number.
  * @return: 2: The given group name is unknown. */
 TPPFUN int TPPLexer_SetWarnings(char const *__restrict group, TPP(wstate_t) state);
+TPPFUN TPP(wstate_t) TPPLexer_GetWarnings(char const *__restrict group);
 
 /* Invoke a given warning number, returning one of 'TPP_WARNINGMODE_*'.
  * NOTE: Unknown warnings will always result in 'TPP_WARNINGMODE_WARN' being returned. */
@@ -1258,6 +1260,12 @@ TPPFUN int TPPLexer_PopExtensions(void);
  * @return: 0: Unknown extension.
  * @return: 1: Successfully configured the given extension. */
 TPPFUN int TPPLexer_SetExtension(char const *__restrict name, int enabled);
+
+/* Returns the state of a given extension.
+ * @return: -1: Unknown extension.
+ * @return:  0: Disabled extension.
+ * @return:  1: Enabled extension. */
+TPPFUN int TPPLexer_GetExtension(char const *__restrict name);
 
 /* Searches the cache and opens a new file if not found.
  * WARNING: If the caller intends to push the file onto the #include-stack,

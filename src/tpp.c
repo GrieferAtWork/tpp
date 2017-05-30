@@ -3312,7 +3312,7 @@ PUBLIC wstate_t TPPLexer_GetWarning(int wnum) {
  uint8_t bitset_byte,byte_shift;
  unsigned int wid = wnum2id(wnum);
  assert(TPPLexer_Current);
- if unlikely(!wid_isvalid(wid)) return WSTATE_WARN;
+ if unlikely(!wid_isvalid(wid)) return WSTATE_UNKNOWN;
  curstate = current.l_warnings.w_curstate;
  assert(curstate);
  assert((curstate == &current.l_warnings.w_basestate) ==
@@ -3333,6 +3333,26 @@ PUBLIC int TPPLexer_SetWarnings(char const *__restrict group, wstate_t state) {
   }
  }
  return 2;
+}
+PUBLIC wstate_t TPPLexer_GetWarnings(char const *__restrict group) {
+ char const *const *iter;
+ assert(TPPLexer_Current);
+ for (iter = wgroup_names; *iter; ++iter) {
+  if (!strcmp(*iter,group)) {
+   struct TPPWarningState *curstate;
+   uint8_t bitset_byte,byte_shift;
+   unsigned int wid = (unsigned int)(iter-wgroup_names);
+   assert(wid_isvalid(wid));
+   curstate = current.l_warnings.w_curstate;
+   assert(curstate);
+   assert((curstate == &current.l_warnings.w_basestate) ==
+          (curstate->ws_prev == NULL));
+   bitset_byte = curstate->ws_state[wid/(8/TPP_WARNING_BITS)];
+   byte_shift  = (uint8_t)((wid%(8/TPP_WARNING_BITS))*TPP_WARNING_BITS);
+   return (wstate_t)((bitset_byte >> byte_shift)&3);
+  }
+ }
+ return WSTATE_UNKNOWN;
 }
 PRIVATE wstate_t do_invoke_wid(int wid) {
  struct TPPWarningState *curstate;
@@ -3827,6 +3847,26 @@ TPPLexer_SetExtension(char const *__restrict name,
   ++iter;
  }
  return 0;
+}
+PUBLIC int
+TPPLexer_GetExtension(char const *__restrict name) {
+ struct tpp_extension const *iter;
+ size_t name_size,id;
+ assert(TPPLexer_Current);
+ assert(name);
+ name_size = strlen(name);
+ iter = tpp_extensions;
+ while (iter->e_name) {
+  if (iter->e_size == name_size &&
+     !memcmp(iter->e_name,name,name_size*sizeof(char))) {
+   id = (size_t)(iter-tpp_extensions);
+   /* Found it! */
+   return !!TPPLexer_HasExtension(id);
+  }
+  ++iter;
+ }
+ /* Unknown extension. */
+ return -1;
 }
 
 
@@ -5982,8 +6022,11 @@ create_int_file:
    case KWD___has_cpp_attribute:
    case KWD___has_declspec_attribute:
    case KWD___has_extension:
+   case KWD___has_known_extension:
+   case KWD___has_warning:
+   case KWD___has_known_warning:
    case KWD___has_feature:
-    /* Create keywords for these to work around leading/terminating understore quirks. */
+    /* Create keywords for these to work around leading/terminating underscore quirks. */
     create_missing_keyword = 1;
     if (FALSE) { case KWD___is_deprecated:
                  case KWD___is_identifier:
@@ -6003,32 +6046,91 @@ create_int_file:
     if (TOK != '(') TPPLexer_Warn(W_EXPECTED_LPAREN);
     keyword_begin = token.t_end,file_end = token.t_file->f_end;
     keyword_begin = skip_whitespace_and_comments(keyword_begin,file_end);
-    keyword_end = keyword_begin;
-    while (keyword_end != file_end) {
-     while (SKIP_WRAPLF(keyword_end,file_end));
-     if (!tpp_isalnum(*keyword_end)) break;
-     ++keyword_end;
-    }
-    file_pos = skip_whitespace_and_comments(keyword_end,file_end);
-    token.t_file->f_pos = file_pos;
-    if (*file_pos != ')') {
-     TPPLexer_Warn(W_EXPECTED_RPAREN);
+    /* Special handling if the next token is a string/number. */
+    if (*keyword_begin == '\"' || tpp_isdigit(*keyword_begin)) {
+     struct TPPConst name;
+     yield_fetch();
+     if (!TPPLexer_Eval(&name)) {
+      name.c_kind       = TPP_CONST_INTEGRAL;
+      name.c_data.c_int = 0;
+     }
+     if (TOK != ')') TPPLexer_Warn(W_EXPECTED_RPAREN);
+     /* Special handling for __has_extension("-fname"), etc. */
+     switch (mode) {
+     case KWD___has_extension:
+     case KWD___has_known_extension: /* __has_extension("-fmacro-recursion") */
+      if likely(name.c_kind == TPP_CONST_STRING) {
+       char *n = name.c_data.c_string->s_text;
+       if (*n == '-') ++n;
+       if (*n == 'f') ++n;
+       intval = (int_t)TPPLexer_GetExtension(n);
+       intval = mode == KWD___has_extension ? ((int)intval == 1)
+                                            : ((int)intval >= 0);
+       TPPString_Decref(name.c_data.c_string);
+       goto create_int_file;
+      }
+      break;
+     case KWD___has_warning:
+     case KWD___has_known_warning: /* __has_warning("-Wsyntax") | __has_warning(42) */
+      if (name.c_kind == TPP_CONST_STRING) {
+       char *n = name.c_data.c_string->s_text;
+       if (*n == '-') ++n;
+       if (*n == 'W') ++n;
+       intval = (int_t)TPPLexer_GetWarnings(n);
+       TPPString_Decref(name.c_data.c_string);
+      } else if likely(name.c_kind != TPP_CONST_FLOAT) {
+       intval = (int_t)TPPLexer_GetWarning((int)name.c_data.c_int);
+      } else {
+       intval = (int_t)TPPLexer_GetWarning((int)name.c_data.c_float);
+      }
+      intval = mode == KWD___has_warning ? TPP_WSTATE_ISENABLED((int)intval)
+                                         : intval != WSTATE_UNKNOWN;
+      goto create_int_file;
+     default: break;
+     }
+     /* Fallback: Create a keyword from the constant expression. */
+     if (name.c_kind == TPP_CONST_STRING) {
+      keyword = TPPLexer_LookupKeyword(name.c_data.c_string->s_text,
+                                       name.c_data.c_string->s_size,
+                                       create_missing_keyword);
+      TPPString_Decref(name.c_data.c_string);
+     } else {
+      struct TPPString *cstname;
+      if ((cstname = TPPConst_ToString(&name)) != NULL)
+           keyword = TPPLexer_LookupKeyword(cstname->s_text,
+                                            cstname->s_size,
+                                            create_missing_keyword),
+           TPPString_Decref(cstname);
+      else keyword = NULL;
+     }
+    } else {
      keyword_end = keyword_begin;
-    } else {
-     ++token.t_file->f_pos; /* Skip the ')' character. */
-    }
-    /* Whitespace and comments have been stripped from both ends, and
-     * we can be sure that the keyword only contains alnum characters. */
-    assert(keyword_begin <= keyword_end);
-    keyword_rawsize = (size_t)(keyword_end-keyword_begin);
-    keyword_realsize = wraplf_memlen(keyword_begin,keyword_rawsize);
-    if (keyword_realsize == keyword_rawsize) {
-     keyword = TPPLexer_LookupKeyword(keyword_begin,keyword_rawsize,
-                                      create_missing_keyword);
-    } else {
-     keyword = lookup_escaped_keyword(keyword_begin,keyword_rawsize,
-                                      keyword_realsize,
-                                      create_missing_keyword);
+     while (keyword_end != file_end) {
+      while (SKIP_WRAPLF(keyword_end,file_end));
+      if (!tpp_isalnum(*keyword_end)) break;
+      ++keyword_end;
+     }
+     file_pos = skip_whitespace_and_comments(keyword_end,file_end);
+     token.t_file->f_pos = file_pos;
+     if (*file_pos != ')') {
+      TPPLexer_Warn(W_EXPECTED_RPAREN);
+      keyword_end = keyword_begin;
+     } else {
+      ++token.t_file->f_pos; /* Skip the ')' character. */
+     }
+     /* Whitespace and comments have been stripped from both ends, and
+      * we can be sure that the keyword only contains alnum characters. */
+     assert(keyword_begin <= keyword_end);
+     keyword_rawsize = (size_t)(keyword_end-keyword_begin);
+     keyword_realsize = wraplf_memlen(keyword_begin,keyword_rawsize);
+     if (keyword_realsize == keyword_rawsize) {
+      keyword = TPPLexer_LookupKeyword(keyword_begin,keyword_rawsize,
+                                       create_missing_keyword);
+     } else {
+      keyword = lookup_escaped_keyword(keyword_begin,keyword_rawsize,
+                                       keyword_realsize,
+                                       create_missing_keyword);
+     }
     }
     /* Handle case: Unknown/unused keyword. */
     if (!keyword) {
@@ -6048,6 +6150,17 @@ create_int_file:
       if unlikely(!TPPKeyword_MAKERARE(keyword)) goto seterr;
       intval = keyword->k_rare->kr_counter++;
       break;
+      /* Default behavior: Use the keyword name for lookup. */
+     case KWD___has_warning:
+      intval = TPP_WSTATE_ISENABLED(TPPLexer_GetWarnings(keyword->k_name));
+      break;
+     case KWD___has_known_extension:
+      intval = TPPLexer_GetExtension(keyword->k_name) != -1;
+      break;
+     case KWD___has_known_warning:
+      intval = TPPLexer_GetWarnings(keyword->k_name) != WSTATE_UNKNOWN;
+      break;
+
      case KWD___is_deprecated:
       /* Don't allow leading/terminating underscores here! */
       intval = keyword->k_rare && !!(keyword->k_rare->kr_flags&TPP_KEYWORDFLAG_IS_DEPRECATED);
