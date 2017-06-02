@@ -81,8 +81,8 @@
 #define PREDEFINED_FUNCTION_IF(name,if,argc,expr)                 PREDEFINED_KWDFUNCTION_IF(KWD_##name,#name,if,argc,expr)
 #define PREDEFINED_FUNCTION(name,argc,expr)                       PREDEFINED_KWDFUNCTION_IF(KWD_##name,#name,1,argc,expr)
 #if TPP_CONFIG_MINGCCFUNC < 2
-#define PREDEFINED_BUILTIN_KWDFUNCTION_IF(name,str,if,argc,expr)  KWD(name,str) KWD_FLAGS(name,(TPPLexer_HasExtension(EXT_BUILTIN_FUNCTIONS) && (if)) ? (TPP_KEYWORDFLAG_HAS_BUILTIN|TPP_KEYWORDFLAG_HAS_TPP_BUILTIN) : 0) BUILTIN_FUNCTION(name,(if) ? (int)(argc) : -1,expr)
-#define PREDEFINED_BUILTIN_KWDFUNCTION(name,str,argc,expr)        KWD(name,str) KWD_FLAGS(name,TPPLexer_HasExtension(EXT_BUILTIN_FUNCTIONS) ? (TPP_KEYWORDFLAG_HAS_BUILTIN|TPP_KEYWORDFLAG_HAS_TPP_BUILTIN) : 0) BUILTIN_FUNCTION(name,argc,expr)
+#define PREDEFINED_BUILTIN_KWDFUNCTION_IF(name,str,if,argc,expr)  KWD(name,str) KWD_FLAGS(name,(HAS(EXT_BUILTIN_FUNCTIONS) && (if)) ? (TPP_KEYWORDFLAG_HAS_BUILTIN|TPP_KEYWORDFLAG_HAS_TPP_BUILTIN) : 0) BUILTIN_FUNCTION(name,(if) ? (int)(argc) : -1,expr)
+#define PREDEFINED_BUILTIN_KWDFUNCTION(name,str,argc,expr)        KWD(name,str) KWD_FLAGS(name,HAS(EXT_BUILTIN_FUNCTIONS) ? (TPP_KEYWORDFLAG_HAS_BUILTIN|TPP_KEYWORDFLAG_HAS_TPP_BUILTIN) : 0) BUILTIN_FUNCTION(name,argc,expr)
 #else
 #define PREDEFINED_BUILTIN_KWDFUNCTION_IF(name,str,if,argc,expr)  KWD(name,str) KWD_FLAGS(name,(if) ? (TPP_KEYWORDFLAG_HAS_BUILTIN|TPP_KEYWORDFLAG_HAS_TPP_BUILTIN) : 0) BUILTIN_FUNCTION(name,(if) ? (int)(argc) : -1,expr)
 #define PREDEFINED_BUILTIN_KWDFUNCTION(name,str,argc,expr)        KWD(name,str) KWD_FLAGS(name,TPP_KEYWORDFLAG_HAS_BUILTIN|TPP_KEYWORDFLAG_HAS_TPP_BUILTIN) BUILTIN_FUNCTION(name,argc,expr)
@@ -124,28 +124,28 @@ DEF_M(__FILE__)
 DEF_M(__LINE__)
 DEF_M(__TIME__)
 DEF_M(__DATE__)
-DEF_M_IF(__BASE_FILE__,    TPPLexer_HasExtension(EXT_BASEFILE))
-DEF_M_IF(__INCLUDE_LEVEL__,TPPLexer_HasExtension(EXT_INCLUDE_LEVEL))
-DEF_M_IF(__INCLUDE_DEPTH__,TPPLexer_HasExtension(EXT_INCLUDE_LEVEL))
-DEF_M_IF(__COUNTER__,      TPPLexer_HasExtension(EXT_COUNTER))
-DEF_M_IF(__TIMESTAMP__,    TPPLexer_HasExtension(EXT_TIMESTAMP))
-DEF_M_IF(__COLUMN__,       TPPLexer_HasExtension(EXT_COLUMN))
+DEF_M_IF(__BASE_FILE__,    HAS(EXT_BASEFILE))
+DEF_M_IF(__INCLUDE_LEVEL__,HAS(EXT_INCLUDE_LEVEL))
+DEF_M_IF(__INCLUDE_DEPTH__,HAS(EXT_INCLUDE_LEVEL))
+DEF_M_IF(__COUNTER__,      HAS(EXT_COUNTER))
+DEF_M_IF(__TIMESTAMP__,    HAS(EXT_TIMESTAMP))
+DEF_M_IF(__COLUMN__,       HAS(EXT_COLUMN))
 
-DEF_M_IF(__is_identifier,         TPPLexer_HasExtension(EXT_CLANG_FEATURES))
-DEF_M_IF(__is_builtin_identifier, TPPLexer_HasExtension(EXT_CLANG_FEATURES))
-DEF_M_IF(__is_deprecated,         TPPLexer_HasExtension(EXT_CLANG_FEATURES))
-DEF_M_IF(__has_attribute,         TPPLexer_HasExtension(EXT_CLANG_FEATURES))
-DEF_M_IF(__has_builtin,           TPPLexer_HasExtension(EXT_CLANG_FEATURES))
-DEF_M_IF(__has_tpp_builtin,       TPPLexer_HasExtension(EXT_CLANG_FEATURES))
-DEF_M_IF(__has_cpp_attribute,     TPPLexer_HasExtension(EXT_CLANG_FEATURES))
-DEF_M_IF(__has_declspec_attribute,TPPLexer_HasExtension(EXT_CLANG_FEATURES))
-DEF_M_IF(__has_feature,           TPPLexer_HasExtension(EXT_CLANG_FEATURES))
-DEF_M_IF(__has_extension,         TPPLexer_HasExtension(EXT_CLANG_FEATURES)) /* __has_extension(name) / __has_extension("-fname"): Query the state of an extension (returns 0 for disabled/unknown extensions). */
-DEF_M_IF(__has_warning,           TPPLexer_HasExtension(EXT_CLANG_FEATURES)) /* __has_warning("-Wname"): Query the state of a warning (returns 0 for unknown warnings). */
-DEF_M_IF(__has_known_extension,   TPPLexer_HasExtension(EXT_CLANG_FEATURES)) /* __has_known_extension("-fname"): Returns 0/1 if 'name' is a known extension. */
-DEF_M_IF(__has_known_warning,     TPPLexer_HasExtension(EXT_CLANG_FEATURES)) /* __has_known_warning(id) / __has_known_warning("-Wname"): Returns 0/1 if 'id'/'name' is a known warning. */
-DEF_M_IF(__has_include,           TPPLexer_HasExtension(EXT_HAS_INCLUDE))
-DEF_M_IF(__has_include_next,      TPPLexer_HasExtension(EXT_HAS_INCLUDE))
+DEF_M_IF(__is_identifier,         HAS(EXT_CLANG_FEATURES))
+DEF_M_IF(__is_builtin_identifier, HAS(EXT_CLANG_FEATURES))
+DEF_M_IF(__is_deprecated,         HAS(EXT_CLANG_FEATURES))
+DEF_M_IF(__has_attribute,         HAS(EXT_CLANG_FEATURES))
+DEF_M_IF(__has_builtin,           HAS(EXT_CLANG_FEATURES))
+DEF_M_IF(__has_tpp_builtin,       HAS(EXT_CLANG_FEATURES))
+DEF_M_IF(__has_cpp_attribute,     HAS(EXT_CLANG_FEATURES))
+DEF_M_IF(__has_declspec_attribute,HAS(EXT_CLANG_FEATURES))
+DEF_M_IF(__has_feature,           HAS(EXT_CLANG_FEATURES))
+DEF_M_IF(__has_extension,         HAS(EXT_CLANG_FEATURES)) /* __has_extension(name) / __has_extension("-fname"): Query the state of an extension (returns 0 for disabled/unknown extensions). */
+DEF_M_IF(__has_warning,           HAS(EXT_CLANG_FEATURES)) /* __has_warning("-Wname"): Query the state of a warning (returns 0 for unknown warnings). */
+DEF_M_IF(__has_known_extension,   HAS(EXT_CLANG_FEATURES)) /* __has_known_extension("-fname"): Returns 0/1 if 'name' is a known extension. */
+DEF_M_IF(__has_known_warning,     HAS(EXT_CLANG_FEATURES)) /* __has_known_warning(id) / __has_known_warning("-Wname"): Returns 0/1 if 'id'/'name' is a known warning. */
+DEF_M_IF(__has_include,           HAS(EXT_HAS_INCLUDE))
+DEF_M_IF(__has_include_next,      HAS(EXT_HAS_INCLUDE))
 
 /* Helper keywords used to implement variadic macros & extensions.
  * HINT: '__VA_NARGS__' is something new I added when I began reviving TPP:
@@ -218,37 +218,37 @@ DEF_K(system_header)
 
 
 /* TPP extension macros. */
-DEF_M_IF(__TPP_EVAL,         TPPLexer_HasExtension(EXT_TPP_EVAL))
-DEF_M_IF(__TPP_LOAD_FILE,    TPPLexer_HasExtension(EXT_TPP_LOAD_FILE))
-DEF_M_IF(__TPP_COUNTER,      TPPLexer_HasExtension(EXT_TPP_COUNTER))
-DEF_M_IF(__TPP_RANDOM,       TPPLexer_HasExtension(EXT_TPP_RANDOM))
-DEF_M_IF(__TPP_STR_DECOMPILE,TPPLexer_HasExtension(EXT_TPP_STR_DECOMPILE))
-DEF_M_IF(__TPP_STR_AT,       TPPLexer_HasExtension(EXT_TPP_STR_SUBSTR))
-DEF_M_IF(__TPP_STR_SUBSTR,   TPPLexer_HasExtension(EXT_TPP_STR_SUBSTR))
-DEF_M_IF(__TPP_STR_PACK,     TPPLexer_HasExtension(EXT_TPP_STR_PACK))
-DEF_M_IF(__TPP_STR_SIZE,     TPPLexer_HasExtension(EXT_TPP_STR_SIZE))
-DEF_M_IF(__TPP_UNIQUE,       TPPLexer_HasExtension(EXT_TPP_UNIQUE))
-DEF_M_IF(__TPP_COUNT_TOKENS, TPPLexer_HasExtension(EXT_TPP_COUNT_TOKENS))
+DEF_M_IF(__TPP_EVAL,         HAS(EXT_TPP_EVAL))
+DEF_M_IF(__TPP_LOAD_FILE,    HAS(EXT_TPP_LOAD_FILE))
+DEF_M_IF(__TPP_COUNTER,      HAS(EXT_TPP_COUNTER))
+DEF_M_IF(__TPP_RANDOM,       HAS(EXT_TPP_RANDOM))
+DEF_M_IF(__TPP_STR_DECOMPILE,HAS(EXT_TPP_STR_DECOMPILE))
+DEF_M_IF(__TPP_STR_AT,       HAS(EXT_TPP_STR_SUBSTR))
+DEF_M_IF(__TPP_STR_SUBSTR,   HAS(EXT_TPP_STR_SUBSTR))
+DEF_M_IF(__TPP_STR_PACK,     HAS(EXT_TPP_STR_PACK))
+DEF_M_IF(__TPP_STR_SIZE,     HAS(EXT_TPP_STR_SIZE))
+DEF_M_IF(__TPP_UNIQUE,       HAS(EXT_TPP_UNIQUE))
+DEF_M_IF(__TPP_COUNT_TOKENS, HAS(EXT_TPP_COUNT_TOKENS))
 
-DEF_M_IF(__DATE_DAY__,  TPPLexer_HasExtension(EXT_DATEUTILS))
-DEF_M_IF(__DATE_WDAY__, TPPLexer_HasExtension(EXT_DATEUTILS))
-DEF_M_IF(__DATE_YDAY__, TPPLexer_HasExtension(EXT_DATEUTILS))
-DEF_M_IF(__DATE_MONTH__,TPPLexer_HasExtension(EXT_DATEUTILS))
-DEF_M_IF(__DATE_YEAR__, TPPLexer_HasExtension(EXT_DATEUTILS))
-DEF_M_IF(__TIME_SEC__,  TPPLexer_HasExtension(EXT_TIMEUTILS))
-DEF_M_IF(__TIME_MIN__,  TPPLexer_HasExtension(EXT_TIMEUTILS))
-DEF_M_IF(__TIME_HOUR__, TPPLexer_HasExtension(EXT_TIMEUTILS))
+DEF_M_IF(__DATE_DAY__,  HAS(EXT_DATEUTILS))
+DEF_M_IF(__DATE_WDAY__, HAS(EXT_DATEUTILS))
+DEF_M_IF(__DATE_YDAY__, HAS(EXT_DATEUTILS))
+DEF_M_IF(__DATE_MONTH__,HAS(EXT_DATEUTILS))
+DEF_M_IF(__DATE_YEAR__, HAS(EXT_DATEUTILS))
+DEF_M_IF(__TIME_SEC__,  HAS(EXT_TIMEUTILS))
+DEF_M_IF(__TIME_MIN__,  HAS(EXT_TIMEUTILS))
+DEF_M_IF(__TIME_HOUR__, HAS(EXT_TIMEUTILS))
 
 
-HAS_EXTENSION_IF(tpp_dollar_is_alpha,             TPPLexer_HasExtension(EXT_DOLLAR_IS_ALPHA))
-HAS_EXTENSION_IF(tpp_va_args,                     TPPLexer_HasExtension(EXT_VA_ARGS))
-HAS_EXTENSION_IF(tpp_named_va_args,               TPPLexer_HasExtension(EXT_GCC_VA_ARGS))
-HAS_EXTENSION_IF(tpp_va_comma,                    TPPLexer_HasExtension(EXT_VA_COMMA))
+HAS_EXTENSION_IF(tpp_dollar_is_alpha,             HAS(EXT_DOLLAR_IS_ALPHA))
+HAS_EXTENSION_IF(tpp_va_args,                     HAS(EXT_VA_ARGS))
+HAS_EXTENSION_IF(tpp_named_va_args,               HAS(EXT_GCC_VA_ARGS))
+HAS_EXTENSION_IF(tpp_va_comma,                    HAS(EXT_VA_COMMA))
 HAS_EXTENSION_IF(tpp_reemit_unknown_pragmas,      !(TPPLexer_Current->l_flags&TPPLEXER_FLAG_EAT_UNKNOWN_PRAGMA))
-HAS_EXTENSION_IF(tpp_msvc_integer_suffix,         TPPLexer_HasExtension(EXT_MSVC_FIXED_INT))
-HAS_EXTENSION_IF(tpp_charize_operator,            TPPLexer_HasExtension(EXT_HASH_AT))
-HAS_EXTENSION_IF(tpp_trigraphs,                   TPPLexer_HasExtension(EXT_TRIGRAPHS))
-HAS_EXTENSION_IF(tpp_digraphs,                    TPPLexer_HasExtension(EXT_DIGRAPHS))
+HAS_EXTENSION_IF(tpp_msvc_integer_suffix,         HAS(EXT_MSVC_FIXED_INT))
+HAS_EXTENSION_IF(tpp_charize_operator,            HAS(EXT_HASH_AT))
+HAS_EXTENSION_IF(tpp_trigraphs,                   HAS(EXT_TRIGRAPHS))
+HAS_EXTENSION_IF(tpp_digraphs,                    HAS(EXT_DIGRAPHS))
 HAS_EXTENSION_IF(tpp_pragma_push_macro,           TPP_PREPROCESSOR_VERSION >= 200)
 HAS_EXTENSION_IF(tpp_pragma_pop_macro,            TPP_PREPROCESSOR_VERSION >= 200)
 HAS_EXTENSION_IF(tpp_pragma_region,               TPP_PREPROCESSOR_VERSION >= 200)
@@ -260,23 +260,23 @@ HAS_EXTENSION_IF(tpp_pragma_once,                 TPP_PREPROCESSOR_VERSION >= 20
 HAS_EXTENSION_IF(tpp_pragma_tpp_exec,             TPP_PREPROCESSOR_VERSION >= 200)
 HAS_EXTENSION_IF(tpp_pragma_deprecated,           TPP_PREPROCESSOR_VERSION >= 200)
 HAS_EXTENSION_IF(tpp_pragma_tpp_set_keyword_flags,TPP_PREPROCESSOR_VERSION >= 200)
-HAS_EXTENSION_IF(tpp_directive_include_next,      TPPLexer_HasExtension(EXT_INCLUDE_NEXT))
-HAS_EXTENSION_IF(tpp_directive_import,            TPPLexer_HasExtension(EXT_IMPORT))
-HAS_EXTENSION_IF(tpp_directive_warning,           TPPLexer_HasExtension(EXT_WARNING))
-HAS_EXTENSION_IF(tpp_lxor,                        TPPLexer_HasExtension(EXT_LXOR))
+HAS_EXTENSION_IF(tpp_directive_include_next,      HAS(EXT_INCLUDE_NEXT))
+HAS_EXTENSION_IF(tpp_directive_import,            HAS(EXT_IMPORT))
+HAS_EXTENSION_IF(tpp_directive_warning,           HAS(EXT_WARNING))
+HAS_EXTENSION_IF(tpp_lxor,                        HAS(EXT_LXOR))
 HAS_EXTENSION_IF(tpp_token_tilde_tilde,           TPPLexer_Current->l_extokens&TPPLEXER_TOKEN_TILDETILDE)
 HAS_EXTENSION_IF(tpp_token_pow,                   TPPLexer_Current->l_extokens&TPPLEXER_TOKEN_STARSTAR)
 HAS_EXTENSION_IF(tpp_token_lxor,                  TPPLexer_Current->l_extokens&TPPLEXER_TOKEN_ROOFROOF)
 HAS_EXTENSION_IF(tpp_token_arrow,                 TPPLexer_Current->l_extokens&TPPLEXER_TOKEN_ARROW)
 HAS_EXTENSION_IF(tpp_token_collon_assign,         TPPLexer_Current->l_extokens&TPPLEXER_TOKEN_COLLONASSIGN)
 HAS_EXTENSION_IF(tpp_token_collon_collon,         TPPLexer_Current->l_extokens&TPPLEXER_TOKEN_COLLONCOLLON)
-HAS_EXTENSION_IF(tpp_macro_calling_conventions,   TPPLexer_HasExtension(EXT_ALTMAC))
+HAS_EXTENSION_IF(tpp_macro_calling_conventions,   HAS(EXT_ALTMAC))
 HAS_EXTENSION_IF(tpp_strict_whitespace,           (TPPLexer_Current->l_flags&TPPLEXER_FLAG_KEEP_ARG_WHITESPACE))
 HAS_EXTENSION_IF(tpp_strict_integer_overflow,     TPP_WSTATE_ISENABLED(TPPLexer_GetWarning(W_INTEGRAL_OVERFLOW)) ||
                                                   TPP_WSTATE_ISENABLED(TPPLexer_GetWarning(W_INTEGRAL_CLAMPED)))
 HAS_EXTENSION_IF(tpp_support_ansi_characters,     0) /* TODO: (Re-)add support for this. */
 HAS_EXTENSION_IF(tpp_emit_lf_after_directive,     (TPPLexer_Current->l_flags&TPPLEXER_FLAG_DIRECTIVE_NOOWN_LF))
-HAS_EXTENSION_IF(tpp_if_cond_expression,          TPPLexer_HasExtension(EXT_IFELSE_IN_EXPR))
+HAS_EXTENSION_IF(tpp_if_cond_expression,          HAS(EXT_IFELSE_IN_EXPR))
 HAS_EXTENSION_IF(tpp_debug,                       TPP_CONFIG_DEBUG)
 
 /* Predefined macros and their values.
@@ -339,8 +339,8 @@ PRIVATE int_t tpp_parity(int_t i) {
 #if TPP_CONFIG_MINGCCFUNC < 2
 /* Special functions that require designated preprocessor support.
  * NOTE: These are not part of the min-gcc-func configuration. */
-HAS_BUILTIN_IF(__builtin_constant_p,TPPLexer_HasExtension(EXT_BUILTIN_FUNCTIONS))
-HAS_BUILTIN_IF(__builtin_choose_expr,TPPLexer_HasExtension(EXT_BUILTIN_FUNCTIONS))
+HAS_BUILTIN_IF(__builtin_constant_p,HAS(EXT_BUILTIN_FUNCTIONS))
+HAS_BUILTIN_IF(__builtin_choose_expr,HAS(EXT_BUILTIN_FUNCTIONS))
 #endif
 
 #if TPP_CONFIG_MINGCCFUNC == 0
@@ -540,7 +540,7 @@ WGROUP(WG_DEPRECATED,          "deprecated",          WSTATE_ERROR)
  assert(textfile);
  assert(textfile->f_kind == TPPFILE_KIND_TEXT);
  WARNF("Redefining macro " Q("%s") "\n",kwd->k_name); 
- WARNF(current.l_flags&TPPLEXER_FLAG_MSVC_MESSAGEFORMAT
+ WARNF(TPPLexer_Current->l_flags&TPPLEXER_FLAG_MSVC_MESSAGEFORMAT
        ? "%s(%d,%d) : " : "%s:%d:%d: "
        , textfile->f_textfile.f_usedname
        ? textfile->f_textfile.f_usedname->s_text
@@ -557,7 +557,7 @@ WGROUP(WG_DEPRECATED,          "deprecated",          WSTATE_ERROR)
  struct TPPIfdefStackSlot *ifdef_slot;
  WARNF("#else after #else\n");
  ifdef_slot = ARG(struct TPPIfdefStackSlot *);
- WARNF(current.l_flags&TPPLEXER_FLAG_MSVC_MESSAGEFORMAT
+ WARNF(TPPLexer_Current->l_flags&TPPLEXER_FLAG_MSVC_MESSAGEFORMAT
        ? "%s(%d) : " : "%s:%d: ",
        ifdef_slot->iss_file->f_name,
       (int)(ifdef_slot->iss_line+1));
@@ -569,7 +569,7 @@ WGROUP(WG_DEPRECATED,          "deprecated",          WSTATE_ERROR)
  struct TPPIfdefStackSlot *ifdef_slot;
  WARNF("#elif after #else\n");
  ifdef_slot = ARG(struct TPPIfdefStackSlot *);
- WARNF(current.l_flags&TPPLEXER_FLAG_MSVC_MESSAGEFORMAT
+ WARNF(TPPLexer_Current->l_flags&TPPLEXER_FLAG_MSVC_MESSAGEFORMAT
        ? "%s(%d) : " : "%s:%d: ",
        ifdef_slot->iss_file->f_name,
       (int)(ifdef_slot->iss_line+1));
@@ -703,6 +703,8 @@ DEF_WARNING(W_TYPECAST_IN_EXPRESSION,(WG_USAGE,WG_SYNTAX,WG_UNDEF),WSTATE_WARN,W
 DEF_WARNING(W_EXPECTED_RPAREN_AFTER_CAST,(WG_SYNTAX),WSTATE_WARN,WARNF("Expected " Q(")") " after casting type, but got " TOK_S,TOK_A)) /*< . */
 DEF_WARNING(W_EXPECTED_RBRACE_AFTER_STATEMENT,(WG_SYNTAX),WSTATE_WARN,WARNF("Expected " Q("}") " after statement, but got " TOK_S,TOK_A)) /*< . */
 DEF_WARNING(W_EXPECTED_WARNING_NAMEORID,(WG_VALUE),WSTATE_WARN,WARNF("Expected warning name or id, but got " Q("%s"),CONST_STR())) /*< [struct TPPConst *]. */
+DEF_WARNING(W_CANT_DEFINE_LOCKED_KEYWORD,(WG_VALUE),WSTATE_DISABLE,WARNF("Cannot #define macro for locked keyword " Q("%s"),KWDNAME())) /*< [struct TPPKeyword *]. */
+DEF_WARNING(W_CANT_UNDEF_LOCKED_KEYWORD,(WG_VALUE),WSTATE_DISABLE,WARNF("Cannot #undef macro for locked keyword " Q("%s"),KWDNAME())) /*< [struct TPPKeyword *]. */
 /* _always_ add new warnings here! */
 
 
