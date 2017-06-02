@@ -2710,8 +2710,7 @@ skip_argument_name:
  result->f_pos = result->f_begin;
  {
   int warn_error;
-  int is_locked = (keyword_entry->k_rare &&
-                  (keyword_entry->k_rare->kr_flags&TPP_KEYWORDFLAG_LOCKED));
+  uint32_t kwd_flags = TPPKeyword_Getflags(keyword_entry);
   if (keyword_entry->k_macro) {
    struct TPPFile *oldfile = keyword_entry->k_macro;
    if (((size_t)(oldfile->f_end-oldfile->f_begin) !=
@@ -2724,10 +2723,10 @@ skip_argument_name:
     if (fix_linenumber) ++curfile->f_textfile.f_lineoff;
     if (!warn_error) goto err_result;
    }
-   if (is_locked) goto locked_keyword;
+   if (kwd_flags&TPP_KEYWORDFLAG_LOCKED) goto locked_keyword;
    TPPKeyword_Undef(keyword_entry);
   }
-  if (is_locked) {
+  if (kwd_flags&TPP_KEYWORDFLAG_LOCKED) {
 locked_keyword:
    if (fix_linenumber) --curfile->f_textfile.f_lineoff;
    warn_error = WARN(W_CANT_DEFINE_LOCKED_KEYWORD,keyword_entry);
@@ -3429,7 +3428,7 @@ PUBLIC int TPPLexer_InvokeWarning(int wnum) {
  group_iter = w_associated_groups[wid-WG_COUNT];
  for (;;) {
   if (state == WSTATE_SUPPRESS ||
-      state == WSTATE_DISABLE) return TPP_WARNINGMODE_IGNORE;
+      state == WSTATE_DISABLED) return TPP_WARNINGMODE_IGNORE;
   found_warn |= state == WSTATE_WARN;
   if (*group_iter < 0) break;
   state = do_invoke_wid(*group_iter++);
@@ -5359,8 +5358,7 @@ def_skip_until_lf:
      keyword = TOKEN.t_kwd;
      assert(keyword);
      if (keyword->k_macro) {
-      if (keyword->k_rare &&
-         (keyword->k_rare->kr_flags&TPP_KEYWORDFLAG_LOCKED))
+      if (TPPKeyword_Getflags(keyword)&TPP_KEYWORDFLAG_LOCKED)
           WARN(W_CANT_UNDEF_LOCKED_KEYWORD,keyword);
       else TPPKeyword_Undef(keyword);
      } else if (TPP_ISBUILTINMACRO(TOK)) {
@@ -9232,7 +9230,7 @@ pragma_warning:
       break;
 
      { /* Set the state of a given set of warnings. */
-      if (FALSE) { case KWD_disable:  newstate = WSTATE_DISABLE; }
+      if (FALSE) { case KWD_disable:  newstate = WSTATE_DISABLED; }
       if (FALSE) { /*case KWD_warning:*/
                    case KWD_enable:   newstate = WSTATE_WARN; }
       if (FALSE) { case KWD_suppress: newstate = WSTATE_SUPPRESS; }
@@ -9283,7 +9281,7 @@ set_warning_newstate:
         */
             if (val.c_data.c_int < 0) newstate = WSTATE_ERROR;
        else if (val.c_data.c_int == 0) newstate = WSTATE_WARN;
-       else if (val.c_data.c_int == 1) newstate = WSTATE_DISABLE;
+       else if (val.c_data.c_int == 1) newstate = WSTATE_DISABLED;
        else newstate = WSTATE_SUPPRESS;
        goto set_warning_newstate;
       } else if (val.c_kind == TPP_CONST_STRING) {
@@ -9296,7 +9294,7 @@ set_warning_newstate:
        warning_text = val.c_data.c_string->s_text;
        if (*warning_text == '-') ++warning_text;
        if (*warning_text == 'W') ++warning_text;
-            if (!memcmp(warning_text,"no-",3*sizeof(char))) warning_text += 3,newstate = WSTATE_DISABLE;
+            if (!memcmp(warning_text,"no-",3*sizeof(char))) warning_text += 3,newstate = WSTATE_DISABLED;
        else if (!memcmp(warning_text,"def-",4*sizeof(char))) warning_text += 4,newstate = WSTATE_DEFAULT;
        else if (!memcmp(warning_text,"sup-",4*sizeof(char))) warning_text += 4,newstate = WSTATE_SUPPRESS;
        else if (!memcmp(warning_text,"suppress-",9*sizeof(char))) warning_text += 9,newstate = WSTATE_SUPPRESS;
@@ -9440,7 +9438,7 @@ yield_after_extension:
       wstate_t newmode; struct TPPConst group_name;
       if (FALSE) { case KWD_warning: newmode = WSTATE_WARN; }
       if (FALSE) { case KWD_error:   newmode = WSTATE_ERROR; }
-      if (FALSE) { case KWD_ignored: newmode = WSTATE_DISABLE; }
+      if (FALSE) { case KWD_ignored: newmode = WSTATE_DISABLED; }
       YIELD();
       if unlikely(!TPPLexer_Eval(&group_name)) goto err;
       if (group_name.c_kind != TPP_CONST_STRING) {

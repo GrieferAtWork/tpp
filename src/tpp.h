@@ -760,12 +760,13 @@ enum{
 };
 
 typedef enum { /* Warning states. */
- TPP(WSTATE_DISABLE)  = 0,
+ TPP(WSTATE_DISABLED) = 0,
  TPP(WSTATE_ERROR)    = 1,
  TPP(WSTATE_WARN)     = 2,
  TPP(WSTATE_SUPPRESS) = 3, /*< Can be set multiple times for recursion. */
  TPP(WSTATE_DEFAULT)  = 4,
  TPP(WSTATE_UNKNOWN)  = 4, /*< May not be used as state. - May be returned by 'TPPLexer_GetWarning(s)' */
+ TPP(WSTATE_DISABLE)  = TPP(WSTATE_DISABLED), /* Deprecated alias. */
 } TPP(wstate_t);
 #define TPP_WSTATE_ISENABLED(s) ((6 >> (s))&1) /* WSTATE_ERROR|WSTATE_WARN */
 
