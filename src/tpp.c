@@ -184,12 +184,14 @@ extern void __debugbreak(void);
 #endif
 
 #undef assert
+#undef assertf
 #if TPP_CONFIG_DEBUG
 PRIVATE
 #ifndef TPP_BREAKPOINT
 __attribute__((__noreturn__))
 #endif
-void tpp_assertion_failed(char const *expr, char const *file, int line) {
+void tpp_assertion_failed(char const *expr, char const *file, int line,
+                          char const *format, ...) {
  fprintf(stderr,
 #ifdef _MSC_VER
         (!TPPLexer_Current || (TPPLexer_Current->l_flags&TPPLEXER_FLAG_MSVC_MESSAGEFORMAT))
@@ -198,21 +200,42 @@ void tpp_assertion_failed(char const *expr, char const *file, int line) {
 #endif
          ? "%s(%d) : " : "%s:%d: ",file,line);
  fprintf(stderr,"Assertion failed : %s\n",expr);
+ if (format) {
+  va_list args;
+  va_start(args,format);
+  vfprintf(stderr,format,args);
+  va_end(args);
+ }
 #ifndef TPP_BREAKPOINT
  exit(1);
 #endif
 }
+#define TPP_EXPAND_FORMAT(...) __VA_ARGS__
+
 #ifdef TPP_BREAKPOINT
-#define assert(expr) ((expr) || (tpp_assertion_failed(#expr,__FILE__,__LINE__),TPP_BREAKPOINT(),0))
+#define assert(expr)    ((expr) || (tpp_assertion_failed(#expr,__FILE__,__LINE__,NULL),TPP_BREAKPOINT(),0))
+#ifdef TPP_EXPAND_FORMAT
+#define assertf(expr,f) ((expr) || (tpp_assertion_failed(#expr,__FILE__,__LINE__,TPP_EXPAND_FORMAT f),TPP_BREAKPOINT(),0))
 #else
-#define assert(expr) ((expr) || (tpp_assertion_failed(#expr,__FILE__,__LINE__),0))
+#define assertf(expr,f) ((expr) || (tpp_assertion_failed(#expr,__FILE__,__LINE__,NULL),TPP_BREAKPOINT(),0))
+#endif
+#else
+#define assert(expr)    ((expr) || (tpp_assertion_failed(#expr,__FILE__,__LINE__,NULL),0))
+#ifdef TPP_EXPAND_FORMAT
+#define assertf(expr,f) ((expr) || (tpp_assertion_failed(#expr,__FILE__,__LINE__,TPP_EXPAND_FORMAT f),0))
+#else
+#define assertf(expr,f) ((expr) || (tpp_assertion_failed(#expr,__FILE__,__LINE__,NULL),0))
+#endif
 #endif
 #elif defined(_MSC_VER)
-#define assert        __assume
+#define assert          __assume
+#define assertf(expr,f) __assume(expr)
 #elif __has_builtin(__builtin_assume)
-#define assert        __builtin_assume
+#define assert          __builtin_assume
+#define assertf(expr,f) __builtin_assume(expr)
 #else /* TPP_CONFIG_DEBUG */
-#define assert(expr) (void)0
+#define assert(expr)    (void)0
+#define assertf(expr,f) (void)0
 #endif /* !TPP_CONFIG_DEBUG */
 
 #define CH_ISALPHA     0x01
@@ -1682,7 +1705,11 @@ TPPFile_NextChunk(struct TPPFile *__restrict self, int flags) {
   newchunk->s_text[newchunk->s_size] = '\0';
   if (!read_bufsize) {
    /* True input stream EOF. */
+   assert(self->f_name != (char *)(uintptr_t)-1);
+   assert(self->f_namesize != (size_t)-1);
    self->f_textfile.f_stream = TPP_STREAM_INVALID;
+   assert(self->f_name != (char *)(uintptr_t)-1);
+   assert(self->f_namesize != (size_t)-1);
    if (self->f_textfile.f_ownedstream != TPP_STREAM_INVALID) {
     stream_close(self->f_textfile.f_ownedstream);
     self->f_textfile.f_ownedstream = TPP_STREAM_INVALID;
@@ -1698,6 +1725,8 @@ search_suitable_end_again:
   if (self->f_end) {
    char *iter,*end,ch,*last_zero_mode;
    int mode = 0,termstring_onlf;
+   assert(self->f_end >= self->f_begin);
+   assert(self->f_end <= effective_end);
    /* Special case: If we managed to read something, but
     * the suitable end didn't increase, just read some more! */
    if (end_offset == (size_t)(self->f_end-self->f_text->s_text)) goto extend_more;
@@ -1771,14 +1800,26 @@ extend_more:
   assert(!self->f_end || !*self->f_end ||
          *self->f_end == self->f_textfile.f_prefixdel);
  }
- assert(self->f_pos   >= self->f_begin);
- assert(self->f_pos   <= self->f_end);
- assert(self->f_begin <= self->f_end);
- assert(self->f_end   >= self->f_text->s_text);
- assert(self->f_end   <= self->f_text->s_text+self->f_text->s_size);
- assert(self->f_begin >= self->f_text->s_text);
- assert(self->f_begin <= self->f_text->s_text+self->f_text->s_size);
+#define DBG_INFO \
+ ("self->f_begin        = %p\n"\
+  "self->f_pos          = %p\n"\
+  "self->f_end          = %p\n"\
+  "self->f_text         = %p\n"\
+  "self->f_text->s_text = %p\n"\
+  "self->f_text->s_size = %p\n"\
+  "end(self->f_text)    = %p\n"\
+ ,self->f_begin,self->f_pos,self->f_end\
+ ,self->f_text,self->f_text->s_text,self->f_text->s_size\
+ ,self->f_text->s_text+self->f_text->s_size)
+ assertf(self->f_pos   >= self->f_begin,DBG_INFO);
+ assertf(self->f_pos   <= self->f_end,  DBG_INFO);
+ assertf(self->f_begin <= self->f_end,  DBG_INFO);
+ assertf(self->f_end    >= self->f_text->s_text,DBG_INFO);
+ assertf(self->f_end    <= self->f_text->s_text+self->f_text->s_size,DBG_INFO);
+ assertf(self->f_begin  >= self->f_text->s_text,DBG_INFO);
+ assertf(self->f_begin  <= self->f_text->s_text+self->f_text->s_size,DBG_INFO);
  assert(!self->f_text->s_text[self->f_text->s_size]);
+#undef DBG_INFO
  self->f_textfile.f_prefixdel = *self->f_end;
  *self->f_end = '\0';
  if unlikely(!self->f_text->s_size) {
@@ -1994,6 +2035,7 @@ TPP_SizeofEscape(char const *data, size_t size) {
 PUBLIC char *
 TPP_Itos(char *buf, int_t i) {
  char *result;
+ assert(buf);
  if (i < 0) *buf++ = '-',i = -i;
  result = (buf += TPP_SizeofItos(i));
  do *--buf = (char)('0'+(i % 10));
@@ -2003,6 +2045,7 @@ TPP_Itos(char *buf, int_t i) {
 PUBLIC size_t
 TPP_SizeofItos(int_t i) {
  size_t result = 0;
+ assert(i != 0 || i == 0);
  if (i < 0) ++result,i = -i;
  do ++result;
  while ((i /= 10) != 0);
@@ -3929,7 +3972,11 @@ rehash_keywords(size_t newsize) {
  assert(newsize);
  assert(CURRENT.l_keywords.km_bucketc);
  assert(CURRENT.l_keywords.km_bucketv);
- assert(newsize > CURRENT.l_keywords.km_bucketc);
+ assertf(newsize > CURRENT.l_keywords.km_bucketc,
+        ("New size %lu isn't greater than old size %lu (%lu entires)",
+        (unsigned long)newsize,
+        (unsigned long)CURRENT.l_keywords.km_bucketc,
+        (unsigned long)CURRENT.l_keywords.km_entryc));
  newvec = (struct TPPKeyword **)calloc(newsize,sizeof(struct TPPKeyword *));
  if unlikely(!newvec) return; /* Ignore errors here. */
  bucket_end = (bucket_iter = CURRENT.l_keywords.km_bucketv)+
@@ -3959,6 +4006,10 @@ TPPLexer_LookupKeyword(char const *name, size_t namelen,
  namehash = hashof(name,namelen);
  /* Try to rehash the keyword map. */
  if (TPPKeywordMap_SHOULDHASH(&CURRENT.l_keywords)) {
+  assertf(CURRENT.l_keywords.km_entryc > CURRENT.l_keywords.km_bucketc,
+         ("New size %lu isn't greater than old size %lu",
+         (unsigned long)CURRENT.l_keywords.km_entryc,
+         (unsigned long)CURRENT.l_keywords.km_bucketc));
   rehash_keywords(CURRENT.l_keywords.km_entryc);
  }
  assert(CURRENT.l_keywords.km_bucketc);
@@ -4029,7 +4080,7 @@ do_fix_filename(char *filename, size_t *pfilename_size) {
 #endif
  /* Remove whitespace before & after slashes. */
  for (text_iter = filename; text_iter != text_end;) {
-  assert(text_iter < text_end);
+  assertf(text_iter < text_end,("text_iter = %p\ntext_end = %p",text_iter,text_end));
   if (*text_iter == SEP) {
    while (text_iter != filename && tpp_isspace(text_iter[-1])) {
     memmove(text_iter-1,text_iter, /* NOTE: This also moves the '\0'-terminator. */
@@ -5232,14 +5283,28 @@ PRIVATE int parse_include_string(char **begin, char **end) {
   else {
    /* Continue parsing _AFTER_ the '>' character! */
    TOKEN.t_file->f_pos = (*end)+1;
-   --end;
   }
  } else {
   WARN(W_EXPECTED_INCLUDE_STRING);
   TOKEN.t_file->f_pos = TOKEN.t_begin;
   result = 0;
  }
- assert(!result || *begin <= *end);
+ assertf(!result || *begin <= *end,
+        ("result                = %d\n"
+         "*begin                = %p\n"
+         "*end                  = %p\n"
+         "TOKEN.t_begin         = %p\n"
+         "TOKEN.t_end           = %p\n"
+         "TOKEN.t_file->f_begin = %p\n"
+         "TOKEN.t_file->f_pos   = %p\n"
+         "TOKEN.t_file->f_end   = %p\n"
+        ,result,*begin,*end
+        ,TOKEN.t_begin
+        ,TOKEN.t_end
+        ,TOKEN.t_file->f_begin
+        ,TOKEN.t_file->f_pos
+        ,TOKEN.t_file->f_end
+        ));
  popf();
  return result;
 }
@@ -9348,7 +9413,7 @@ yield_after_extension:
       char const *name = extname.c_data.c_string->s_text;
       if (*name == '-') ++name;
       if (*name == 'f') ++name;
-      if (!memcmp(name,"no-",3)) name += 3,mode = 0;
+      if (!memcmp(name,"no-",3*sizeof(char))) name += 3,mode = 0;
       ext_error = TPPLexer_SetExtension(name,mode);
       if unlikely(!ext_error) ext_error = WARN(W_UNKNOWN_EXTENSION,name);
       TPPString_Decref(extname.c_data.c_string);
