@@ -6381,6 +6381,8 @@ create_int_file:
     incfile = TPPLexer_OpenFile(mode,include_begin,
                                (size_t)(include_end-include_begin),
                                 NULL);
+    assert(!(incfile) || !(incfile->f_prev) ||
+           !(mode&TPPLEXER_OPENFILE_FLAG_NEXT));
     if (function == KWD___TPP_LOAD_FILE && !incfile) {
      WARN(W_FILE_NOT_FOUND,include_begin,
                   (size_t)(include_end-include_begin));
