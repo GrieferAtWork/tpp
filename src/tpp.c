@@ -39,7 +39,7 @@
 #   define __has_builtin(x) 0
 #endif
 #ifndef __GNUC__
-#    define __attribute__(x) /* nothing */
+#   define __attribute__(x) /* nothing */
 #endif
 
 #if defined(__GNUC__) || __has_attribute(__builtin_expect)
@@ -651,7 +651,11 @@ funop_putarg(funop_t *piter, size_t arg) {
 #endif
 #define pp_hashof2(result,str) PP_CAT(pp_hashof2_,__TPP_EVAL(!!str))(result,str)
 #pragma extension(pop)
-#define pp_hashof(str)         pp_hashof2(1,str)
+#if __SIZEOF_POINTER__ == 4
+#   define pp_hashof(str)         PP_CAT(pp_hashof2(1,str),ul)
+#elif __SIZEOF_POINTER__ == 8
+#   define pp_hashof(str)         PP_CAT(pp_hashof2(1,str),ull)
+#endif
 #endif
 
 #ifdef pp_hashof
@@ -3376,7 +3380,7 @@ PRIVATE int set_wstate(int wid, wstate_t state) {
  if (state == WSTATE_SUPPRESS) {
   if (iter == end || iter->wse_wid != wid) {
    /* Must insert/allocate a new slot. */
-   newslot = curstate->ws_extendedv;
+   newslot = iter;
    while (newslot != end && newslot->wse_suppress) ++newslot;
    if (newslot == end) {
     /* No free slots. */
@@ -3393,7 +3397,7 @@ PRIVATE int set_wstate(int wid, wstate_t state) {
     newslot += curstate->ws_extendeda;
     curstate->ws_extendeda = newalloc;
    }
-   assert(iter <= newslot);
+   assertf(iter <= newslot,("iter = %p\nnewslot = %p\n",iter,newslot));
    assert(iter == newslot || iter->wse_wid > wid);
    assert(iter == curstate->ws_extendedv || iter[-1].wse_wid < wid);
    /* Move data between iter and newslot. */
@@ -7155,9 +7159,9 @@ expand_function_macro_impl(struct TPPFile *__restrict macro,
     /* Advance: Simply copy text from src --> dst. */
     arg = funop_getarg(code);
     assertf(arg <= (size_t)(dest_end-dest_iter),
-           (DBG_TEXT "Insufficient memory for text advancing in DST (Required: %lu; Available: %lu)",
+           (DBG_TEXT "Insufficient memory for text advancing in DST (Required: %lu; Available: %lu; dest_iter: %p)",
             DBG_DATA (unsigned long)(arg),
-                     (unsigned long)(dest_end-dest_iter)));
+                     (unsigned long)(dest_end-dest_iter),dest_iter));
     assertf(arg <= (size_t)(source_end-source_iter),
            (DBG_TEXT "Insufficient memory for text advancing in SRC (Required: %lu; Available: %lu)",
             DBG_DATA (unsigned long)(arg),
