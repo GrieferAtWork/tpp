@@ -190,7 +190,9 @@ PRIVATE void tpp_vlogerrf(char const *format, va_list args) {
 #ifdef _WIN32
  char buffer[4096];
  vsprintf(buffer,format,args);
+#ifndef __DCC_VERSION__
  OutputDebugStringA(buffer);
+#endif
  fwrite(buffer,sizeof(char),strlen(buffer),stderr);
 #else
  vfprintf(stderr,format,args);
@@ -220,6 +222,8 @@ PRIVATE char *tpp_hexrepr(void const *start, size_t size) {
  return result;
 }
 
+static int in_assertion = 0;
+
 PRIVATE
 #ifndef TPP_BREAKPOINT
 #if defined(__GNUC__) || __has_attribute(__noreturn__)
@@ -245,11 +249,10 @@ void tpp_assertion_failed(char const *expr, char const *file, int line,
   va_end(args);
   tpp_logerrf("\n");
  }
- {
-  static int in_assertion = 0;
-  if (!in_assertion && TPPLexer_Current) {
-   struct TPPLCInfo info;
-   char const *lx_file;
+ if (TPPLexer_Current) {
+  struct TPPLCInfo info;
+  char const *lx_file;
+  if (!in_assertion) {
    ++in_assertion;
    TPPLexer_LC(&info);
    lx_file = TPPLexer_FILE(NULL);
@@ -1647,6 +1650,16 @@ TPPFile_NextChunk(struct TPPFile *__restrict self, int flags) {
 #else
  ssize_t read_bufsize;
 #endif
+#define DBG_INFO  \
+  ("self->f_begin                             = %p\n"\
+   "self->f_pos                               = %p\n"\
+   "self->f_end                               = %p\n"\
+   "self->f_text->s_text                      = %p\n"\
+   "self->f_text->s_size                      = %p\n"\
+   "self->f_text->s_text+self->f_text->s_size = %p\n"\
+  ,self->f_begin,self->f_pos,self->f_end \
+  ,self->f_text->s_text,self->f_text->s_size \
+  ,self->f_text->s_text+self->f_text->s_size)
  assert(self);
  assert(self->f_text);
  assert(self->f_pos   >= self->f_begin);
@@ -1710,6 +1723,10 @@ TPPFile_NextChunk(struct TPPFile *__restrict self, int flags) {
    self->f_pos         = self->f_begin = newchunk->s_text;
   }
   self->f_text = newchunk;
+  assertf(self->f_begin >= self->f_text->s_text,DBG_INFO);
+  assertf(self->f_begin <= self->f_text->s_text+self->f_text->s_size,DBG_INFO);
+  assertf(self->f_pos   >= self->f_text->s_text,DBG_INFO);
+  assertf(self->f_pos   <= self->f_text->s_text+self->f_text->s_size,DBG_INFO);
 #ifdef _WIN32
   if (!ReadFile(self->f_textfile.f_stream,
                 newchunk->s_text+prefix_size,
@@ -1735,6 +1752,10 @@ TPPFile_NextChunk(struct TPPFile *__restrict self, int flags) {
    else newchunk = self->f_text;
    self->f_begin = newchunk->s_text+(self->f_begin-old_textbegin);
    self->f_pos   = newchunk->s_text+(self->f_pos-old_textbegin);
+   assertf(self->f_begin >= self->f_text->s_text,DBG_INFO);
+   assertf(self->f_begin <= self->f_text->s_text+self->f_text->s_size,DBG_INFO);
+   assertf(self->f_pos   >= self->f_text->s_text,DBG_INFO);
+   assertf(self->f_pos   <= self->f_text->s_text+self->f_text->s_size,DBG_INFO);
   }
   if (!(flags&TPPFILE_NEXTCHUNK_FLAG_BINARY) &&
       !(CURRENT.l_flags&TPPLEXER_FLAG_NO_ENCODING) &&
@@ -1752,7 +1773,7 @@ TPPFile_NextChunk(struct TPPFile *__restrict self, int flags) {
      memmove(text_start,new_text_start,read_bufsize*sizeof(char));
      newchunk->s_size -= size_diff;
      if (self->f_begin >= new_text_start) self->f_begin -= size_diff;
-     if (self->f_pos >= new_text_start) self->f_pos -= size_diff;
+     if (self->f_pos   >= new_text_start) self->f_pos -= size_diff;
     }
    }
    if (self->f_textfile.f_encoding != TPP_ENCODING_UTF8) {
@@ -1786,14 +1807,31 @@ TPPFile_NextChunk(struct TPPFile *__restrict self, int flags) {
    break;
   }
   effective_end = self->f_text->s_text+self->f_text->s_size;
+#undef DBG_INFO
+#define DBG_INFO  \
+  ("self->f_begin                             = %p\n"\
+   "self->f_pos                               = %p\n"\
+   "self->f_end                               = %p\n"\
+   "effective_end                             = %p\n"\
+   "self->f_text->s_text                      = %p\n"\
+   "self->f_text->s_size                      = %p\n"\
+   "self->f_text->s_text+self->f_text->s_size = %p\n"\
+  ,self->f_begin,self->f_pos,self->f_end,effective_end \
+  ,self->f_text->s_text,self->f_text->s_size \
+  ,self->f_text->s_text+self->f_text->s_size)
 search_suitable_end_again:
+  assertf(self->f_begin >= self->f_text->s_text,DBG_INFO);
+  assertf(self->f_begin <= self->f_text->s_text+self->f_text->s_size,DBG_INFO);
+  assertf(effective_end >= self->f_text->s_text,DBG_INFO);
+  assertf(effective_end <= self->f_text->s_text+self->f_text->s_size,DBG_INFO);
   self->f_end = string_find_suitable_end(self->f_begin,(size_t)
                                         (effective_end-self->f_begin));
   if (self->f_end) {
    char *iter,*end,ch,*last_zero_mode;
    int mode = 0,termstring_onlf;
-   assert(self->f_end >= self->f_begin);
-   assert(self->f_end <= effective_end);
+   assertf(self->f_end >= self->f_begin,DBG_INFO);
+   assertf(self->f_end <= effective_end,DBG_INFO);
+#undef DBG_INFO
    /* Special case: If we managed to read something, but
     * the suitable end didn't increase, just read some more! */
    if (end_offset == (size_t)(self->f_end-self->f_text->s_text)) goto extend_more;
@@ -2432,7 +2470,8 @@ strop_normal:
                   ) goto seterr;
       func.f_deltotal += (size_t)(TOKEN.t_end-strop_begin);
       last_text_pointer = TOKEN.t_end;
-      if (strop != TPP_FUNOP_INS) ++iter->ai_ins_str;
+      if (strop != TPP_FUNOP_INS)
+           ++iter->ai_ins_str;
       else ++iter->ai_ins;
       TPPLexer_YieldRaw();
       goto next;
@@ -3906,6 +3945,7 @@ PRIVATE struct tpp_extension const tpp_extensions[] = {
 #undef tolower
 #endif
 #define tolower(c) (char)((c) >= 'A' && (c) <= 'Z' ? ((c)+('a'-'A')) : (c))
+
 
 #if 0
 /* Fuzzy match two strings */
@@ -5596,7 +5636,12 @@ def_skip_until_lf:
     struct TPPFile *curfile;
     if (FALSE) { case KWD_ifdef:  block_mode = 0; }
     if (FALSE) { case KWD_ifndef: block_mode = 1; }
-    assert(block_mode == (TOK == KWD_ifndef));
+    assertf(block_mode == (TOK == KWD_ifndef),
+           ("block_mode = %d\n"
+            "TOK        = %d\n"
+            "KWD_ifdef  = %d\n"
+            "KWD_ifndef = %d\n",
+            block_mode,TOK,KWD_ifdef,KWD_ifndef));
     ifndef_keyword = NULL;
     TPPLexer_YieldRaw();
     if (TPP_ISKEYWORD(TOK)) {
@@ -6572,7 +6617,7 @@ create_int_file:
      int recursion = 1;
      while (TOK > 0) {
            if (TOK == '(') ++recursion;
-      else if (TOK == ')' && !--recursion) break;
+      else if (TOK == ')' && !--recursion) { TPPLexer_Yield(); break; }
       TPPLexer_Yield();
      }
      if (TOK == ')') TPPLexer_Yield();
@@ -7268,8 +7313,7 @@ done_exec:
  assertf(source_iter <= source_end,
         ("The final SRC iterator %p is out-of-bounds of %p by %lu characters",
          source_iter,source_end,(unsigned long)(source_iter-source_end)));
- assertf((size_t)(dest_end-dest_iter) ==
-         (size_t)(source_end-source_iter),
+ assertf((size_t)(dest_end-dest_iter) == (size_t)(source_end-source_iter),
         ("Difference between the overflow buffer sizes (%lu != %lu).\n"
          "This means that either the cache generator, or interpreter is flawed.",
         (unsigned long)(dest_end-dest_iter),
@@ -8095,7 +8139,7 @@ PUBLIC int TPP_Atoi(int_t *__restrict pint) {
   else break;
   if unlikely(more >= numsys) break;
   new_intval = intval*numsys+more;
-  if unlikely((uint64_t)new_intval < (uint64_t)intval) {
+  if unlikely((uintmax_t)new_intval < (uintmax_t)intval) {
    /* Warn about overflow: */
    if unlikely(!WARN(W_INTEGRAL_OVERFLOW,intval,new_intval)) goto err;
   }
@@ -8141,10 +8185,11 @@ wrong_suffix:
   if (begin != end) {
    /* Warning: Unknown suffix. */
    if unlikely(!WARN(W_INVALID_INTEGER_SUFFIX,
-                              begin,(size_t)(end-begin))
+                     begin,(size_t)(end-begin))
                ) goto err;
   }
  }
+#if 0
  /* Clamp 'intval' with the determined type. */
  switch (result&TPP_ATOI_TYPE_MASK) {
 #define T_MASK(T) (int_t)(~(T)0)
@@ -8165,6 +8210,7 @@ wrong_suffix:
   if unlikely(!WARN(W_INTEGRAL_CLAMPED,intval,new_intval)) goto err;
  }
  intval = new_intval;
+#endif
 done: *pint = intval;
 end:   return result;
 err:   result = TPP_ATOI_ERR; goto end;
@@ -9738,7 +9784,9 @@ PRIVATE void tpp_warnf(char const *fmt, ...) {
  va_end(args);
  bufsiz = strlen(buffer);
  fwrite(buffer,sizeof(char),bufsiz,stderr);
+#ifndef __DCC_VERSION__
  OutputDebugStringA(buffer);
+#endif
 }
 #define WARNF      tpp_warnf
 #else
