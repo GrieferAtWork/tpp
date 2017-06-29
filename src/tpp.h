@@ -1119,6 +1119,7 @@ TPP_LOCAL TPP(col_t) TPPLexer_COLUMN(void) { struct TPPFile *f = TPPLexer_Textfi
 #define TPPLEXER_FLAG_TERMINATE_STRING_LF    0x00000040 /*< Terminate character/string sequences when a linefeed is detected (also emit a warning in that case). */
 #define TPPLEXER_FLAG_NO_MACROS              0x00000080 /*< Disable expansion of macros (user defined only; builtin must be disabled explicitly with 'TPPLEXER_FLAG_NO_BUILTIN_MACROS'). */
 #define TPPLEXER_FLAG_NO_DIRECTIVES          0x00000100 /*< Disable evaluation of preprocessor directives. */
+/*                                           0x00000200 */
 #define TPPLEXER_FLAG_ASM_COMMENTS           0x00000400 /*< Suppress warnings for unknown/invalid preprocessor directives, instead either emitting them as 'TOK_COMMENT' or ignoring them based on 'TPPLEXER_FLAG_WANTCOMMENTS'. */
 #define TPPLEXER_FLAG_NO_BUILTIN_MACROS      0x00000800 /*< When set, don't expand _any_ builtin macros (such as __FILE__ and __LINE__). */
 #define TPPLEXER_FLAG_DIRECTIVE_NOOWN_LF     0x00001000 /*< Linefeeds terminating preprocessor directives are not part of those directives and are instead re-emit (Meaningless without 'TPPLEXER_FLAG_WANTLF').
@@ -1142,6 +1143,8 @@ TPP_LOCAL TPP(col_t) TPPLexer_COLUMN(void) { struct TPPFile *f = TPPLexer_Textfi
 #define TPPLEXER_FLAG_EAT_UNKNOWN_PRAGMA     0x02000000 /*< Don't re-emit unknown pragmas. */
 #define TPPLEXER_FLAG_CHAR_UNSIGNED          0x04000000 /*< When set, character-constants are unsigned. */
 #define TPPLEXER_FLAG_EOF_ON_PAREN           0x08000000 /*< When set, recursively track '('...')' pairs and yield EOF when 'l_eof_paren' reaches ZERO(0). */
+/*                                           0x10000000 */
+/*                                           0x20000000 */
 #define TPPLEXER_FLAG_RANDOM_INITIALIZED     0x40000000 /*< Set when rand() has been initialized. */
 #define TPPLEXER_FLAG_ERROR                  0x80000000 /*< When set, the lexer is in an error-state in which calls to yield() will return TOK_ERR. */
 #define TPPLEXER_FLAG_MERGEMASK              0xf0000000 /*< A mask of flags that are merged (or'd together) during popf(). */
