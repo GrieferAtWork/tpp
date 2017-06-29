@@ -359,6 +359,7 @@ TPPString_Cat(/*ref*/struct TPPString *__restrict lhs,
  * @return: NULL: Not enough available memory. */
 TPPFUN /*ref*/struct TPPString *TPPString_New(char const *__restrict text, size_t size);
 TPPFUN /*ref*/struct TPPString *TPPString_NewSized(size_t size);
+#define TPPString_NewEmpty()   (TPPString_Incref(TPPFile_Empty.f_text),TPPFile_Empty.f_text)
 
 
 struct TPPTextFile {
@@ -624,14 +625,28 @@ TPPFUN int TPPFile_NextChunk(struct TPPFile *__restrict self, int flags);
                                          *  NOTE: This flag is implied if the lexer has the 'TPPLEXER_FLAG_NO_ENCODING' flag set. */
 
 
+#ifndef TPP_UNESCAPE_ENDIAN
+#define TPP_UNESCAPE_ENDIAN  TPP_BYTEORDER
+#endif
+#ifndef TPP_UNESCAPE_MAXCHAR
+/* Max value for 'charsize' passed to 'TPP_Unescape' (Must be one of 1,2,4 or 8) */
+#define TPP_UNESCAPE_MAXCHAR 1
+#endif
 
 /* Escape/Unescape a given block of data.
  * NOTE: 'TPP_Unescape/TPP_Escape' will return the surrounding  */
-TPPFUN char *TPP_Unescape(char *buf, char const *data, size_t size);
+#if TPP_UNESCAPE_MAXCHAR == 1
+TPPFUN char *TPP_Unescape_(char *buf, char const *data, size_t size);
+TPPFUN size_t TPP_SizeofUnescape_(char const *data, size_t size);
+#define TPP_Unescape(buf,data,size,charsize)   TPP_Unescape_(buf,data,size)
+#define TPP_SizeofUnescape(data,size,charsize) TPP_SizeofUnescape_(data,size)
+#else
+TPPFUN char *TPP_Unescape(char *buf, char const *data, size_t size, size_t charsize);
+TPPFUN size_t TPP_SizeofUnescape(char const *data, size_t size, size_t charsize);
+#endif
 TPPFUN char *TPP_Escape(char *buf, char const *data, size_t size);
 TPPFUN char *TPP_Itos(char *buf, TPP(int_t) i);
 TPPFUN char *TPP_Ftos(char *buf, TPP(float_t) f);
-TPPFUN size_t TPP_SizeofUnescape(char const *data, size_t size);
 TPPFUN size_t TPP_SizeofEscape(char const *data, size_t size);
 TPPFUN size_t TPP_SizeofItos(TPP(int_t) i);
 TPPFUN size_t TPP_SizeofFtos(TPP(float_t) f);
@@ -1534,7 +1549,12 @@ TPPFUN int TPPLexer_ParseBuiltinPragma(void);
  *       next non-string token.
  * @return: * :   A reference to the unescaped string that was parsed.
  * @return: NULL: A lexer error occurred (TPPLexer_SetErr() was set). */
+#if TPP_UNESCAPE_MAXCHAR == 1
 TPPFUN /*ref*/struct TPPString *TPPLexer_ParseString(void);
+#else
+#define TPPLexer_ParseString() TPPLexer_ParseStringEx(sizeof(char))
+TPPFUN /*ref*/struct TPPString *TPPLexer_ParseStringEx(size_t sizeof_char);
+#endif
 
 /* Transform the current token (which must either be 'TOK_INT' or 'TOK_CHAR')
  * into an integral value, storing that value in '*pint' and returning
