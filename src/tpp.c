@@ -7087,8 +7087,19 @@ err_substr:  TPPString_Decref(basestring);
   predefined_macro = &predef##name;\
   goto predef_macro;\
 }
+#define SET_TEXT(x)    (string_text = (x),TPPString_Incref(string_text))
+#define SET_TEXTREF(x) (string_text = (x))
+#define RT_BUILTIN_MACRO(name,value) case name:\
+{ if (!TPP_ISBUILTINMACRO(name)) break; \
+  value; \
+  if unlikely(!string_text) goto seterr; \
+  goto create_string_file; \
+}
 #include "tpp-defs.inl"
+#undef RT_BUILTIN_MACRO
 #undef BUILTIN_MACRO
+#undef SET_TEXTREF
+#undef SET_TEXT
     ;
 predef_macro:
     if (!TPP_ISBUILTINMACRO(TOK)) break;

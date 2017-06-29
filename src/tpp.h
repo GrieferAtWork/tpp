@@ -344,6 +344,12 @@ struct TPPString {
  size_t        s_size;   /*< Size of the text in characters. */
  char          s_text[TPP_SYMARRAY_SIZE]; /*< [s_size] ZERO-terminated text. */
 };
+
+#define TPPSTRING_DEF(name,value) \
+ struct { TPP(refcnt_t) _r; size_t _s; \
+          char _t[sizeof(value)/sizeof(char)];\
+ } name = {0x80000000,(sizeof(value)/sizeof(char))-1,value}
+
 #define TPPString_Incref(self) (void)(++(self)->s_refcnt)
 #define TPPString_Decref(self) (void)(--(self)->s_refcnt || (free(self),0))
 
