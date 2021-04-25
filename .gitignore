@@ -4,5 +4,8 @@ lib/*
 .vs/*.sdf
 .vs/*.suo
 .vs/*.opensdf
+.vs/.vs/
 *.exe
 *.dat
+*.VC.db
+*.VC.opendb
