@@ -9645,11 +9645,16 @@ create_int_file:
 			/* Special handling if the next token is a string/number. */
 			if (*keyword_begin == '\"' || tpp_isdigit(*keyword_begin)) {
 				struct TPPConst name;
+				pushf();
+				CURRENT.l_flags &= ~(TPPLEXER_FLAG_WANTCOMMENTS |
+				                     TPPLEXER_FLAG_WANTSPACE |
+				                     TPPLEXER_FLAG_WANTLF);
 				yield();
 				if (!TPPLexer_Eval(&name)) {
 					name.c_kind       = TPP_CONST_INTEGRAL;
 					name.c_data.c_int = 0;
 				}
+				popf();
 				if (tok != ')')
 					(void)WARN(W_EXPECTED_RPAREN);
 				/* Special handling for __has_extension("-fname"), etc. */

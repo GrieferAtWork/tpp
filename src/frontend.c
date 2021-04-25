@@ -961,6 +961,10 @@ use_infile:
 		break;
 	}
 	pp_emit_dummy_targets();
+	/* Check if something went wrong. */
+	if ((TPPLexer_Current->l_flags & TPPLEXER_FLAG_ERROR) ||
+		(TPPLexer_Current->l_errorcount != 0))
+		result = 1;
 end:
 	TPP_FINALIZE();
 #ifdef _CRTDBG_MAP_ALLOC
