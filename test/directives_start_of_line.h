@@ -20,13 +20,13 @@
 
 // ISO/IEC 9899:201x - 6.10 - 8
 
-TEST_EXPANDS(
 #define EMPTY
+TEST_EXPANDS(
 EMPTY # include <file.h> // Expands to [#][include][<][file][.][h][>]
 , "# include <file.h>")
 
-TEST_EXPANDS(
 #undef EMPTY
+TEST_EXPANDS(
 EMPTY # include <file.h> // Expands to [EMPTY][#][include][<][file][.][h][>]
 , "EMPTY # include <file.h>")
 

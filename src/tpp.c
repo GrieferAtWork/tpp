@@ -1700,10 +1700,10 @@ LOCAL funop_t *TPPCALL
 funop_putarg(funop_t *piter, size_t arg) {
 	size_t temp, shift;
 	temp = arg, shift = 0;
-	do
-		temp >>= 7,
+	do {
+		temp >>= 7;
 		shift += 7;
-	while (temp);
+	} while (temp);
 	do {
 		uint8_t byte;
 		shift -= 7;
@@ -11751,6 +11751,7 @@ done_args:
 		else {
 			va_size -= (effective_argc - 1);
 		}
+
 		assert(token.t_file == arguments_file);
 		if (arg_iter != arg_last) {
 			if (macro->f_macro.m_flags & TPP_MACROFILE_FLAG_FUNC_VARIADIC &&
@@ -11777,6 +11778,7 @@ done_args:
 				}
 			}
 		}
+
 		/* All the arguments have been parsed and the file pointer of the arguments file
 		 * (which at this point is also the #include-stack top-file) is set to point
 		 * directly after the closing parenthesis.
@@ -11804,18 +11806,27 @@ done_args:
 			            !WARN(W_TOO_MANY_MACRO_ARGUMENTS, macro))
 				goto err_argv;
 		}
+
 		/* If the variadic portion of varargs function is empty, the variadic size drops to ZERO(0).
 		 * >> This is required to properly implement __VA_COMMA__/__VA_NARGS__ semantics. */
 		if (macro->f_macro.m_flags & TPP_MACROFILE_FLAG_FUNC_VARIADIC &&
-		    arg_last->ac_begin == arg_last->ac_end)
-			assert(va_size), --va_size;
+		    arg_last->ac_begin == arg_last->ac_end) {
+			assert(va_size);
+			--va_size;
+		}
 
 #if HAVELOG(LOG_CALLMACRO) /* DEBUG: Log calls to macros. */
 		{
 			arg_end = (arg_iter = argv) + effective_argc;
-			LOG(LOG_CALLMACRO | LOG_RAW, ("[DEBUG] Calling: %.*s(\n", (int)macro->f_namesize, macro->f_name));
+			LOG(LOG_CALLMACRO | LOG_RAW,
+			    ("[DEBUG] Calling: %.*s(\n",
+			     (int)macro->f_namesize, macro->f_name));
 			for (; arg_iter != arg_end; ++arg_iter) {
-				LOG(LOG_CALLMACRO | LOG_RAW, ("\t[%.*s],\n", (int)(arg_iter->ac_end - arg_iter->ac_begin), arg_iter->ac_begin));
+				LOG(LOG_CALLMACRO | LOG_RAW,
+				    ("\t[%.*s],\n",
+				     (int)(arg_iter->ac_end -
+				           arg_iter->ac_begin),
+				     arg_iter->ac_begin));
 			}
 			LOG(LOG_CALLMACRO | LOG_RAW, (")\n"));
 		}
@@ -11833,6 +11844,7 @@ done_args:
 		}
 		if unlikely(!expand_file)
 			goto end0;
+
 		/* Sanity checks. */
 		assert(expand_file->f_kind == TPPFILE_KIND_MACRO);
 		assert((expand_file->f_macro.m_flags & TPP_MACROFILE_KIND) ==
@@ -11864,8 +11876,10 @@ done_args:
 				file_iter = file_iter->f_prev;
 			}
 		}
+
 		/* Track the amount of times this macro is being expanded on the stack. */
 		++macro->f_macro.m_function.f_expansions;
+
 		/* Insert the new macro file into the expansion stack. */
 		expand_file->f_prev = token.t_file;
 		token.t_file        = expand_file;
@@ -11929,8 +11943,8 @@ TPPConst_ToString(struct TPPConst const *__restrict self) {
  *    With this calling convention, the result-argument doesn't need to be
  *    re-push onto the stack every time the next lower level is called.
  */
-#if defined(__GNUC__) && \
-(defined(__i386__) || defined(__i386) || defined(i386))
+#if (defined(__GNUC__) && \
+     (defined(__i386__) || defined(__i386) || defined(i386)))
 #define EVAL_CALL __attribute__((__fastcall__))
 #elif defined(_MSC_VER)
 #define EVAL_CALL __fastcall
@@ -12005,8 +12019,9 @@ TPPLexer_ParseStringEx(size_t sizeof_char)
 			reqsize = result->s_size + TPP_SizeofUnescapeRaw(string_begin,
 			                                                 (size_t)(string_end - string_begin));
 			if (reqsize > allocsize) {
-				newbuffer = (struct TPPString *)API_REALLOC(result, TPP_OFFSETOF(struct TPPString, s_text) +
-				                                                    (reqsize + sizeof(char)));
+				newbuffer = (struct TPPString *)API_REALLOC(result,
+				                                            TPP_OFFSETOF(struct TPPString, s_text) +
+				                                            (reqsize + sizeof(char)));
 				if unlikely(!newbuffer) {
 					free(result);
 					goto err;
@@ -12867,12 +12882,12 @@ again_unary:
 		if (TPP_ISKEYWORD(tok) &&
 		    (TPP_ISUSERKEYWORD(tok) || (
 #if TPP_CONFIG_GCCFUNC
-		                               get_builtin_argc(tok) == -1 &&
-		                               tok != KWD___builtin_constant_p &&
-		                               tok != KWD___builtin_choose_expr &&
+		                                get_builtin_argc(tok) == -1 &&
+		                                tok != KWD___builtin_constant_p &&
+		                                tok != KWD___builtin_choose_expr &&
 #endif /* TPP_CONFIG_GCCFUNC */
-		                               tok != KWD_defined &&
-		                               tok != KWD_if))) {
+		                                tok != KWD_defined &&
+		                                tok != KWD_if))) {
 			unsigned int recursion = 1;
 			/* Keyword without any special meaning associated to it.
 			 * >> Assume c-style casting and recursively skip it. */
@@ -13366,8 +13381,8 @@ skip_array_deref:
 	return;
 err_r:
 	TPPConst_Quit(result);
-	/*err:*/ TPPLexer_SetErr();
-	return;
+/*err:*/
+	TPPLexer_SetErr();
 }
 
 PRIVATE void EVAL_CALL eval_prod(struct TPPConst *result) {
@@ -14369,7 +14384,7 @@ set_warning_newstate:
 			goto set_warning_newstate;
 		} else if (val.c_kind == TPP_CONST_STRING) {
 			/* Very nice-looking warning directives:
-			 * >> #pragma warning(push,"-Wno-syntax")
+			 * >> #pragma warning(push, "-Wno-syntax")
 			 * >> ... // Do something ~nasty~.
 			 * >> #pragma warning(pop)
 			 */
@@ -14525,10 +14540,12 @@ yield_after_include_path:
 			}
 		}
 		mode = 1;
-		if (tok == '+')
+		if (tok == '+') {
 			yield();
-		else if (tok == '-')
-			mode = 0, yield();
+		} else if (tok == '-') {
+			mode = 0;
+			yield();
+		}
 		if unlikely(!TPPLexer_Eval(&path_string))
 			goto err;
 		if (path_string.c_kind != TPP_CONST_STRING) {
