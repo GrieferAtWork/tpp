@@ -18,18 +18,19 @@
  */
 #include "include/test.h"
 
-#pragma once
+#define REDEF(m, b)  __pragma(tpp_exec("#undef " #m "\n#define " #m " " #b))
+#define Word  w1
+#define w1    REDEF(Word, w2)Hello
+#define w2    REDEF(Word, w3)There
+#define w3    REDEF(Word, w4)Good
+#define w4    REDEF(Word, w1)Sir!
 
-#ifdef WAS_HERE
-#error "Shouldn't have gotten here more than once!"
-#endif
-#define WAS_HERE
+TEST_EXPANDS(Word Word Word Word, "Hello There Good Sir!")
+TEST_EXPANDS(Word, "Hello")
+TEST_EXPANDS(Word, "There")
+TEST_EXPANDS(Word, "Good")
+TEST_EXPANDS(Word, "Sir!")
+TEST_EXPANDS(Word Word, "Hello There")
+TEST_EXPANDS(Word Word, "Good Sir!")
 
-/* include ourselves with some really abstract path.
- * #pragma once will prevent infinite recursion */
-#include "include_path.h"
-#include "./include_path.h"
 
-//FIXME:#include "./../test/include_path.h"
-//FIXME:#include "./../test/include_path.h"
-//FIXME:#include "./../test/./missing_folder/../include_path.h"
