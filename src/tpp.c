@@ -5671,7 +5671,7 @@ PUBLIC int TPPCALL TPPLexer_PushWarnings(void) {
 	if unlikely(!newstate)
 		return 0;
 	if ((newstate->ws_extendeda = curstate->ws_extendeda) != 0) {
-		/* todo: maybe only copy slots that are actually in use? */
+		/* XXX: maybe only copy slots that are actually in use? */
 		size_t extended_size   = newstate->ws_extendeda * sizeof(struct TPPWarningStateEx);
 		newstate->ws_extendedv = (struct TPPWarningStateEx *)API_MALLOC(extended_size);
 		if unlikely(!newstate->ws_extendedv) {
@@ -9639,6 +9639,7 @@ create_int_file:
 #endif /* !NO_EXTENSION_TPP_COUNTER */
 			mode = tok;
 			pushf();
+			/* FIXME: Must disable deprecation warnings when parsing a keyword here! */
 			CURRENT.l_flags &= ~(TPPLEXER_FLAG_WANTCOMMENTS |
 			                     TPPLEXER_FLAG_WANTSPACE |
 			                     TPPLEXER_FLAG_WANTLF);
@@ -10853,7 +10854,6 @@ expand_function_macro_impl(struct TPPFile *__restrict macro,
 	char *dest_iter, *dest_end, *source_iter, *source_end;
 	size_t expanded_text_size;
 	funop_t *code;
-	size_t expanded_string_size;
 	assert(macro);
 	assert(macro->f_kind == TPPFILE_KIND_MACRO);
 	assert((macro->f_macro.m_flags & TPP_MACROFILE_KIND) == TPP_MACROFILE_KIND_FUNCTION);
@@ -10874,7 +10874,7 @@ expand_function_macro_impl(struct TPPFile *__restrict macro,
 		TPPString_Incref(result_text);
 		result->f_text = result_text; /* Inherit reference. */
 		/* Setup the resulting macro to reference the original's text. */
-		result->f_pos =
+		result->f_pos   = macro->f_begin;
 		result->f_begin = macro->f_begin;
 		result->f_end   = macro->f_end;
 		/* Sub-values to not cleanup anything below. */
@@ -10889,24 +10889,32 @@ expand_function_macro_impl(struct TPPFile *__restrict macro,
 	expanded_text_size = (size_t)(macro->f_end - macro->f_begin);
 	expanded_text_size -= macro->f_macro.m_function.f_deltotal;
 	for (; iter != end; ++iter, ++arg_iter) {
-		if (iter->ai_ins_str) {
-			/* Figure out and cache how long the stringy-fied version of this is. */
-			expanded_string_size = 2 + TPP_SizeofEscape(arg_iter->ac_begin,
-			                                            (size_t)(arg_iter->ac_end - arg_iter->ac_begin));
-			expanded_text_size += (iter->ai_ins_str * expanded_string_size);
-		}
+		/* NOTE: Must handle `ai_ins_exp' first, because `argcache_genexpand()'
+		 *       might alter the source text in certain cases (such as when it
+		 *       references `__has_include()', in which case the source file
+		 *       text may be altered)
+		 * Technically, source text shouldn't be allowed to be altered in such
+		 * a situation, however still doing so is more efficient, and this is
+		 * such a rare and unlikely cornercase, that any user-visible effects
+		 * are negligible. */
 		if (iter->ai_ins_exp) {
 			/* Expand and cache the argument. */
-			/* todo: maybe optimize the memory footprint of this by not
-			 *       ~really~ needing to create an explicit malloc()-block
-			 *       when the argument's expanded text doesn't differ
-			 *       from the original. (e.g.: simple arguments like `add(10,20)') */
+			/* XXX: maybe optimize the memory footprint of this by not
+			 *      ~really~ needing to create an explicit malloc()-block
+			 *      when the argument's expanded text doesn't differ
+			 *      from the original. (e.g.: simple arguments like `add(10,20)') */
 			if (!argcache_genexpand(arg_iter, arg_iter->ac_begin, arg_iter->ac_end))
 				goto err_argcache;
 			expanded_text_size += (iter->ai_ins_exp * arg_iter->ac_expand_size);
 		}
-		if (iter->ai_ins) {
+		if (iter->ai_ins)
 			expanded_text_size += (iter->ai_ins * (size_t)(arg_iter->ac_end - arg_iter->ac_begin));
+		if (iter->ai_ins_str) {
+			size_t expanded_string_size;
+			/* Figure out and cache how long the stringy-fied version of this is. */
+			expanded_string_size = 2 + TPP_SizeofEscape(arg_iter->ac_begin,
+			                                            (size_t)(arg_iter->ac_end - arg_iter->ac_begin));
+			expanded_text_size += (iter->ai_ins_str * expanded_string_size);
 		}
 	}
 	/* Adjust for __VA_COMMA__ and __VA_NARGS__. */
