@@ -10068,15 +10068,20 @@ create_int_file:
 				pragma_error = 1;
 			while (token.t_file != CURRENT.l_eof_file)
 				TPPLexer_PopFile();
-			if (!tok && *token.t_begin == ')')
+			if (!tok && *token.t_begin == ')') {
 				tok = ')';
+				if (token.t_file->f_pos == token.t_begin)
+					tok = TPPLexer_YieldRaw();
+			}
 			if (pragma_error) {
 				int recursion = 1;
 				while (tok > 0) {
-					/* */ if (tok == '(')
+					if (tok == '(') {
 						++recursion;
-					else if (tok == ')' && !--recursion)
-						break;
+					} else if (tok == ')') {
+						if (!--recursion)
+							break;
+					}
 					TPPLexer_Yield();
 				}
 #if 1
