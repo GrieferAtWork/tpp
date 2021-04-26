@@ -10772,6 +10772,7 @@ argcache_genexpand(struct argcache_t *__restrict self,
 	char *buf_begin, *buf_end, *buf_pos;
 	char *tok_begin, *tok_end, *new_buf;
 	size_t reqsize, sizeavail, newsize;
+	size_t old_ifdef_size;
 	file = token.t_file;
 	assert(file);
 	assert(file->f_text);
@@ -10789,6 +10790,7 @@ argcache_genexpand(struct argcache_t *__restrict self,
 	/* Parse tokens until EOF is reached, appending the begin..end
 	 * string regions of each to the expansion buffer.
 	 * NOTE: We use yield to allow for recursion, as well as expansion of macros. */
+	old_ifdef_size = CURRENT.l_ifdef.is_slotc;
 	while (TPPLexer_Yield() > 0) {
 		if unlikely(tok < 0)
 			goto err_buffer;
@@ -10816,6 +10818,17 @@ argcache_genexpand(struct argcache_t *__restrict self,
 		buf_pos += reqsize;
 		assert(buf_pos <= buf_end);
 	}
+
+	/* Make sure that all started #if-blocks are closed before the argument ends! */
+	if unlikely(CURRENT.l_ifdef.is_slotc != old_ifdef_size) {
+		while (CURRENT.l_ifdef.is_slotc > old_ifdef_size) {
+			struct TPPIfdefStackSlot *slot;
+			slot = &CURRENT.l_ifdef.is_slotv[CURRENT.l_ifdef.is_slotc - 1];
+			(void)WARN(W_IF_WITHOUT_ENDIF, slot);
+			--CURRENT.l_ifdef.is_slotc;
+		}
+	}
+
 	/* NOTE: Not ZERO-terminated! */
 	self->ac_expand_size = (size_t)(buf_pos - buf_begin);
 	if (buf_pos != buf_end) {
@@ -11497,7 +11510,7 @@ at_next_non_whitespace:
 		size_t va_size        = 0;
 		uintptr_t text_offset;
 
-		TPPLexer_YieldPP();
+		TPPLexer_YieldRaw();
 		/* NOTE: In order to reduce special cases below, we simply parse
 		 *       one argument for no-args functions, then later check
 		 *       to make sure that that argument is empty (except for whitespace) */
@@ -11506,7 +11519,7 @@ at_next_non_whitespace:
 		/* Allocate a local buffer used to track argument offsets. */
 		if (macro->f_macro.m_function.f_argbuf) {
 			/* Take the preallocated lazy buffer. */
-			argv                               = (struct argcache_t *)macro->f_macro.m_function.f_argbuf;
+			argv = (struct argcache_t *)macro->f_macro.m_function.f_argbuf;
 			macro->f_macro.m_function.f_argbuf = NULL;
 		} else {
 #if TPP_CONFIG_DEBUG
@@ -11762,7 +11775,7 @@ err_argv:
 					goto done_args;
 				break;
 			}
-			TPPLexer_YieldPP(); /* YieldPP: Allow preprocessor directives in macro arguments. */
+			TPPLexer_YieldRaw();
 		}
 done_args:
 		if (va_size < effective_argc)
