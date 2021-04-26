@@ -12552,18 +12552,19 @@ done_zero:
 }
 
 
-PUBLIC int TPPCALL TPP_PrintToken(printer_t printer, void *closure) {
+PUBLIC ptrdiff_t TPPCALL TPP_PrintToken(printer_t printer, void *closure) {
 	char *flush_start, *iter, *end, arg[1], temp;
-	int error = 0;
+	ptrdiff_t status, result = 0;
 #define print(s, l)                                   \
 	do {                                              \
-		if ((error = (*printer)(s, l, closure)) != 0) \
-			goto done;                                \
+		if ((status = (*printer)(closure, s, l)) < 0) \
+			goto err;                                 \
+		result += status;                             \
 	} while (FALSE)
-#define return_print(s, l)                 \
-	do {                                   \
-		error = (*printer)(s, l, closure); \
-		goto done;                         \
+#define return_print(s, l)                  \
+	do {                                    \
+		result = (*printer)(closure, s, l); \
+		goto done;                          \
 	} while (FALSE)
 	assert(TPPLexer_Current);
 	assert(printer);
@@ -12617,16 +12618,17 @@ PUBLIC int TPPCALL TPP_PrintToken(printer_t printer, void *closure) {
 next:
 		++iter;
 	}
-	if (iter != flush_start) {
-		error = (*printer)(flush_start, (size_t)(iter - flush_start), closure);
-	}
+	if (iter != flush_start)
+		print(flush_start, (size_t)(iter - flush_start));
 done:
-	return error;
+	return result;
+err:
+	return status;
 #undef return_print
 #undef print
 }
 
-PUBLIC int TPPCALL TPP_PrintComment(printer_t printer, void *closure) {
+PUBLIC ptrdiff_t TPPCALL TPP_PrintComment(printer_t printer, void *closure) {
 	(void)printer, (void)closure;
 	return 0; /* TODO */
 }

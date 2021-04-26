@@ -90,7 +90,8 @@ static TPP(stream_t) stdout_handle;
  *      (You can probably turn that off, but I'm not even gonna bother) */
 #define out_write(p, s) write(stdout_handle, p, s)
 
-static int out_printer(char const *buf, size_t bufsize, void *closure) {
+static ptrdiff_t
+out_printer(void *closure, char const *buf, size_t bufsize) {
 	(void)closure;
 	out_write(buf, bufsize * sizeof(char));
 	return 0;
