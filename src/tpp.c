@@ -9358,7 +9358,13 @@ again:
 			if (!macro->f_macro.m_function.f_expansions ||
 			    macro->f_macro.m_flags & TPP_MACROFILE_FLAG_FUNC_SELFEXPAND) {
 				/* Function-style macro. */
-				switch (TPPLexer_ExpandFunctionMacro(macro)) {
+				int status;
+				/* Keep a reference to the macro, in case it gets #undef'd
+				 * while we're expanding the arguments to-be passed to it. */
+				TPPFile_Incref(macro);
+				status = TPPLexer_ExpandFunctionMacro(macro);
+				TPPFile_Decref(macro);
+				switch (status) {
 				case 2: goto end;   /* Macro was not expanded. */
 				case 1: goto again; /* Macro was expanded. */
 				default: return TOK_ERR;
