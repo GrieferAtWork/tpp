@@ -7246,7 +7246,11 @@ TPPLexer_OpenFile(int mode, char *__restrict filename, size_t filename_size,
 			filename = mfilename;
 		}
 		fix_filename(filename, &filename_size);
+	} else {
+		/* Even without normalization, must ensure NUL-terminated filenames! */
+		filename[filename_size] = '\0';
 	}
+
 #ifdef HAVE_CALLBACK_UNKNOWN_FILE
 retry:
 #endif /* HAVE_CALLBACK_UNKNOWN_FILE */
