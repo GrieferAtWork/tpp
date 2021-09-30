@@ -7907,10 +7907,6 @@ eof:
 		}
 		goto settok;
 
-	case '…': /* Why not? */
-		ch = TOK_DOTS;
-		goto settok;
-
 	case '+':
 		if (*forward == '=') {
 			ch = TOK_ADD_EQUAL;
