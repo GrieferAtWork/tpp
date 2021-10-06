@@ -6853,6 +6853,9 @@ do_fix_filename(char *filename, size_t *pfilename_size) {
 					filename = slash; /* Trim at start-of-file. */
 					if (slash != text_end)
 						++filename;
+					/* For the purpose of removing "foo/.." sequences,
+					 * also move up the base-address used by that logic. */
+					base = filename;
 				} else if (slash == text_end) {
 					text_iter[-1] = '\0';
 				} else {
