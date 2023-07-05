@@ -8505,7 +8505,9 @@ do_keyword:
 			for (;;) {
 				iter = tpp_skip_wraplf_z(iter/*, file->f_end*/);
 continue_int:
-				if (!tpp_isalnum(*iter)) {
+				if (!tpp_isalnum(*iter) ||
+				    ((*iter == 'p' || *iter == 'P')) ||
+				    ((*iter == 'e' || *iter == 'E') && token.t_id == TOK_FLOAT)) {
 					switch (*iter) {
 
 					case '.':
@@ -8515,6 +8517,10 @@ continue_int:
 						token.t_id = TOK_FLOAT;
 						break;
 
+					case 'p':
+					case 'P':
+						token.t_id = TOK_FLOAT;
+						ATTR_FALLTHROUGH
 					case 'e':
 					case 'E':
 						/* Exponent suffix for floating-point.
@@ -12677,7 +12683,7 @@ PUBLIC int TPPCALL TPP_Atof(TPP(tfloat_t) * __restrict pfloat) {
 			break;
 
 		case 'e':
-			if (numsys < (10 + 'e' - 'a'))
+			if (numsys < 15)
 				goto flt_ext;
 			ATTR_FALLTHROUGH
 		case 'a':
@@ -12688,7 +12694,7 @@ PUBLIC int TPPCALL TPP_Atof(TPP(tfloat_t) * __restrict pfloat) {
 			break;
 
 		case 'E':
-			if (numsys < (10 + 'E' - 'A'))
+			if (numsys < 15)
 				goto flt_ext;
 			ATTR_FALLTHROUGH
 		case 'A':
@@ -12808,7 +12814,7 @@ dbl:
 				ch = *iter++;
 				goto sfx;
 			}
-
+			ATTR_FALLTHROUGH
 		default:
 			goto err_invalid_suffix; /* Invalid suffix */
 		}
