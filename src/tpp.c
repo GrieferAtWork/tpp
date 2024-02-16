@@ -215,13 +215,9 @@
 #endif /* !TPP_BYTEORDER */
 
 
-#undef TPP_CONFIG_WIN32
-#if defined(__CYGWIN__) || defined(__CYGWIN32__) || defined(__WINDOWS__) || \
-    defined(_WIN16) || defined(WIN16) || defined(_WIN32) || defined(WIN32) || \
-    defined(_WIN64) || defined(WIN64) || defined(__WIN32__) || defined(__TOS_WIN__) || \
-    defined(_WIN32_WCE) || defined(WIN32_WCE)
+#ifndef SEP
+#ifdef _WIN32
 /* An alternate path-separator that is replaced with `SEP' during sanitization. */
-#define TPP_CONFIG_WIN32
 #define HAVE_INSENSITIVE_PATHS
 #define SEP       '/'  /* The path-separator used in sanitized pathnames. */
 #define ALTSEP    '\\'
@@ -230,12 +226,7 @@
 #define SEP       '/'  /* The path-separator used in sanitized pathnames. */
 #define ISABS(x) ((x)[0] == '/')
 #endif /* !Windows... */
-
-#ifdef TPP_CONFIG_WIN32
-#ifndef NO_INCLUDE_WINDOWS_H
-#include <Windows.h>
-#endif /* !NO_INCLUDE_WINDOWS_H */
-#endif /* TPP_CONFIG_WIN32 */
+#endif /* !SEP */
 
 #ifdef _MSC_VER
 #pragma warning(pop)
@@ -2670,7 +2661,7 @@ TPPFile_Open(char const *__restrict filename) {
 	stream = TPP_USERSTREAM_FOPEN(filename);
 	if (stream == TPP_STREAM_INVALID)
 		return NULL;
-#elif defined(TPP_CONFIG_WIN32)
+#elif defined(_WIN32)
 	DBG_ALIGNMENT_DISABLE();
 	stream = CreateFileA(filename, GENERIC_READ,
 	                     FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
@@ -3045,11 +3036,11 @@ TPPFile_NextChunk(struct TPPFile *__restrict self, unsigned int flags) {
 	size_t end_offset, prefix_size;
 #ifdef TPP_CONFIG_USERSTREAMS
 	size_t read_bufsize;
-#elif defined(TPP_CONFIG_WIN32)
+#elif defined(_WIN32)
 	DWORD read_bufsize;
 #else /* ... */
 	ssize_t read_bufsize;
-#endif /* !TPP_CONFIG_WIN32 */
+#endif /* !... */
 #define DBG_INFO                                                         \
 	("self->f_begin                                             = %p\n"  \
 	 "self->f_pos                                               = %p\n"  \
@@ -3175,7 +3166,7 @@ TPPFile_NextChunk(struct TPPFile *__restrict self, unsigned int flags) {
 			                                    newchunk->s_text + prefix_size,
 			                                    STREAM_BUFSIZE);
 		}
-#elif defined(TPP_CONFIG_WIN32)
+#elif defined(_WIN32)
 		DBG_ALIGNMENT_DISABLE();
 #ifdef TPP_CONFIG_NONBLOCKING_IO
 		if ((self->f_textfile.f_flags & TPP_TEXTFILE_FLAG_NONBLOCK) &&
@@ -14127,7 +14118,7 @@ TPPLexer_ClearInclude(void) {
 
 PRIVATE uint_least64_t TPPCALL
 get_last_modified_time(struct TPPFile *__restrict fp) {
-#ifdef TPP_CONFIG_WIN32
+#ifdef _WIN32
 	HANDLE hFile;
 	FILETIME ftLastModified;
 	DBG_ALIGNMENT_DISABLE();
@@ -15193,7 +15184,7 @@ PUBLIC int TPPCALL TPPLexer_UnsetErr(void) {
 
 #if defined(TPP_WARNF)
 #define WARNF TPP_WARNF
-#elif TPP_CONFIG_DEBUG && defined(TPP_CONFIG_WIN32)
+#elif TPP_CONFIG_DEBUG && defined(_WIN32)
 PRIVATE void TPPVCALL tpp_warnf(char const *fmt, ...) {
 	char buffer[1024];
 	va_list args;
