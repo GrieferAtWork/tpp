@@ -8,6 +8,7 @@ TPP is designed to be used in 1 of 2 ways:
 
 - As a back-end for writing C and C-like compilers with all of the work needed for dealing with macros, directives, warnings, and preprocessor-related pragmas already taken care of.  
   For this purpose, TPP is meant to be included statically as part of another project's source tree.
+  - For a sample on how this can be done, look in `/samples`
 
 - As a standalone Preprocessor (similar to GNU's `cpp` utility).  
   For this purpose, you may build `src/frontend.c` to produce the commandline utility
