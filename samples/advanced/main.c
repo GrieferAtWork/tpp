@@ -49,10 +49,30 @@ int main() {
 	/* Process input one token at a time.
 	 * Hint: emission of certain tokens depends on `TPPLEXER_FLAG_WANT*' and `TPPLEXER_TOKEN_*' */
 	while (TPPLexer_Yield() > 0) {
-		int id        = TPPLexer_Current->l_token.t_id;
-		char *tokstr  = TPPLexer_Current->l_token.t_begin;
+		int id = TPPLexer_Current->l_token.t_id;
+		char *tokstr = TPPLexer_Current->l_token.t_begin;
 		size_t toklen = (size_t)(TPPLexer_Current->l_token.t_end - tokstr);
-		printf("token: %d: '%.*s'\n", id, (int)toklen, tokstr);
+		struct TPPLCInfo lc;
+		struct TPPFile *f = TPPLexer_Textfile();
+		struct TPPFile *current = TPPLexer_GetFile();
+		char *f_ptr = current == f ? tokstr : f->f_pos;
+		TPPFile_LCAt(f, &lc, f_ptr);
+		printf("%s:%d:%d: %d: '%.*s'", TPPFile_Filename(f, NULL),
+		       (int)lc.lc_line + 1, (int)lc.lc_col + 1,
+		       id, (int)toklen, tokstr);
+		if (current != f) {
+			struct TPPFile *mac = current;
+			while (mac != f && mac->f_kind != TPPFILE_KIND_MACRO)
+				mac = mac->f_prev;
+			if (mac != f) {
+				struct TPPLCInfo mac_lc;
+				TPPFile_LCAt(mac, &mac_lc, current == mac ? tokstr : mac->f_pos);
+				printf(" [in macro '%.*s' at %s:%d:%d]",
+				       (int)mac->f_namesize, mac->f_name, TPPFile_Filename(mac, NULL),
+				       (int)mac_lc.lc_line + 1, (int)mac_lc.lc_col + 1);
+			}
+		}
+		putchar('\n');
 	}
 
 	/* Check if something went wrong (stuff like `#error' directives, or syntax errors) */
