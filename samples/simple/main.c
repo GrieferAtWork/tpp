@@ -44,7 +44,7 @@ int main() {
 	                                         NULL);
 	if (!file)
 		ERROR_HANDLING;
-	TPPLexer_PushFileInherited(file);
+	TPPLexer_PushFile(file);
 
 	/* Process input one token at a time.
 	 * Hint: emission of certain tokens depends on `TPPLEXER_FLAG_WANT*' and `TPPLEXER_TOKEN_*' */
