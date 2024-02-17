@@ -61,7 +61,7 @@ TEST_EXPANDS(HACK_COUNTER, "3")
 TEST_EXPANDS(HACK_COUNTER_VALUE, "4")
 
 /* When `HACK_COUNTER' isn't actually expanded, then the tpp_exec
- * code must't get executed (since it's skipped in its entirety).
+ * code mustn't get executed (since it's skipped in its entirety).
  * Assert this fact! */
 #define HIDE(x)
 HIDE(HACK_COUNTER)

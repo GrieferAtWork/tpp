@@ -21,19 +21,19 @@
 
 // Macro calling conventions
 
-#define angel<x>   +x-
+#define angle<x>   +x-
 #define brace{x}   +x-
 #define bracket[x] +x-
 #define paren(x)   +x- // Original (Unchanged)
 
-TEST_EXPANDS(angel<<>>, "+<>-")
-//angel<<<>>   // ERROR: EOF in macro argument list
-TEST_EXPANDS(angel<{<}>, "+{<}-")
-TEST_EXPANDS(angel<[<]>, "+[<]-")
-TEST_EXPANDS(angel<(<)>, "+(<)-")
-TEST_EXPANDS(angel<{>}>, "+{>}-")
-TEST_EXPANDS(angel<[>]>, "+[>]-")
-TEST_EXPANDS(angel<(>)>, "+(>)-")
+TEST_EXPANDS(angle<<>>, "+<>-")
+//angle<<<>>   // ERROR: EOF in macro argument list
+TEST_EXPANDS(angle<{<}>, "+{<}-")
+TEST_EXPANDS(angle<[<]>, "+[<]-")
+TEST_EXPANDS(angle<(<)>, "+(<)-")
+TEST_EXPANDS(angle<{>}>, "+{>}-")
+TEST_EXPANDS(angle<[>]>, "+[>]-")
+TEST_EXPANDS(angle<(>)>, "+(>)-")
 //brace{<{>}   // ERROR: EOF in macro argument list
 //brace{{{}}   // ERROR: EOF in macro argument list
 TEST_EXPANDS(brace{[{]}, "+[{]-")

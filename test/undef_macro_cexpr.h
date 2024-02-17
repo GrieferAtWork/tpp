@@ -29,9 +29,9 @@ PRAGMA_WARNING_PUSH_SUPPRESS("undef")
 #endif
 PRAGMA_WARNING_POP_SUPPRESS("undef")
 
-#if defined(FOOBAR2) && never // Should't result in a warning
+#if defined(FOOBAR2) && never // Shouldn't result in a warning
 #endif
-#if 0 && ladidadida // Should't result in a warning
+#if 0 && ladidadida // Shouldn't result in a warning
 #endif
 
 
