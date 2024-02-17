@@ -22,29 +22,29 @@ Its-a-builtin!
 /*Expected output (token IDs may differ):
 
 It's working!
-token: 816: 'printf'
-token: 40: '('
-token: 34: '"x = %d"'
-token: 44: ','
-token: 48: '10'
-token: 43: '+'
-token: 48: '42'
-token: 43: '+'
-token: 48: '10'
-token: 43: '+'
-token: 48: '42'
-token: 258: '=='
-token: 48: '104'
-token: 41: ')'
-token: 59: ';'
-token: 817: 'IS'
-token: 818: 'PREDEFINED'
-token: 819: 'awesome'
-token: 820: 'Its'
-token: 45: '-'
-token: 814: 'a'
-token: 45: '-'
-token: 821: 'builtin'
-token: 33: '!'
+input.c:6:1: 814: 'printf'
+input.c:6:7: 40: '('
+input.c:6:8: 34: '"x = %d"'
+input.c:6:16: 44: ','
+input.c:6:35: 48: '10' [in macro 'foo' at input.c:4:19]
+input.c:6:35: 43: '+' [in macro 'foo' at input.c:4:20]
+input.c:6:35: 48: '42' [in macro 'foo' at input.c:4:21]
+input.c:6:35: 43: '+' [in macro 'foo' at input.c:4:22]
+input.c:6:35: 48: '10' [in macro 'foo' at input.c:4:23]
+input.c:6:35: 43: '+' [in macro 'foo' at input.c:4:24]
+input.c:6:35: 48: '42' [in macro 'foo' at input.c:4:25]
+input.c:6:36: 258: '=='
+input.c:6:68: 48: '104'
+input.c:6:68: 41: ')'
+input.c:6:69: 59: ';'
+input.c:8:1: 815: 'IS'
+input.c:8:4: 816: 'PREDEFINED'
+input.c:11:1: 817: 'awesome'
+input.c:15:1: 818: 'Its'
+input.c:15:4: 45: '-'
+input.c:15:5: 812: 'a'
+input.c:15:6: 45: '-'
+input.c:15:7: 819: 'builtin'
+input.c:15:14: 33: '!'
 
 */

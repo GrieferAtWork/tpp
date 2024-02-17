@@ -760,7 +760,7 @@ TPPFile_NewExplicitInherited(/*ref*/struct TPPString *__restrict inherited_text)
  * NOTE: The caller is responsible for only passing a value
  *       for `text_pointer', that is conforming to:
  *       `self->f_begin <= text_pointer <= self->f_end'
- *      (Yes: `self->f_end' is still valid, although
+ *       (Yes: `self->f_end' is still valid, although
  *       technically already out-of-bounds, but an exception
  *       is made to allow for safe calls to this function, even
  *       when `text_pointer' was retrieved from an EOF token) */
@@ -824,7 +824,7 @@ TPPFUN /*ref*/struct TPPFile *TPPCALL
 TPPFile_CopyForInclude(struct TPPFile *__restrict self);
 
 
-/* Opens a file and caches the first block of data.
+/* Opens a file.
  * NOTE: The given filename is what will appear as text when expanding __FILE__
  * @return: NULL: Failed to open the given file (`errno' was set to ENOENT)
  * @return: NULL: Not enough available memory (TPP_CONFIG_SET_API_ERROR) */
@@ -1798,7 +1798,7 @@ TPPLexer_OpenFile(int mode, char *__restrict filename, size_t filename_size,
 #ifndef TPP_CONFIG_NO_CALLBACK_UNKNOWN_FILE
 #define TPPLEXER_OPENFILE_FLAG_NOCALLBACK 0x10 /* FLAG: Don't invoke the unknown-file callback when set. */
 #endif /* !TPP_CONFIG_NO_CALLBACK_UNKNOWN_FILE */
-#define TPPLEXER_OPENFILE_FLAG_CONSTNAME  0x20 /* FLAG: The given `filename' may not be modified. */
+#define TPPLEXER_OPENFILE_FLAG_CONSTNAME  0x20 /* FLAG: The given `filename' may not be modified, but is guarantied to be '\0'-terminated. */
 
 /* Push a given file into the #include-stack of the current lexer.
  * NOTE: These functions never fail and return void.

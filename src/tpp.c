@@ -2294,7 +2294,6 @@ TPPFile_OpenStream(stream_t stream, char const *__restrict name) {
 	result->f_begin =
 	result->f_end =
 	result->f_pos = TPPString_TEXT(empty_string);
-	/* Read the first chunk. */
 	return result;
 err_r:
 	free(result);
@@ -4248,6 +4247,7 @@ lookup_escaped_keyword(char const *__restrict name, size_t namelen,
 
 #define func self->f_macro.m_function
 
+#ifndef NO_EXTENSION_TRADITIONAL_MACRO
 /* Performs traditional parsing of a function-style macro.
  * @return: * :   Text-pointer to the end of the function block.
  * @return: NULL: An error occurred and a lexer error was set. */
@@ -4442,6 +4442,7 @@ err:
 	codewriter_quit(&writer);
 	goto done;
 }
+#endif /* !NO_EXTENSION_TRADITIONAL_MACRO */
 
 PRIVATE int TPPCALL
 macro_function_scan_block(struct TPPFile *__restrict self) {
@@ -5032,6 +5033,7 @@ skip_argument_name:
 		result->f_macro.m_function.f_expansions = 0;
 		/* Scan the entirety of the macro's text block.
 		 * NOTE: If requested to, use traditional scanning. */
+#ifndef NO_EXTENSION_TRADITIONAL_MACRO
 		if (HAVE_EXTENSION_TRADITIONAL_MACRO) {
 			char *macro_end;
 			result->f_end = curfile->f_end;
@@ -5043,7 +5045,9 @@ skip_argument_name:
 			token.t_file->f_pos = macro_end;
 			/* Yield the next token after the macro. */
 			TPPLexer_YieldRaw();
-		} else {
+		} else
+#endif /* !NO_EXTENSION_TRADITIONAL_MACRO */
+		{
 			if unlikely(!macro_function_scan_block(result))
 				goto err_arginfo;
 			assert(curfile == token.t_file);
@@ -7312,7 +7316,9 @@ TPPLexer_OpenFile(int mode, char *__restrict filename, size_t filename_size,
 	int checked_empty_path = 0;
 	size_t buffersize      = 0, newbuffersize;
 	assert(mode != (TPPLEXER_OPENFILE_MODE_NORMAL | TPPLEXER_OPENFILE_FLAG_NEXT));
+
 	/* Fix broken/distorted filenames to prevent ambiguity. */
+#ifndef NO_EXTENSION_CANONICAL_HEADERS
 	if (HAVE_EXTENSION_CANONICAL_HEADERS) {
 		if (mode & TPPLEXER_OPENFILE_FLAG_CONSTNAME) {
 			/* Create a copy that will be modified below. */
@@ -7323,9 +7329,12 @@ TPPLexer_OpenFile(int mode, char *__restrict filename, size_t filename_size,
 			filename = mfilename;
 		}
 		fix_filename(filename, &filename_size);
-	} else {
+	} else
+#endif /* !NO_EXTENSION_CANONICAL_HEADERS */
+	{
 		/* Even without normalization, must ensure NUL-terminated filenames! */
-		filename[filename_size] = '\0';
+		if (!(mode & TPPLEXER_OPENFILE_FLAG_CONSTNAME))
+			filename[filename_size] = '\0';
 	}
 
 #ifdef HAVE_CALLBACK_UNKNOWN_FILE
@@ -10099,8 +10108,10 @@ create_int_file:
 					if (FALSE) {
 				case KWD___has_feature:
 						mask = TPP_KEYWORDFLAG_HAS_FEATURE;
+#ifndef NO_EXTENSION_EXT_ARE_FEATURES
 						if (HAVE_EXTENSION_EXT_ARE_FEATURES)
 							mask |= TPP_KEYWORDFLAG_HAS_EXTENSION;
+#endif /* !NO_EXTENSION_EXT_ARE_FEATURES */
 					}
 					intval = !!(TPPKeyword_GetFlags(keyword, 1) & mask);
 				}	break;
@@ -12499,6 +12510,7 @@ PUBLIC int TPPCALL TPP_Atoi(tint_t *__restrict pint) {
 		++begin;
 	}
 	if (begin < end) {
+#ifndef NO_EXTENSION_MSVC_FIXED_INT
 		if (HAVE_EXTENSION_MSVC_FIXED_INT &&
 		    (result & TPP_ATOI_TYPE_MASK) == TPP_ATOI_TYPE_INT) {
 			/* MSVC-style fixed-length integer suffix. */
@@ -12533,6 +12545,7 @@ PUBLIC int TPPCALL TPP_Atoi(tint_t *__restrict pint) {
 				}
 			}
 		}
+#endif /* !NO_EXTENSION_MSVC_FIXED_INT */
 wrong_suffix:
 		if (begin < end) {
 #if 1
@@ -13266,8 +13279,8 @@ rparen_after_expression:
 		}
 		break;
 
-#if !defined(NO_EXTENSION_ASSERTIONS) || \
-    !defined(NO_EXTENSION_STRINGOPS)
+#if (!defined(NO_EXTENSION_ASSERTIONS) || \
+     !defined(NO_EXTENSION_STRINGOPS))
 	case '#':
 		/* Determine the length of a string. */
 		if (!HAVE_EXTENSION_STRINGOPS &&
@@ -13376,7 +13389,7 @@ res_zero:
 		}
 	}	break;
 
-#if (!defined(TPP_CONFIG_EXTENSION_IFELSE_IN_EXPR) || TPP_CONFIG_EXTENSION_IFELSE_IN_EXPR)
+#ifndef NO_EXTENSION_IFELSE_IN_EXPR
 	case KWD_if: { /* Statement-style if expressions. */
 		int is_true;
 #ifndef TPP_CONFIG_EXTENSION_IFELSE_IN_EXPR
@@ -13439,7 +13452,7 @@ res_zero:
 			TPPConst_ZERO(result);
 		}
 	}	break;
-#endif /* TPP_CONFIG_EXTENSION_IFELSE_IN_EXPR */
+#endif /* !NO_EXTENSION_IFELSE_IN_EXPR */
 
 #if TPP_CONFIG_GCCFUNC
 	case KWD___builtin_constant_p: {
