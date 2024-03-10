@@ -12614,9 +12614,9 @@ err:
 }
 
 PUBLIC int TPPCALL TPP_Atof(TPP(tfloat_t) * __restrict pfloat) {
-	tfloat_t fltval = 0;
+	tfloat_t float_extension_mult, fltval = 0;
 	char *iter, *end, ch;
-	int numsys, more, float_extension_mult;
+	int numsys, more;
 	int result = TPP_ATOF_OK;
 	assert(pfloat);
 	assert(TPPLexer_Current);
@@ -12774,9 +12774,9 @@ flt_ext:
 		ch   = *iter++;
 		iter = tpp_skip_wraplf(iter, end);
 	}
-	float_extension_mult = 1;
+	float_extension_mult = 1.0;
 	while (float_extension_off != 0) {
-		float_extension_mult *= 10;
+		float_extension_mult *= 10.0;
 		--float_extension_off;
 	}
 	if (float_extension_pos) {
