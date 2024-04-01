@@ -443,9 +443,9 @@
 #define __SIZEOF_POINTER__ 2
 #else
 #include <hybrid/typecore.h>
-#ifndef __SIZEOF_POINTER__
+#if !defined(__SIZEOF_POINTER__) && !defined(__DEEMON__)
 #error FIXME
-#endif /* !__SIZEOF_POINTER__ */
+#endif /* !__SIZEOF_POINTER__ && !__DEEMON__ */
 #endif
 #endif /* !__SIZEOF_POINTER__ */
 
@@ -1016,6 +1016,7 @@ enum {
 	TPP(TOK_RANGLE3_EQUAL), /* ">>>=". */
 	TPP(TOK_EQUAL3),        /* "===". */
 	TPP(TOK_NOT_EQUAL3),    /* "!==". */
+	TPP(TOK_QMARK_QMARK),   /* "??". */
 	TPP(TOK_KEYWORD_BEGIN), /* KEEP THIS THE LAST TOKEN! */
 
 	TPP(TOK_TWOCHAR_END) = TPP(TOK_KEYWORD_BEGIN),
@@ -1625,6 +1626,7 @@ TPPFUN void TPPCALL TPPLexer_LoadPosition(struct TPPLexerPosition *__restrict se
 #define TPPLEXER_TOKEN_EQUALBINOP            0x00008000 /* Enable recognition of `=+', `=-', `=*', `=/', `=%', `=&', `=|', `=^', `=<<', `=>>', `=>>>', `=<<<', `=@' and `=**' tokens (NOTE: These are all aliasing the regular inplace versions).
                                                          * NOTE: Special token such as `=@' or `=<<<' are only available when other token extensions are enabled as well! */
 #define TPPLEXER_TOKEN_EQUAL3                0x00010000 /* Enable recognition of `===' and `!==' tokens. */
+#define TPPLEXER_TOKEN_QMARK_QMARK           0x00020000 /* Enable recognition of `??' tokens. */
 #define TPPLEXER_TOKEN_DOLLAR                0x80000000 /* Recognize `$' as its own token (Supersedes `EXT_DOLLAR_IS_ALPHA'). */
 #define TPPLEXER_TOKEN_DEFAULT               0x0fffffff /* Default set of extension tokens (enable all). */
 
@@ -1651,7 +1653,7 @@ TPPFUN void TPPCALL TPPLexer_LoadPosition(struct TPPLexerPosition *__restrict se
 	(TPPLEXER_TOKEN_COLONCOLON | TPPLEXER_TOKEN_COLONASSIGN | \
 	 TPPLEXER_TOKEN_STARSTAR | TPPLEXER_TOKEN_ARROW |         \
 	 TPPLEXER_TOKEN_C_COMMENT | TPPLEXER_TOKEN_CPP_COMMENT |  \
-	 TPPLEXER_TOKEN_EQUAL3)
+	 TPPLEXER_TOKEN_EQUAL3 | TPPLEXER_TOKEN_QMARK_QMARK)
 
 
 struct TPPLexer {

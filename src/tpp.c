@@ -509,6 +509,7 @@ tpp_assertion_failed(char const *expr, char const *file, int line,
 
 PRIVATE uint8_t const chrattr[256] = {
 /*[[[deemon
+#include <file> // So deemon200 enables backwards compat
 for (local i = 0; i < 256; ++i) {
 	if ((i % 16) == 0)
 		print "\t",;
@@ -524,7 +525,7 @@ for (local i = 0; i < 256; ++i) {
 	if (i in ['=','(','/',')','\'','<','!','>','-','?'])
 		flags |= CH_ISTRIGRAPH;
 	if (i in ['<','>','=','!','.','+','-','*','/','%',
-	          '&','|','^','#','~',':','@',])
+	          '&','|','^','#','~',':','@','?'])
 		flags |= CH_ISMULTICHAR;
 	if (i in ['\r','\n'])
 		flags |= CH_ISLF;
@@ -544,7 +545,7 @@ for (local i = 0; i < 256; ++i) {
 	0x80,0x04,0x04,0x04,0x04,0x04,0x04,0x04,0x04,0x04,0x44,0x04,0x04,0x44,0x04,0x04,
 	0x04,0x04,0x04,0x04,0x04,0x04,0x04,0x04,0x04,0x04,0x04,0x04,0x04,0x04,0x04,0x04,
 	0x04,0x30,0x00,0x20,0x01,0x20,0x20,0x10,0x10,0x10,0x20,0x20,0x00,0x30,0x20,0x30,
-	0x02,0x02,0x02,0x02,0x02,0x02,0x02,0x02,0x02,0x02,0x20,0x00,0x30,0x30,0x30,0x10,
+	0x02,0x02,0x02,0x02,0x02,0x02,0x02,0x02,0x02,0x02,0x20,0x00,0x30,0x30,0x30,0x30,
 	0x20,0x01,0x01,0x01,0x01,0x01,0x01,0x01,0x01,0x01,0x01,0x01,0x01,0x01,0x01,0x01,
 	0x01,0x01,0x01,0x01,0x01,0x01,0x01,0x01,0x01,0x01,0x01,0x00,0x00,0x00,0x20,0x01,
 	0x00,0x01,0x01,0x01,0x01,0x01,0x01,0x01,0x01,0x01,0x01,0x01,0x01,0x01,0x01,0x01,
@@ -2106,9 +2107,9 @@ PUBLIC struct TPPFile TPPFile_Empty = {
 	/* f_namehash               */ 2699259396lu,
 #elif __SIZEOF_SIZE_T__ == 8	   
 	/* f_namehash               */ 406800526700036llu,
-#else
-#   error "FIXME"				   
-#endif
+#elif !defined(__DEEMON__)
+#   error "FIXME"
+#endif /* ... */
 	/* f_text                   */ empty_string,
 	/* f_begin                  */ TPPString_TEXT(empty_string),
 	/* f_end                    */ TPPString_TEXT(empty_string),
@@ -7960,24 +7961,29 @@ eof:
 		/* The string/char token ID is the startup character. */
 		goto settok;
 
+
+		/* Multi-char characters (with `forward' initialized) */
+	case '?':
 #ifndef NO_FEATURE_TRIGRAPHS
-	case '?': /* Check for trigraphs. */
+		/* Check for trigraphs. */
 		if (HAVE_FEATURE_TRIGRAPHS && *iter == '?') {
 			char tri_ch = map_trichar(iter[1]);
-			if (!tri_ch)
-				goto settok;
-			ch = tri_ch;
-			if
-				unlikely(!WARN(W_ENCOUNTERED_TRIGRAPH, iter - 1))
-			goto err;
-			iter += 2;
-			if (tpp_ismultichar(ch))
-				goto parse_multichar;
+			if (tri_ch) {
+				ch = tri_ch;
+				if unlikely(!WARN(W_ENCOUNTERED_TRIGRAPH, iter - 1))
+					goto err;
+				iter += 2;
+				if (tpp_ismultichar(ch))
+					goto parse_multichar;
+			}
+		}
+#endif /* !NO_FEATURE_TRIGRAPHS */
+		if (*forward == '?' && (CURRENT.l_extokens & TPPLEXER_TOKEN_QMARK_QMARK)) {
+			ch = TOK_QMARK_QMARK;
+			goto settok_forward1;
 		}
 		goto settok;
-#endif /* !NO_FEATURE_TRIGRAPHS */
 
-	/* Multi-char characters (with `forward' initialized) */
 	case '<':
 	case '>':
 		if (*forward == (char)ch) {
