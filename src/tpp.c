@@ -3334,7 +3334,7 @@ search_suitable_end_again:
 #undef DBG_INFO
 			/* Special case: If we managed to read something, but
 			 * the suitable end didn't increase, just read some more! */
-			if (end_offset == (size_t)(self->f_end - TPPString_TEXT(self->f_text)))
+			if (end_offset >= (size_t)(self->f_end - TPPString_TEXT(self->f_text)))
 				goto extend_more;
 #define MODE_INSTRING 0x01
 #define MODE_INCHAR 0x02
@@ -3464,7 +3464,7 @@ extend_more:
 		flags &= ~TPPFILE_NEXTCHUNK_FLAG_NOBLCK; /* Disable non-blocking I/O */
 #endif /* TPP_CONFIG_NONBLOCKING_IO */
 		assert(TPPString_SIZE(self->f_text));
-		self->f_end                  = TPPString_TEXT(self->f_text) + TPPString_SIZE(self->f_text);
+		self->f_end = TPPString_TEXT(self->f_text) + TPPString_SIZE(self->f_text);
 		self->f_textfile.f_prefixdel = newchunk->s_text[0];
 		assert(!self->f_end || !*self->f_end ||
 		       *self->f_end == self->f_textfile.f_prefixdel);
