@@ -7926,6 +7926,22 @@ eof:
 		/* Scan forward until the end of the string/character. */
 		for (;;) {
 			if (!*iter && iter >= file->f_end) {
+				/* We shouldn't normally get here, unless the user is doing custom string
+				 * parsing. Give then a hand and try to read from data from the text file. */
+				if (!(CURRENT.l_flags & TPPLEXER_FLAG_NO_SEEK_ON_EOB) &&
+				    (CURRENT.l_eob_file != file)) {
+					unsigned int chunk_flags = TPPLEXER_FLAG_EXTENDFILE;
+#ifdef TPP_CONFIG_NONBLOCKING_IO
+#if TPPLEXER_FLAG_NONBLOCKING == TPPFILE_NEXTCHUNK_FLAG_NOBLCK
+					chunk_flags |= CURRENT.l_flags & TPPLEXER_FLAG_NONBLOCKING;
+#else /* TPPLEXER_FLAG_NONBLOCKING == TPPFILE_NEXTCHUNK_FLAG_NOBLCK */
+					if (CURRENT.l_flags & TPPLEXER_FLAG_NONBLOCKING)
+						chunk_flags |= TPPFILE_NEXTCHUNK_FLAG_NOBLCK;
+#endif /* TPPLEXER_FLAG_NONBLOCKING != TPPFILE_NEXTCHUNK_FLAG_NOBLCK */
+#endif /* !TPP_CONFIG_NONBLOCKING_IO */
+					if (TPPFile_NextChunk(file, chunk_flags))
+						goto again;
+				}
 				if unlikely(!WARN(W_STRING_TERMINATED_BY_EOF))
 					goto err;
 				break;
@@ -8414,6 +8430,22 @@ glue_tok:
 				break;
 			}
 			if (!*iter && iter >= file->f_end) {
+				/* We shouldn't normally get here, unless the user is doing custom string
+				 * parsing. Give then a hand and try to read from data from the text file. */
+				if (!(CURRENT.l_flags & TPPLEXER_FLAG_NO_SEEK_ON_EOB) &&
+				    (CURRENT.l_eob_file != file)) {
+					unsigned int chunk_flags = TPPLEXER_FLAG_EXTENDFILE;
+#ifdef TPP_CONFIG_NONBLOCKING_IO
+#if TPPLEXER_FLAG_NONBLOCKING == TPPFILE_NEXTCHUNK_FLAG_NOBLCK
+					chunk_flags |= CURRENT.l_flags & TPPLEXER_FLAG_NONBLOCKING;
+#else /* TPPLEXER_FLAG_NONBLOCKING == TPPFILE_NEXTCHUNK_FLAG_NOBLCK */
+					if (CURRENT.l_flags & TPPLEXER_FLAG_NONBLOCKING)
+						chunk_flags |= TPPFILE_NEXTCHUNK_FLAG_NOBLCK;
+#endif /* TPPLEXER_FLAG_NONBLOCKING != TPPFILE_NEXTCHUNK_FLAG_NOBLCK */
+#endif /* !TPP_CONFIG_NONBLOCKING_IO */
+					if (TPPFile_NextChunk(file, chunk_flags))
+						goto again;
+				}
 				if unlikely(!WARN(W_STRING_TERMINATED_BY_EOF))
 					goto err;
 				break;
