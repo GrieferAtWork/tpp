@@ -1,4 +1,4 @@
-/* Copyright (c) 2017-2023 Griefer@Work                                       *
+/* Copyright (c) 2017-2025 Griefer@Work                                       *
  *                                                                            *
  * This software is provided 'as-is', without any express or implied          *
  * warranty. In no event will the authors be held liable for any damages      *
@@ -12,7 +12,7 @@
  *    claim that you wrote the original software. If you use this software    *
  *    in a product, an acknowledgement (see the following) in the product     *
  *    documentation is required:                                              *
- *    Portions Copyright (c) 2017-2023 Griefer@Work                           *
+ *    Portions Copyright (c) 2017-2025 Griefer@Work                           *
  * 2. Altered source versions must be plainly marked as such, and must not be *
  *    misrepresented as being the original software.                          *
  * 3. This notice may not be removed or altered from any source distribution. *
@@ -3680,31 +3680,53 @@ abort_hex:
 					}
 put_val:
 #if TPP_UNESCAPE_MAXCHAR == 1
-					*(*(uint8_t **)&buf)++ = (uint8_t)val;
+					*(uint8_t *)buf = (uint8_t)val;
+					buf += sizeof(uint8_t);
 #else /* TPP_UNESCAPE_MAXCHAR == 1 */
 					switch (charsize) {
 #if TPP_UNESCAPE_ENDIAN == TPP_BYTEORDER
 #if TPP_UNESCAPE_MAXCHAR >= 8
-					case 8: *(*(uint64_t **)&buf)++ = (uint64_t)val; break;
+					case 8:
+						*(uint64_t *)buf = (uint64_t)val;
+						buf += sizeof(uint64_t);
+						break;
 #endif /* TPP_UNESCAPE_MAXCHAR >= 8 */
 #if TPP_UNESCAPE_MAXCHAR >= 4
-					case 4: *(*(uint32_t **)&buf)++ = (uint32_t)val; break;
+					case 4:
+						*(uint32_t *)buf = (uint32_t)val;
+						buf += sizeof(uint32_t);
+						break;
 #endif /* TPP_UNESCAPE_MAXCHAR >= 4 */
 #if TPP_UNESCAPE_MAXCHAR >= 2
-					case 2: *(*(uint16_t **)&buf)++ = (uint16_t)val; break;
+					case 2:
+						*(uint16_t *)buf = (uint16_t)val;
+						buf += sizeof(uint16_t);
+						break;
 #endif /* TPP_UNESCAPE_MAXCHAR >= 2 */
 #else /* TPP_UNESCAPE_ENDIAN == TPP_BYTEORDER */
 #if TPP_UNESCAPE_MAXCHAR >= 8
-					case 8: *(*(uint64_t **)&buf)++ = bswap_64((uint64_t)val); break;
+					case 8:
+						*(uint64_t *)buf = bswap_64((uint64_t)val);
+						buf += sizeof(uint64_t);
+						break;
 #endif /* TPP_UNESCAPE_MAXCHAR >= 8 */
 #if TPP_UNESCAPE_MAXCHAR >= 4
-					case 4: *(*(uint32_t **)&buf)++ = bswap_32((uint32_t)val); break;
+					case 4:
+						*(uint32_t *)buf = bswap_32((uint32_t)val);
+						buf += sizeof(uint32_t);
+						break;
 #endif /* TPP_UNESCAPE_MAXCHAR >= 4 */
 #if TPP_UNESCAPE_MAXCHAR >= 2
-					case 2: *(*(uint16_t **)&buf)++ = bswap_16((uint16_t)val); break;
+					case 2:
+						*(uint16_t *)buf = bswap_16((uint16_t)val);
+						buf += sizeof(uint16_t);
+						break;
 #endif /* TPP_UNESCAPE_MAXCHAR >= 2 */
 #endif /* TPP_UNESCAPE_ENDIAN != TPP_BYTEORDER */
-					default: *(*(uint8_t **)&buf)++ = (uint8_t)val; break;
+					default:
+						*(uint8_t *)buf = (uint8_t)val;
+						buf += sizeof(uint8_t);
+						break;
 					}
 #endif /* TPP_UNESCAPE_MAXCHAR != 1 */
 				} else {
