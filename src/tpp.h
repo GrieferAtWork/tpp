@@ -532,8 +532,11 @@ struct TPPString {
 		value                                           \
 	}
 
+#ifndef TPPString_Free
+#define TPPString_Free(self)   free(self)
+#endif /* !TPPString_Free */
 #define TPPString_Incref(self) (void)(++(self)->s_refcnt)
-#define TPPString_Decref(self) (void)(--(self)->s_refcnt || (free(self),0))
+#define TPPString_Decref(self) (void)(--(self)->s_refcnt || (TPPString_Free(self), 0))
 
 /* Concat two given string and drop ONE(1) references from each.
  * @return: * :   A reference to a string containing the sum of what is given.
