@@ -1,4 +1,16 @@
-# tpp - Tiny PreProcessor
+## This project has been superseded by [TPP3](https://github.com/GrieferAtWork/tpp3)
+
+There will be no further development happening here, other than critical bug fixes. New features and compliance with newer C/C++ standards will not be added here.
+
+To learn how to migrate from TPP2 to TPP3, see [here](https://github.com/GrieferAtWork/tpp3/#migrating-from-tpp2).
+
+<br/>
+<br/>
+<br/>
+<br/>
+<br/>
+
+# tpp2 - Tiny PreProcessor
 
 TPP is a tiny (single source file) C Preprocessor, meant as a low-level backend for compilers of C and C-like languages, whilst implementing pretty much all preprocessor extensions supported by other compilers, ontop of a large number of its own (tpp-specific) extensions.
 
